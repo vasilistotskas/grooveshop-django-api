@@ -49,7 +49,6 @@ from order.tasks import (
     send_invoice_email,
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_payment_failed_email,
     send_refund_confirmation_email,
     send_review_request_emails,
     send_shipping_notification_email,
@@ -339,13 +338,6 @@ class TestCustomerOrderEmails:
             assert send_review_request_emails.run()["sent"] == 1
 
         assert_sent("order_review_request", language)
-
-    def test_payment_failed(self, language):
-        order = build_order(language, payment_status=PaymentStatus.FAILED)
-
-        assert send_payment_failed_email.run(order.id) is True
-
-        assert_sent("payment_failed", language)
 
     def test_refund_confirmation(self, language):
         order = build_order(language, payment_status=PaymentStatus.COMPLETED)

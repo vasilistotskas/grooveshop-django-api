@@ -1,8 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from djangorestframework_camel_case.util import camel_to_underscore
 
 from core.filters.core import TimeStampFilterMixin
+from core.utils.string_case import camel_to_snake
 
 
 class CamelCaseFilterMixin:
@@ -29,7 +29,7 @@ class CamelCaseFilterMixin:
 
             new_data = QueryDict(mutable=True)
             for key in data:
-                snake_key = camel_to_underscore(key)
+                snake_key = camel_to_snake(key)
                 values = data.getlist(key)
                 for value in values:
                     new_data.appendlist(snake_key, value)
@@ -37,7 +37,7 @@ class CamelCaseFilterMixin:
 
         new_data = {}
         for key, value in data.items():
-            snake_key = camel_to_underscore(key)
+            snake_key = camel_to_snake(key)
             new_data[snake_key] = value
         return new_data
 

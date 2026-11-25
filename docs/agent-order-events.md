@@ -30,15 +30,15 @@ rolls back with the change only when the save runs inside a transaction:
 `ATOMIC_REQUESTS` is off and `Order.save` opens none of its own. The call
 sites that change these fields do run inside one:
 
-- order creation: `OrderService._create_order_for_verified_intent` (behind
-  `create_order_from_cart`) and `OrderService.create_order_from_cart_offline`,
-  both `@transaction.atomic`, the attribution row included;
-- status: `OrderService.update_order_status`, `_cancel_order_locked` (behind
+- order creation: `OrderService._create_order_locked` (behind
+  `create_order_from_cart`), `@transaction.atomic`, the attribution row
+  included;
+- status: `OrderLifecycleService.update_order_status`, `_cancel_order_locked` (behind
   `cancel_order`) and `add_tracking_info`, all `@transaction.atomic`;
 - payment: `OrderService.handle_payment_succeeded`, `handle_payment_failed`,
   `confirm_offline_payment` and `settle_cod_payment` (`@transaction.atomic`),
   Stripe's `checkout.session.completed` handler and Viva's
-  `_process_event_in_tenant` (`with transaction.atomic()`);
+  `viva_settlement.apply_event` (`with transaction.atomic()`);
 - the admin's change form (Django wraps it in a transaction).
 
 A save outside any transaction commits the order first and writes the event

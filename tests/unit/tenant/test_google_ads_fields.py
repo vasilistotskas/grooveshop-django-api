@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 
 from tenant.admin import TenantAdmin
 from tenant.models import Tenant
+from tenant.models.tenant_rules import GOOGLE_ADS_LABEL_FIELDS
 from tenant.serializers import TenantAdminSerializer, TenantConfigSerializer
 
 
@@ -54,13 +55,13 @@ class TestConversionId:
 class TestConversionLabels:
     ID = "AW-18429554292"
 
-    @pytest.mark.parametrize("field", Tenant.GOOGLE_ADS_LABEL_FIELDS)
+    @pytest.mark.parametrize("field", GOOGLE_ADS_LABEL_FIELDS)
     def test_a_label_with_the_id_is_valid(self, field: str) -> None:
         _unsaved_tenant(
             google_ads_conversion_id=self.ID, **{field: "7T1qCJOa0vocEPTc8tNE"}
         ).clean()
 
-    @pytest.mark.parametrize("field", Tenant.GOOGLE_ADS_LABEL_FIELDS)
+    @pytest.mark.parametrize("field", GOOGLE_ADS_LABEL_FIELDS)
     def test_a_label_without_the_id_is_refused(self, field: str) -> None:
         # The label is the second half of send_to; alone it can never be
         # sent, and the operator who typed it expects conversions.
@@ -96,10 +97,7 @@ class TestConversionLabels:
 
 class TestAddPaymentInfoLabel:
     def test_is_one_of_the_validated_label_fields(self) -> None:
-        assert (
-            "google_ads_add_payment_info_label"
-            in Tenant.GOOGLE_ADS_LABEL_FIELDS
-        )
+        assert "google_ads_add_payment_info_label" in GOOGLE_ADS_LABEL_FIELDS
 
     def test_defaults_to_empty_in_the_database_too(self) -> None:
         # ``db_default`` keeps the column writable by the previous

@@ -23,14 +23,17 @@ named here, and when a path named here does not exist.
 - **A module becomes a package at about 500 lines.** `services.py` turns
   into `services/` with one module per subject, and every import site
   moves in the same change (no re-export shim). The modules that are far
-  past that today (`src/order/services.py`, `src/shipping_acs/services.py`,
-  `src/tenant/models.py` and others) are being split by the architecture
+  past that today (`src/order/services.py`, `src/shipping_acs/services.py`
+  and others) are being split by the architecture
   programme, epic #558.
 - **Tasks live in `tasks`, receivers in `signals`.** A Celery task is
   defined in the app's `tasks` module (or package), a signal receiver in
   its `signals` module (or package), and the receivers are connected by
   importing that module from the app's `AppConfig.ready()`. A task that
   changes module keeps its registered name (`name="<its old dotted path>"`).
+- **An app's cache surfaces live in its `cache_surfaces` module**, as a
+  `SURFACES` tuple of `CacheSurface`s that
+  `core.cache.surfaces.register_default_surfaces` collects at boot.
 - **Imports between apps are contracts.** `[tool.importlinter]` in
   `pyproject.toml` lists what may import what; run
   `PYTHONPATH=src uv run lint-imports` (it puts only the working directory
@@ -68,20 +71,24 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 
 - the abstract models (`src/core/models.py`) and the custom fields
   (`src/core/fields/`);
-- `BaseModelViewSet` (`src/core/api/views.py`), permissions
-  (`src/core/api/permissions.py`), Knox token authentication
-  (`src/core/api/tokens.py`), throttles (`src/core/api/throttling.py`) and
-  the OpenAPI helpers (`src/core/utils/serializers.py`,
-  `src/core/api/schema.py`);
+- `BaseModelViewSet` (`src/core/api/views.py`), the health and settings
+  endpoints (`src/core/api/health_api.py`, `src/core/api/settings_api.py`),
+  permissions (`src/core/api/permissions.py`), Knox token authentication
+  (`src/core/api/tokens.py`), the throttle bases and the shared throttles
+  (`src/core/api/throttling.py`; an app's own are in its `throttles.py`) and
+  the per-action serializer and OpenAPI config (`src/core/api/action_config.py`)
+  and the OpenAPI helpers (`src/core/api/schema.py`);
 - filters, pagination and managers (`src/core/filters/`,
   `src/core/pagination/`, `src/core/managers/`);
 - the Celery app (`src/core/celery.py`) and the transport its publishing
   connections use while RabbitMQ blocks publishers (`src/core/broker.py`,
-  `docs/deferred-dispatch.md`), `MonitoredTask` and the system
-  tasks (`src/core/tasks.py`), the retry sets (`src/core/retry.py`) and
-  the retention helper (`src/core/retention.py`);
-- the cache backend (`src/core/caches.py`) and the cache surface registry
-  (`src/core/cache/`);
+  `docs/deferred-dispatch.md`), `MonitoredTask`
+  (`src/core/monitored_task.py`), the system tasks (`src/core/tasks.py`),
+  the retry sets (`src/core/retry.py`) and the retention helper
+  (`src/core/retention.py`);
+- the cache backend (`src/core/cache_backend.py`) and the cache surface registry
+  (`src/core/cache/`), with the surfaces no single app owns (settings,
+  storefront pages, sitemap and SEO);
 - middleware (`src/core/middleware/`), the email templates
   (`src/core/templates/`) and the root URL conf.
 
@@ -96,7 +103,10 @@ The multi-tenancy control plane. Models: `Tenant` (the django-tenants
 `TenantMixin`, with branding, plan flags and every per-store credential
 field), `TenantDomain`, `UserTenantMembership` (staff roles),
 `PlatformStaffToken`, `TenantArchive`, `TenantStatsSnapshot` and
-`DeferredDispatch`. A domain is a bare lowercase host name:
+`DeferredDispatch`, one module each in `src/tenant/models/`; the choices
+(`TenantPlan`, `StoreVertical`, `SuspendedReason`, `TenantMembershipRole`,
+`StaffTokenScope`) are in `src/tenant/enum.py`, and the cross-field rules
+`Tenant.clean()` runs are in `src/tenant/models/tenant_rules.py`. A domain is a bare lowercase host name:
 `tenant.validators.validate_store_hostname` runs in the form and in
 `save()`, because routing matches the text exactly.
 
@@ -111,7 +121,10 @@ secrets), `src/tenant/provisioning.py`, `src/tenant/lifecycle.py`,
 `src/tenant/billing.py`, `src/tenant/cache.py` (`make_tenant_key`,
 `tenant_resolve_key`), `src/tenant/celery.py` (`TenantTask`,
 `run_for_all_tenants`, `dispatch_on_commit`), `src/tenant/tasks.py`
-(every beat fan-out), `src/tenant/features.py` (`STORE_FEATURES`, the
+(the beat fan-outs, a carrier's own excepted: those are in its app's
+`tasks.py` under their `tenant.tasks.fanout_*` names; the health monitor
+and the scheduled backup, which alert the operators through
+`src/tenant/emails.py`), `src/tenant/features.py` (`STORE_FEATURES`, the
 store feature table) and `src/tenant/customer_accounts.py` (a store
 without customer accounts).
 
@@ -134,7 +147,7 @@ not declare. Read `docs/scheduler.md`.
 
 `Country` and `Region`: reference rows shared by every store, seeded from
 `src/country/seed_data.py` and `src/region/seed_data.py`. They have no doc
-of their own; `docs/order/creation.md` (section 3.3) has the delivery-address
+of their own; `docs/order/creation-address.md` (section 3.3) has the delivery-address
 rules that read them.
 
 ### `devtools/`
@@ -153,7 +166,8 @@ staging anonymiser (`src/devtools/anonymise/`); the seed commands. Read
 and each store's schema holds its customers. Also `UserAddress`,
 `UserSubscription`, `SubscriptionTopic` and `UserDataExport`. Services are
 a package (`src/user/services/`, with the data export and account
-deletion in `src/user/services/gdpr.py`). Authentication is django-allauth
+deletion in `src/user/services/gdpr.py`; read `docs/gdpr-erasure.md`).
+Authentication is django-allauth
 headless, mounted at `_allauth/` in `src/core/urls.py`; read
 `docs/allauth-schema.md`.
 
@@ -208,8 +222,12 @@ covers what you are changing. Models under `src/order/models/`: `Order`,
 `RetailCredit`, `CreditCounter`, `StockReservation`, `StockLog`, `Expense`
 and `VivaWebhookEvent`.
 
-Entry points: `src/order/services.py` (creation, the state machine,
-cancel, refund), `src/order/checkout/quote.py` (`OrderQuoteService`: the
+Entry points: `src/order/services.py` (creation, payment settlement),
+`src/order/lifecycle/service.py` (`OrderLifecycleService`: the status
+machine, its `ALLOWED_TRANSITIONS`, reorder and cancel),
+`src/order/refunds/service.py` (`RefundService`: claiming,
+allocating, making, booking and declining a refund),
+`src/order/checkout/quote.py` (`OrderQuoteService`: the
 checkout quote, which is the one total, the free-shipping basis, the
 shipping price and the pay-way fee),
 `src/order/inventory/stock.py` (`StockManager`),
@@ -223,7 +241,8 @@ shipping price and the pay-way fee),
 
 `Cart`, `CartItem` and `CartAttribution` (`src/cart/models/`),
 `src/cart/services.py`, the guest and customer cart API under
-`src/cart/views/`, and the agent's cart token (`src/cart/agent_token.py`).
+`src/cart/views/`, the agent's cart token (`src/cart/agent_token.py`) and
+the guest-cart cleanup tasks (`src/cart/tasks.py`).
 Read `docs/cart-agent-token.md` for the token,
 `docs/order/creation.md` (section 3.0) for `POST /cart/quote`, priced by
 `order.checkout.quote`, and `docs/order/creation-records.md` (section
@@ -234,7 +253,9 @@ Read `docs/cart-agent-token.md` for the token,
 `BlogPost`, `BlogCategory` (MPTT), `BlogAuthor`, `BlogComment` and
 `BlogTag` under `src/blog/models/`, views per model under
 `src/blog/views/`. Indexed in Meilisearch beside the products. Read
-`docs/blog-related-posts.md`.
+`docs/blog-related-posts.md`. A category's `icon` is one of the page
+builder's icons, checked against the store's catalogue (`src/blog/icons.py`,
+`docs/builder/documents.md`).
 
 ### `promotion/`, `giftcard/`, `b2b/`
 
@@ -265,23 +286,29 @@ the cross-service view is
 ### `shipping/`, `shipping_acs/`, `shipping_boxnow/`
 
 - `shipping/`: the carrier abstraction (`src/shipping/interfaces.py`),
-  `ShippingProvider`, the per-store `ShippingRate` table
+  `ShippingProvider`, the per-store `ShippingZone` (where the store
+  delivers: a whole country or some regions, `src/shipping/models/zone.py`,
+  resolved by `src/shipping/zones.py`) and its `ShippingRate` table
   (`src/shipping/models/rate.py`: the only source of a shipping price,
   availability and weight cap), `ShippingService`
   (`src/shipping/services.py`), the one lock order for an order and its
   shipment (`src/shipping/locks.py`), the HTTP session and retry rule
-  both carrier clients send through (`src/shipping/carrier_http.py`) and
-  the operational alerts (`src/shipping/alerts.py`). Read
-  `docs/order/shipping.md`.
+  both carrier clients send through (`src/shipping/carrier_http.py`),
+  the purge a carrier credential change queues (`src/shipping/tasks.py`)
+  and the operational alerts (`src/shipping/alerts.py`). Read
+  `docs/order/shipping.md` and `docs/order/shipping-zones.md`.
 - `shipping_acs/`: `AcsShipment`, `AcsPickupList`, `AcsPickupListRun`,
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,
   `AcsVoucherHold` and `AcsUnrecognisedVoucher`; the HTTP client
   (`src/shipping_acs/client.py`), `AcsService`
-  (`src/shipping_acs/services.py`) and the tasks. Read
+  (`src/shipping_acs/services.py`), the tasks with their per-store
+  fan-outs and the demo shipment (`src/shipping_acs/demo.py`). Read
   `docs/order/shipping-acs.md` and `docs/acs-debugging.md`.
 - `shipping_boxnow/`: `BoxNowShipment`, `BoxNowLocker` and
-  `BoxNowParcelEvent`; the client, `BoxNowService`, the tasks and the
-  webhook (`src/shipping_boxnow/views/webhook.py`). Read
+  `BoxNowParcelEvent`; the client, `BoxNowService`, the tasks with their
+  per-store fan-outs, the demo shipment (`src/shipping_boxnow/demo.py`)
+  and the webhook (`src/shipping_boxnow/views/webhook.py`, routed by
+  `src/shipping_boxnow/webhook_urls.py`). Read
   `docs/order/shipping-boxnow.md`.
 
 The import contracts keep the two carrier apps from importing each other
@@ -341,7 +368,9 @@ the engine (`src/recommendation/engine.py`) and its strategies
 
 ### `notification/`
 
-`Notification` and `NotificationUser`, the Channels consumer
+`Notification` and `NotificationUser`, written once per dispatch by
+`src/notification/services.py` (`dispatch_key`) and pushed once
+(`pushed_at`, `src/notification/tasks.py`), the Channels consumer
 (`src/notification/consumers.py`), the per-user group names and the
 send to them, bounded by `NOTIFICATION_PUSH_TIMEOUT_SECONDS`
 (`src/notification/groups.py`), and the single-use WebSocket ticket
@@ -378,7 +407,7 @@ OAuth surface has no doc in this repository; the cross-service views are
 
 `meili/` is the Meilisearch layer: `IndexMixin` with a `MeiliMeta` inner
 class (`src/meili/models.py`), the client (`src/meili/_client.py`), the
-index and delete tasks (`src/meili/tasks.py`) and the management
+index and delete tasks and the daily index sync (`src/meili/tasks.py`) and the management
 commands. `search/` is the product-facing side: the product and blog
 search views (`src/search/views/`: `blog`, `product`, `click`, `report`,
 `trending`; query-string parsing in `src/search/params.py`, what a request
@@ -390,7 +419,9 @@ analytics. Read `docs/api/search.md` and the files under `docs/search/`.
 
 Meta Conversions API: `MetaCapiEventLog`, the receivers on order and
 registration events (`src/meta_capi/signals.py`) and the tasks that post
-the events (`src/meta_capi/tasks.py`). It has no doc in this repository;
+the events (`src/meta_capi/tasks.py`), each event once: its id is fixed
+before a task can run again (`src/meta_capi/services.py`) and the check and
+the send hold an advisory lock on it. It has no doc in this repository;
 the cross-service view is
 `grooveshop-docs/src/dev/flows/analytics-and-consent.md`.
 
@@ -408,4 +439,5 @@ Stripe is dj-stripe (`djstripe` in `TENANT_APPS`, its webhook under
 `stripe/` in `src/core/urls.py`). Viva Wallet is
 `src/order/views/viva_webhook.py` and `src/order/payments/payment_events.py`. Both
 read their credentials from the `Tenant` row through
-`src/tenant/credentials.py`. Read `docs/order/payments.md`.
+`src/tenant/credentials.py`. Read `docs/order/payments.md`, and
+`docs/order/payments-viva.md` for Viva.

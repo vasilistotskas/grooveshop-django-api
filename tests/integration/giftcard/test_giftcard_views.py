@@ -518,6 +518,11 @@ class TestMine:
 
         assert response.status_code == 404
 
+    # The bare array is not what the operation documents (its paginated
+    # envelope): the whole list moves to a route of its own (#684).
+    @pytest.mark.known_schema_drift(
+        "GET", "/api/v1/giftcard/mine", 200, at="$", issue=684
+    )
     def test_pagination_false_returns_every_card_as_a_list(self):
         """The account summary reads every card in one request
         (``GiftCardViewSet.unpaginated_actions``)."""

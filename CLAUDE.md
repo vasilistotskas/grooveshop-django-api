@@ -97,7 +97,7 @@ Every app, the settings package (`src/settings/`) and the `asgi` package live in
 - `SortableModel` — `sort_order` with atomic `move_up()`/`move_down()` using `select_for_update()`
 - `PublishableModel` — `is_published`/`published_at` with `PublishableManager.published()` queryset
 - `MetaDataModel` — `metadata`/`private_metadata` JSONFields with GinIndex
-- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()`, `.deleted_only()`, `.restore()`, `.hard_delete()`)
+- `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()` and `.deleted_only()` on the manager, `.restore()` and `.hard_delete()` on its querysets); the queryset and manager behaviour is `core.mixins.soft_delete` (`SoftDeleteQuerySetMixin`, `SoftDeleteManagerMixin`), so a bulk `queryset.delete()` soft-deletes as `instance.delete()` does and only `hard_delete()` removes rows
 
 Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, UUIDModel, MetaDataModel, TaggedModel)` with `ProductTranslation(TranslatedFieldsModel, SeoTranslationModel, IndexMixin)`.
 
@@ -107,7 +107,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - Supports three pagination strategies via `?pagination_type=` query param: `pageNumber` (default), `cursor`, `limitOffset`
 - Handles multipart translation data via `TranslationsProcessingMixin`
 - Atomic transactions on create/update
-- URL confs wire actions by hand (`ViewSet.as_view({"post": "retry_payment"})`), not through a router; `RouterActionOverridesMixin` (in `BaseModelViewSet`) applies each extra action's `@action(...)` arguments — `throttle_classes`, `permission_classes`, `pagination_class`, `queryset` — the way DRF's router would. A viewset not built on `BaseModelViewSet` must include it; `tests/unit/core/test_routes_apply_action_overrides.py` fails for any route that drops an override
+- URL confs wire actions by hand (`ViewSet.as_view({"post": "create_checkout_session"})`), not through a router; `RouterActionOverridesMixin` (in `BaseModelViewSet`) applies each extra action's `@action(...)` arguments — `throttle_classes`, `permission_classes`, `pagination_class`, `queryset` — the way DRF's router would. A viewset not built on `BaseModelViewSet` must include it; `tests/unit/core/test_routes_apply_action_overrides.py` fails for any route that drops an override
 
 **Optimized Managers** (`src/core/managers/`):
 - `OptimizedManager`/`OptimizedQuerySet` — Override `for_list()` and `for_detail()` for select_related/prefetch_related
@@ -121,7 +121,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Pagination** (`src/core/pagination/`): `PageNumberPaginator`, `CursorPaginator`, `LimitOffsetPaginator` — all return consistent envelope: `{links, count, total_pages, page_size, page_total_results, page, results}`
 
-**Serializer utilities** (`src/core/utils/serializers.py`):
+**Action config** (`src/core/api/action_config.py`; the shared serializer field `TranslatedFieldExtended` is in `src/core/utils/serializers.py`):
 - `ActionConfig` dataclass — per-action request/response serializer + OpenAPI metadata
 - `crud_config()` — shorthand for standard CRUD serializer mapping
 - `create_schema_view_config()` — auto-generates `@extend_schema` decorators from model verbose names
@@ -132,7 +132,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Permissions** (`src/core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields; the staff bypass is `tenant.membership.is_store_staff` (a provenance-stamped platform identity with a staff role in the current tenant, or a superuser). `request.user.is_staff` is never an authorization signal on an API request — on a tenant-schema row it is customer residue (see `IsPlatformSuperuser`). Store-scoped write routes use `StoreStaffModelPermissions`. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
 
-**Admin actions** (`src/*/admin.py`): every action passes `permissions=[...]` in its decorator: `change` for an edit, `add` for a copy, `delete` for a deletion, `view` only for a named read-only one. Unfold serves list, row and detail actions at URLs of their own, behind the admin login and that argument alone; `tests/unit/admin/test_actions_declare_permissions.py` fails for an action without one. A detail action's `has_<perm>_permission` receives the object id (a string), never the object: look the row up by it (`OrderAdmin.has_confirm_payment_permission`). A package's admin on the store site belongs to an app in `tenant.role_scopes.PLATFORM_ONLY_APP_LABELS` and is named in that test's `THIRD_PARTY_ADMINS`; a URL it serves itself is named in `THIRD_PARTY_URLS` with its check (dj-stripe's: `admin.mixins.StripeMirrorModelAdmin`).
+**Admin actions** (`src/*/admin.py`): every action passes `permissions=[...]` in its decorator: `change` for an edit, `add` for a copy, `delete` for a deletion, `view` only for a named read-only one. Unfold serves list, row and detail actions at URLs of their own, behind the admin login and that argument alone; `tests/unit/admin/test_actions_declare_permissions.py` fails for an action without one. A list, row or detail action confirms first and acts only on a POST: give it `dialog=ActionDialog(...)` (Unfold then runs the body only for the posted form, and the body answers with `admin.responses.hx_redirect`), or, if it is a download or a redirect, name it in its admin's `read_actions` (the ACS voucher download is one that also stamps the label as printed); `tests/unit/admin/test_actions_confirm.py` fails for any other. A detail action's `has_<perm>_permission` receives the object id (a string), never the object: look the row up by it (`OrderAdmin.has_confirm_payment_permission`). A package's admin on the store site belongs to an app in `tenant.role_scopes.PLATFORM_ONLY_APP_LABELS` and is named in that test's `THIRD_PARTY_ADMINS`; a URL it serves itself is named in `THIRD_PARTY_URLS` with its check (dj-stripe's: `admin.mixins.StripeMirrorModelAdmin`).
 
 ### API Conventions
 
@@ -164,10 +164,14 @@ ASGI routing in `src/asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/tasks.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
+App configured in `src/core/celery.py`. Base task class: `MonitoredTask` in `src/core/monitored_task.py` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries`, so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `src/core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
-- `src/core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
+- `src/core/tasks.py` — the database dump and old-backup cleanup, cache clearing, session and history cleanup
+- `src/tenant/tasks.py` — the per-store fan-outs (a carrier's own are in its app's `tasks.py`, under their `tenant.tasks.fanout_*` names), deferred dispatch, and the platform's health monitor and scheduled backup, which alert the operators (`src/tenant/emails.py`)
+- `src/cart/tasks.py` — abandoned and old guest cart cleanup
+- `src/user/tasks.py` — account and allauth emails, data export, the inactive-user re-engagement email
+- `src/meili/tasks.py` — document indexing and the daily index sync
 - `src/product/tasks.py` — price drop notifications, price-record reconciliation (`reevaluate_price_episodes`)
 - `src/search/tasks.py` — search analytics
 - `src/blog/tasks.py` — comment liked notifications
@@ -192,8 +196,8 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `src/dev
 - `auto_translations` flag for parler models
 - `unique_model_fields` list for collision-free field generation
 - `@factory.post_generation` for related objects (images, reviews, translations, cart items)
-- `get_or_create_instance()` helper in `src/core/helpers/factory.py` for dynamic model/factory resolution
-- `UserNameGenerator` in `src/core/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
+- `get_or_create_instance()` in `src/tag/factories/tagged_item.py`, its only caller, for dynamic model/factory resolution
+- `UserNameGenerator` in `src/user/generators.py` generates `{Adjective}{Noun}#{hash}` usernames from email
 
 ### Test Configuration
 

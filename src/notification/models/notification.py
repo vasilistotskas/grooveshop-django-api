@@ -71,6 +71,13 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         blank=True,
         db_default=Now() + timedelta(days=EXPIRATION_DAYS),
     )
+    # The dispatch that wrote this notification, for the user it is for
+    # (``notification.services.create_user_notification``): every copy of a
+    # task carries the same key, so the second copy finds the row instead of
+    # writing another. Empty for a notification written outside a task.
+    dispatch_key = models.UUIDField(
+        _("Dispatch key"), null=True, blank=True, editable=False
+    )
     translations = TranslatedFields(
         title=models.CharField(_("Title"), max_length=250),
         message=models.TextField(_("Message")),
@@ -89,6 +96,13 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         verbose_name = _("Notification")
         verbose_name_plural = _("Notifications")
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dispatch_key"],
+                condition=models.Q(dispatch_key__isnull=False),
+                name="notification_dispatch_key_unique",
+            ),
+        ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["kind"], name="notification_kind_ix"),

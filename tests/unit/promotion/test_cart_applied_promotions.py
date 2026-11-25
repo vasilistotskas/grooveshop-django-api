@@ -214,7 +214,7 @@ def test_applied_coupons_says_what_each_code_does(enable_promotions, make_cart):
     assert entry == {
         "code": code.code,
         "amount": Decimal(0),
-        "freeShipping": True,
+        "free_shipping": True,
         "gift": False,
         "rejection": None,
     }
@@ -258,7 +258,7 @@ def test_applied_coupons_explains_a_code_that_stopped_applying(
 
     assert entry["code"] == code.code
     assert entry["amount"] == Decimal(0)
-    assert entry["freeShipping"] is False
+    assert entry["free_shipping"] is False
     assert entry["gift"] is False
     assert entry["rejection"] == str(
         CouponRejectionReason.COMBINATION_DISALLOWED

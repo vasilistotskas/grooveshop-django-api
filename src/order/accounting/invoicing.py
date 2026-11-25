@@ -105,9 +105,11 @@ def receipt_issuable(order: Order) -> bool:
     receipt order (an invoice order never gets one) whose goods have
     shipped, or whose parcel waits for its carrier: a courier or locker
     sale's receipt is issued with movement indication before the movement
-    starts (``order.accounting.movement``), once nothing is owed online,
-    the store has set its dispatch point (``movement_receipts_on``) and the
-    carrier has accepted the parcel
+    starts (``order.accounting.movement``), once nothing is owed online and
+    the order still ships (``Order.ships_nothing``: a full refund leaves it
+    PROCESSING with a voucher that is not to leave), the store has set its
+    dispatch point (``movement_receipts_on``) and the carrier has accepted
+    the parcel
     (``ShippingService.carrier_holds_the_parcel``: ACS's voucher, BOX NOW's
     parcel). Neither a shipment row (ACS's is written at checkout, before
     the voucher is asked for) nor a tracking number typed on the order is
@@ -119,6 +121,7 @@ def receipt_issuable(order: Order) -> bool:
     return (
         order.status in PRE_SHIPMENT_STATUSES
         and not order.awaits_online_payment
+        and not order.ships_nothing
         and movement_receipts_on(order)
         and ShippingService.carrier_holds_the_parcel(order)
     )
@@ -141,7 +144,7 @@ def hold_receipt_for_cancel(order: Order) -> bool:
     was set aside.
 
     Called by the one path that cancels an order
-    (``OrderService._cancel_order_locked``), in its transaction and under
+    (``OrderLifecycleService._cancel_order_locked``), in its transaction and under
     its lock on the order row, the lock every credit is created under: no
     credit can be created between the cancel and the hold. The receipt's
     email reads the hold when it runs (``Invoice.is_deliverable``).
@@ -221,19 +224,25 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the document is frozen).
+    until the document is frozen); the credit documents render the
+    snapshot taken with the receipt they credit.
 
-    ΕΛΠ art. 12(4) has the seller keep the customer's name and address for
-    every credit document above EUR 50: the credit documents render this
-    snapshot, taken with the receipt they credit.
+    A retail document needs no buyer address: Law 4308/2014 art. 12 par. 2
+    names only the seller's, and the former par. 4 rule (the customer's
+    name and address above EUR 50) was deleted by Law 5222/2025 art. 238
+    par. 2. The address shown is the order's delivery address, which for
+    a pickup-point order is the point's (#642).
     """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
         "email": order.email,
         "phone": str(order.phone) if order.phone else "",
         "address_line_1": f"{order.street} {order.street_number}".strip(),
-        "address_line_2": order.place or "",
+        "address_line_2": order.address_line_2,
         "city": order.city,
+        # A district or area (Τοποθεσία), printed with the city: never the
+        # address's second line, which is ``address_line_2``.
+        "place": order.place,
         "postal_code": order.zipcode,
         "country": (order.country.name if order.country_id else "")
         if hasattr(order, "country")
@@ -257,7 +266,7 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
-    Gift-card amounts are payment, never allocated (order/checkout/discounts.py).
+    Gift-card amounts are payment, never allocated (order.checkout.discounts).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
     allocation = _returned_before_receipt(order)

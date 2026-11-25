@@ -27,8 +27,9 @@ envelope or in the value row), `auth` (403/406), `retryable` (5xx) and
 `transport` (connection error or timeout); ERROR only for `unexpected` (a
 non-JSON body, an HTTP 4xx other than 403/406, or an exception that is not an
 ACS one). The outcome says how the call failed, not whether ACS executed it:
-see "A voucher request with an unknown outcome" below. Credentials (`Company_ID`, `Company_Password`, `User_ID`,
-`User_Password`, `AcsApiKey`) never reach the log or the database.
+see "A voucher request with an unknown outcome" below. Credentials
+(`Company_ID`, `Company_Password`, `User_ID`, `User_Password`, `AcsApiKey`)
+never reach the log or the database.
 
 **A persisted call history**, `AcsApiCall` (admin: ACS API Calls, platform
 superusers only because the redacted payload still holds the recipient's name,
@@ -67,8 +68,8 @@ If your pipeline nests the JSON under a `log.` prefix, use `log.acs_alias`.
      Print their labels, then "Issue ACS pickup list now".
    - `blocked_unprinted_silent`: ACS named nothing, no list was adopted from
      `ACS_Get_Pickup_Lists`, and every candidate is unprinted locally
-     (`unprinted_vouchers_local`). Same fix. Seen when a voucher stays
-     unprinted into a later day (2026-10-23, 10-28).
+     (`unprinted_vouchers_local`). Same fix. It happens when a voucher
+     stays unprinted into a later day.
    - `nothing_to_issue`: no candidate, or only dead vouchers
      (`check_stale_acs_shipments` owns those).
    - `error`: read `error_message`. With a locally printed candidate, ACS's
@@ -95,8 +96,7 @@ LogsQL: `voucher_no:7227891111 | sort by (_time)`
 `ACS_Create_Voucher` has no idempotency key and no duplicate error, and no
 ACS call finds a voucher by our reference before it is on a pickup list
 (`ACS_POD_FROM_REFERENCE_NO` needs a finalised voucher; manual, April 2026,
-p. 7-9 and 21-22). A second request for one order mints a second voucher
-(stage order 682, 2026-04-29). So the client sorts every failure by whether
+p. 7-9 and 21-22). A second request for one order mints a second voucher. So the client sorts every failure by whether
 the request may have reached ACS (`AcsClient._exchange`):
 
 | Failure | Class | Mint |
@@ -114,8 +114,8 @@ and keeps the claim's value as `metadata["unknown_request"]`: which request
 the unknown state belongs to. A late answer saves its voucher only when
 that is its own request; once staff have resolved the check, or a later
 request is the one in question, the answer is deleted at ACS (or recorded
-as our own unused voucher). A state with no recorded request (set before
-the identity existed) is treated as not the answer's. Every resolution
+as our own unused voucher). A state with no recorded request is treated as not the
+answer's. Every resolution
 removes the key with the flag. Entering the state
 notes the order, sends `ops.acs_voucher_request_unknown` once, and every
 later call of `create_voucher_for_order` (the task, its retries, a

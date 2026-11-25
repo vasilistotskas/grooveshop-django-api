@@ -1,4 +1,5 @@
-"""Unit tests for ``ShippingRateInline`` on ``ShippingProviderAdmin``."""
+"""Unit tests for ``ShippingRateInline`` on ``ShippingZoneAdmin``, and the
+provider admin's rates count."""
 
 from __future__ import annotations
 
@@ -6,9 +7,13 @@ import pytest
 from django.contrib.admin.sites import AdminSite
 
 from country.factories import CountryFactory
-from shipping.admin import ShippingProviderAdmin, ShippingRateInline
+from shipping.admin import (
+    ShippingProviderAdmin,
+    ShippingRateInline,
+    ShippingZoneAdmin,
+)
 from shipping.factories import ShippingProviderFactory, ShippingRateFactory
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingZone
 
 pytestmark = pytest.mark.django_db
 
@@ -19,15 +24,15 @@ def admin_instance():
 
 
 class TestShippingRateInline:
-    def test_country_is_an_autocomplete(self):
+    def test_the_zones_country_is_an_autocomplete(self):
         """Countries are reference data every store role may view
         (``tenant.role_scopes.REFERENCE_DATA_APP_LABELS``), so the
         country admin's autocomplete answers on a store host."""
-        assert "country" in ShippingRateInline.autocomplete_fields
+        assert "country" in ShippingZoneAdmin.autocomplete_fields
 
     def test_fields_cover_the_editable_columns(self):
         assert ShippingRateInline.fields == (
-            "country",
+            "provider",
             "kind",
             "price",
             "free_shipping_threshold",
@@ -42,8 +47,12 @@ class TestShippingRateInline:
 
         assert ShippingRateInline.model is ShippingRate
 
-    def test_registered_on_the_provider_admin(self, admin_instance):
-        assert ShippingRateInline in admin_instance.inlines
+    def test_registered_on_the_zone_admin_only(self, admin_instance):
+        """A rate is edited where its destination is: on its zone."""
+        zone_admin = ShippingZoneAdmin(ShippingZone, AdminSite())
+
+        assert ShippingRateInline in zone_admin.inlines
+        assert ShippingRateInline not in admin_instance.inlines
 
 
 class TestRatesCount:

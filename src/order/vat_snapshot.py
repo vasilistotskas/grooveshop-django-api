@@ -1,7 +1,7 @@
 """Snapshot what the turnover report reads: VAT lines and the ship moment.
 
 ``OrderVatLine`` rows are written when an order is created
-(``write_vat_lines``, from both creation paths of ``OrderService``) by the
+(``write_vat_lines``, from ``OrderService.create_order_from_cart``) by the
 very function the receipt and the myDATA payload use
 (``order.accounting.taxation.order_vat_lines``), so no figure can differ from the
 receipt. ``Order.shipped_at`` is stamped by ``Order.save`` the first time

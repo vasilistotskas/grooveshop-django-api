@@ -1,10 +1,12 @@
 import logging
 
+from django.db import connection
 from django.utils import timezone
 
 from core import celery_app
+from core.db.locks import held_across_calls
+from core.monitored_task import MonitoredTask
 from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 
 logger = logging.getLogger(__name__)
@@ -19,9 +21,23 @@ logger = logging.getLogger(__name__)
     retry_jitter=True,
 )
 def deliver_gift_card_email(self, gift_card_id: int) -> dict:
-    """Email the gift card to its recipient. Idempotent via
-    ``delivered_at`` — retries and the daily scheduled sweep both
-    funnel through here."""
+    """Email the gift card to its recipient, once: ``delivered_at``.
+
+    The purchase, the admin's resend, the daily sweep and every copy of one
+    of their tasks (a retry, a message delivered again, the sweep's copy of
+    a publish) funnel through here, and two can run at the same moment. So
+    ``delivered_at`` is read and the mail sent under an advisory lock on the
+    card (``core.db.locks.held_across_calls``): the second run finds the card
+    delivered. A worker that dies mid-send takes the lock with it, and the
+    run after it sends the card again rather than never.
+    """
+    with held_across_calls(
+        f"giftcard.delivery:{connection.schema_name}:{gift_card_id}"
+    ):
+        return _deliver(gift_card_id)
+
+
+def _deliver(gift_card_id: int) -> dict:
     from giftcard.models import GiftCard
 
     try:

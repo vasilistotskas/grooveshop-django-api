@@ -29,7 +29,7 @@ from giftcard.models import (
     GiftCardTransactionKind,
 )
 from giftcard.services import GiftCardService
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.integration.giftcard.test_staff_issue_limit import (
     _adjust,
     _admin,

@@ -1,6 +1,6 @@
 """The answer to a request whose security store is unreachable.
 
-A key under ``core.caches.STRICT_KEY_PREFIXES`` (or a ``count_in_window`` /
+A key under ``core.cache_backend.STRICT_KEY_PREFIXES`` (or a ``count_in_window`` /
 ``add`` / ``incr``) raises ``REDIS_UNAVAILABLE`` instead of lying when Redis
 cannot be reached: a rate limit that cannot count, a TOTP code whose replay
 cannot be checked, an IdP code or a ticket that cannot be stored or spent.
@@ -36,7 +36,7 @@ from django.shortcuts import render
 from django.urls import Resolver404, ResolverMatch, resolve
 from rest_framework.views import APIView
 
-from core.caches import (
+from core.cache_backend import (
     REDIS_UNAVAILABLE,
     STRICT_CACHE_UNAVAILABLE_CODE,
     STRICT_CACHE_UNAVAILABLE_MESSAGE,

@@ -565,7 +565,7 @@ class TestPollShipmentDeliveryTransitions:
     ):
         """An admin-set terminal order status (DELIVERED / COMPLETED /
         CANCELED) is never overwritten by polling — the state-machine
-        forward-only guard in OrderService.update_order_status filters
+        forward-only guard in OrderLifecycleService.update_order_status filters
         backwards moves and ``_apply_order_status_transition`` early-
         returns when ``current_status in TERMINAL_ORDER_STATUSES``."""
         from order.enum.status import OrderStatus, PaymentStatus
@@ -1858,6 +1858,114 @@ class TestSanitizeDeliveryNotes:
         assert len(sanitize_delivery_notes(long_note)) == DELIVERY_NOTES_MAX_LEN
 
 
+class TestCourierNotes:
+    """The address line 2 rides first in the notes, never cut (#641)."""
+
+    def test_the_address_line_comes_first(self):
+        from shipping.services import CourierNotes
+
+        assert (
+            CourierNotes(
+                address_line_2="Διαμ. 3,  2ος   όροφος",
+                customer_notes="Χτυπήστε\nδύο φορές.",
+            ).sent
+            == "Διαμ. 3, 2ος όροφος | Χτυπήστε δύο φορές."
+        )
+
+    def test_the_floor_comes_before_the_address_line(self):
+        from shipping.services import CourierNotes
+
+        assert (
+            CourierNotes(
+                floor="2ος όροφος",
+                address_line_2="Διαμ. 3",
+                customer_notes="Θυρωρός",
+            ).sent
+            == "2ος όροφος | Διαμ. 3 | Θυρωρός"
+        )
+
+    def test_the_floor_and_the_line_are_never_cut(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            CourierNotes,
+        )
+
+        sent = CourierNotes(
+            floor="6ος όροφος +",
+            address_line_2="β" * 255,
+            customer_notes="α" * 800,
+        ).sent
+
+        assert len(sent) == DELIVERY_NOTES_MAX_LEN
+        assert sent.startswith("6ος όροφος + | " + "β" * 255 + " | ")
+
+    def test_either_alone_is_sent_alone(self):
+        from shipping.services import CourierNotes
+
+        assert (
+            CourierNotes(address_line_2="Διαμ. 3", customer_notes="").sent
+            == "Διαμ. 3"
+        )
+        assert (
+            CourierNotes(address_line_2="", customer_notes="Θυρωρός").sent
+            == "Θυρωρός"
+        )
+        assert CourierNotes(address_line_2="", customer_notes="").sent == ""
+
+    def test_the_customer_note_is_cut_first_to_the_limit(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            DELIVERY_NOTES_SEPARATOR,
+            CourierNotes,
+        )
+
+        line = "β" * 255
+        sent = CourierNotes(address_line_2=line, customer_notes="α" * 800).sent
+
+        assert len(sent) == DELIVERY_NOTES_MAX_LEN
+        assert sent.startswith(line + DELIVERY_NOTES_SEPARATOR)
+        assert sent.endswith("α")
+
+    def test_a_note_that_fits_is_kept_whole(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            DELIVERY_NOTES_SEPARATOR,
+            CourierNotes,
+        )
+
+        line = "β" * 100
+        room = (
+            DELIVERY_NOTES_MAX_LEN - len(line) - len(DELIVERY_NOTES_SEPARATOR)
+        )
+        note = "α" * room
+
+        assert CourierNotes(address_line_2=line, customer_notes=note).sent == (
+            line + DELIVERY_NOTES_SEPARATOR + note
+        )
+
+    def test_the_customer_part_is_the_note_as_it_was_cut(self):
+        """The customer's note as cut for the courier: what reached ACS,
+        not a longer note cut again."""
+        from shipping.services import DELIVERY_NOTES_SEPARATOR, CourierNotes
+
+        notes = CourierNotes(
+            floor="2ος όροφος",
+            address_line_2="β" * 120,
+            customer_notes="α" * 480,
+        )
+        sent_note = notes.sent.split(DELIVERY_NOTES_SEPARATOR)[-1]
+
+        assert notes.customer_part == sent_note
+        assert len(sent_note) < 480
+
+    def test_the_customer_part_of_a_note_alone_is_what_was_sent(self):
+        from shipping.services import CourierNotes
+
+        notes = CourierNotes(address_line_2="", customer_notes="Θυρωρός")
+
+        assert notes.customer_part == notes.sent
+
+
 class TestDeliveryNotesInPayload:
     def test_customer_notes_lands_in_Delivery_Notes(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
@@ -1865,6 +1973,8 @@ class TestDeliveryNotesInPayload:
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
             customer_notes="Χτυπήστε το κουδούνι 2  φορές.\nΘυρωρός.",
         )
         AcsShipmentFactory(order=order)
@@ -1876,12 +1986,70 @@ class TestDeliveryNotesInPayload:
             sent["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές. Θυρωρός."
         )
 
+    def test_the_address_line_2_rides_ahead_of_the_notes(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
+            address_line_2="Διαμ. 3, 2ος όροφος",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == "Διαμ. 3, 2ος όροφος | Θυρωρός."
+        # ACS's ``Recipient_Address`` is the street alone.
+        assert sent["Recipient_Address"] == order.street
+
+    @pytest.mark.parametrize(
+        ("floor", "label"),
+        [
+            ("BASEMENT", "Υπόγειο"),
+            ("GROUND_FLOOR", "Ισόγειο"),
+            ("FIRST_FLOOR", "1ος όροφος"),
+            ("SECOND_FLOOR", "2ος όροφος"),
+            ("THIRD_FLOOR", "3ος όροφος"),
+            ("FOURTH_FLOOR", "4ος όροφος"),
+            ("FIFTH_FLOOR", "5ος όροφος"),
+            ("SIXTH_FLOOR_PLUS", "6ος όροφος +"),
+        ],
+    )
+    def test_the_floor_rides_first_in_greek(
+        self, acs_client_mock, floor, label
+    ):
+        """Until ``Recipient_Floor``'s format is known (an ACS stage
+        voucher), the floor's label leads the free-text notes, whatever
+        the voucher's language."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor=floor,
+            address_line_2="Διαμ. 3",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == f"{label} | Διαμ. 3 | Θυρωρός."
+        assert "Recipient_Floor" not in sent
+
     def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            # The floor rides in the notes too; none here.
+            floor="",
             customer_notes="",
         )
         AcsShipmentFactory(order=order)
@@ -1901,6 +2069,7 @@ class TestDeliveryNotesInPayload:
         order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
+            floor="",
             customer_notes="Χτυπήστε το κουδούνι 2 φορές.",
         )
         AcsShipmentFactory(order=order)
@@ -1933,6 +2102,80 @@ class TestDeliveryNotesInPayload:
             assert forbidden not in envelope, (
                 f"PII leak in create_request envelope: {forbidden}"
             )
+
+    def test_the_audit_copy_holds_no_address_line_2(self, acs_client_mock):
+        """The voucher's notes carry the floor and the address line 2; the
+        audit copy on ``shipment.metadata`` holds neither, as it holds no
+        recipient address. It keeps the customer's note."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor="SECOND_FLOOR",
+            address_line_2="Διαμ. 3",
+            customer_notes="Θυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Delivery_Notes"] == "2ος όροφος | Διαμ. 3 | Θυρωρός."
+        envelope = result.metadata["create_request"]
+        assert envelope["Delivery_Notes"] == "Θυρωρός."
+        assert "Διαμ. 3" not in str(result.metadata)
+        assert "όροφος" not in str(result.metadata)
+
+    def test_the_audit_copy_records_the_note_as_it_was_cut(
+        self, acs_client_mock
+    ):
+        """A note cut to make room for the floor and the address line is
+        recorded as ACS received it, not cut again for the shorter copy."""
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping.services import DELIVERY_NOTES_SEPARATOR
+
+        line = "β" * 120
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            floor="SECOND_FLOOR",
+            address_line_2=line,
+            customer_notes="α" * 480,
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        sent = acs_client_mock.last_create_payload["Delivery_Notes"]
+        recorded = result.metadata["create_request"]["Delivery_Notes"]
+        assert recorded == sent.split(DELIVERY_NOTES_SEPARATOR)[-1]
+        assert sent.endswith(recorded)
+        assert len(recorded) < 480
+
+    def test_a_floor_outside_the_choices_issues_the_voucher(
+        self, acs_client_mock
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Θυρωρός.",
+        )
+        from order.models.order import Order
+
+        Order.objects.filter(pk=order.pk).update(floor="ROOF")
+        order.refresh_from_db()
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        assert acs_client_mock.last_create_payload["Delivery_Notes"] == (
+            "Θυρωρός."
+        )
 
     def test_success_clears_stale_last_error(self, acs_client_mock):
         """A retry after a prior failed mint must wipe ``last_error`` so

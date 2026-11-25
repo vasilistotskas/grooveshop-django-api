@@ -20,7 +20,7 @@ from order.serializers.item import (
 )
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
-from tenant.models import TenantMembershipRole
+from tenant.enum import TenantMembershipRole
 from tests.utils import TestURLFixerMixin
 from tests.utils.staff import (
     bind_store_tenant,
@@ -435,7 +435,9 @@ class RestockActionTests(TestURLFixerMixin, APITestCase):
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()
 
-        with patch("order.services.order_refunded.send") as refunded_signal:
+        with patch(
+            "order.refunds.service.order_refunded.send"
+        ) as refunded_signal:
             response = self.client.post(
                 self.get_restock_url(self.order_item.id),
                 {"quantity": 2},

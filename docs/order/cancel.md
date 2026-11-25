@@ -16,7 +16,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   works for `GUEST_ORDER_ACCESS_DAYS` after the order, see
   `Order.opens_for_guest`; on a store without customer accounts every order
   is a guest's, `Order.served_as_guest`): `POST /api/v1/order/{id}/cancel` →
-  `OrderService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`.
+  `OrderLifecycleService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`.
   The courier is asked first, see §7.1.1.
 - **Agent gateway:** `GET /api/v1/agent/internal/order/{uuid}`, with its shared
   secret in `X-Internal-Token`, reads an order an agent placed
@@ -29,8 +29,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
 - **Admin**: same `cancel_order` (`customer_initiated=False`) via the "Cancel
   selected orders and restore stock" action. The change form's `status` field
   is **read-only**: a form save wrote the column straight to the row, bypassing
-  both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08)
-  and the transition table in `update_order_status`. Every other transition is
+  both `cancel_order` (so no stock restore) and the transition table in `update_order_status`. Every other transition is
   an action too (`mark_as_processing` … `mark_as_returned`,
   `mark_as_refunded`), routed through `update_order_status`. RETURNED and
   REFUNDED deliberately leave stock alone ([§5.1](shipping-acs.md)).
@@ -40,7 +39,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   An unpaid online order holds its stock until then, so how many one customer
   can have waiting is bounded per store: `ORDER_MAX_UNPAID_ONLINE_ORDERS`
   (default 5, `0` = off; `OrderService._enforce_unpaid_order_limit`, checked in
-  `create_order_from_cart_offline` for online methods only). The customer is
+  `create_order_from_cart` for online methods only). The customer is
   the account, or the email (case-insensitive) for a guest. Every PENDING order
   still awaiting its online payment counts
   (`Order.objects.awaiting_online_payment()`: payment pending, processing or
@@ -53,7 +52,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   An order the agent gateway places has a second bound, per cart: none while
   an earlier order of that cart awaits its online payment
   (`cart_has_unpaid_order`, [§3.2](creation.md)).
-- **Carrier-driven (ACS only)**: `OrderService.cancel_for_dead_shipment`
+- **Carrier-driven (ACS only)**: `OrderLifecycleService.cancel_for_dead_shipment`
   (`customer_initiated=False`, `refund_payment=False`; the shipment is already
   canceled), called by the ACS status sync for a CANCELED shipment of an order
   not yet shipped ([§2.1](state-machines.md)). The courier is not asked to
@@ -69,17 +68,14 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   shipment CANCELED and leaves the order to the customer, staff or the sweep
   above ([§2.1](state-machines.md)). An open order behind it needs follow-up
   ([§2.3](state-machines.md)). So a customer cancel whose parcel event lands
-  before the order row is locked (§7.1.1, step 4) still cancels and refunds:
-  before #600 the event canceled the order first, without a refund, and the
-  customer's own cancel then failed its status check.
+  before the order row is locked (§7.1.1, step 4) still cancels and refunds.
+  If the event canceled the order, it would do so without a refund, and the
+  customer's own cancel would then fail its status check.
 
 There is no other path. `update_order_status` refuses CANCELED
 ([§2.1](state-machines.md)), the admin change form cannot write `status`, and
 the order write serializer keeps it read-only, so `cancel_order` is the only
-code that sets it on an existing order. The `order_canceled` receiver that used
-to backfill `metadata['cancellation']` and cancel the voucher for a status
-written some other way (`handle_order_canceled`) is gone with the last such
-path; `order_canceled` still fires on every cancel for the gift-card credit and
+code that sets it on an existing order. `order_canceled` fires on every cancel for the gift-card credit and
 the loyalty reversal.
 
 `customer_initiated` is a required decision for every caller that is not a
@@ -101,7 +97,7 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    commits here. It never calls the courier.
 4. Staff / system only, after the cancel has COMMITTED: cascades to the
    courier voucher via `cancel_attached_shipment` →
-   `ShippingService.cancel_shipment` (PR #2 H), with no transaction open and
+   `ShippingService.cancel_shipment`, with no transaction open and
    no row locked (§7.1.2). Records the dispatch outcome on metadata. A carrier
    rejection (e.g., voucher already in pickup list) does not undo the cancel:
    it is logged, kept in
@@ -113,19 +109,18 @@ the courier's answer (§7.1.1) rather than silently skipping it.
    For a customer cancel the courier already confirmed in step 0, so the
    outcome is recorded up front, in step 3, and the cascade skips.
 5. After the cancel has COMMITTED, optional refund via `refund_order`
-   (`OrderService._refund_canceled_order`; `refund_payment=True`, and the order
+   (`OrderLifecycleService._refund_canceled_order`; `refund_payment=True`, and the order
    is paid or the ledger still holds refundable money, so an order a provider's
    dashboard already refunded in part gets the rest back, not nothing). The
    refund is its own claim, call and record ([§7.2](refund-execution.md)): no
-   transaction is open while the provider answers, which a cancel used to hold
-   open across the call. A refund refused before any provider is asked (a
+   transaction is open while the provider answers. A refund refused before any provider is asked (a
    dispute is open, nothing left, no credentials) is written to the order's
    history in plain words and reported as
    `refund_info = {"refunded": False, ...}`; for a dispute
    `refund_info["dispute_open"]` is true, the history says the refund waits
    until the dispute closes, and the admin cancel action says the same.
 
-**The receipt of an order canceled before its parcel left** (#747). Where the
+**The receipt of an order canceled before its parcel left.** Where the
 platform issues the store's receipts, a courier or locker order's receipt
 (with movement indication) is registered when its voucher or parcel is
 created and handed to the customer only when the parcel leaves. So every
@@ -152,7 +147,7 @@ Detail: [§7.4](fiscal-movement-receipts.md).
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly
 to cancel — you'll skip the stock release, the refund, the cancellation record
 and the courier, and nothing catches it afterwards. Always go through
-`OrderService.cancel_order`.
+`OrderLifecycleService.cancel_order`.
 
 ### 7.1.0 The payment hold: stock is released when the payment link expires
 
@@ -168,11 +163,9 @@ locks stock.
   (per store, default 30; the validator accepts 30 to 1092) is passed as the
   expiry of the payment link or session on every path that opens a payment:
   `OrderViewSet.create_checkout_session` (hosted Stripe Checkout Session and
-  Viva payment order), and `PayWayService.process_payment`, which the
-  `create_payment_intent` and `retry-payment` endpoints use.
-  `confirm_agent_payment` (UCP/ACP delegated payment) charges at once and opens
-  nothing that waits. The payment-first Stripe path ([§3.1](creation.md))
-  creates no order until the money has moved, so it holds nothing.
+  Viva payment order), the one way a shopper pays an order
+  ([§3.1](creation.md)). `confirm_agent_payment` (UCP/ACP delegated payment)
+  charges at once and opens nothing that waits.
 - **What each provider does with it.**
   - Viva Smart Checkout: `paymentTimeout` on `POST /checkout/v2/orders`,
     **seconds**, default 1800, `65535` = never expires. After it expires the
@@ -186,17 +179,16 @@ locks stock.
     minutes; the default 30 minute hold therefore lasts 31 minutes on Stripe.
     An expired session sends `checkout.session.expired`, and a customer opening
     it sees an expired message.
-  - Stripe PaymentIntent (the order-first `create_payment_intent` /
-    `retry-payment` flow): a PaymentIntent has no expiry, so the sweep cancels
-    it (`StripePaymentProvider.close_payment`, reason `abandoned`) before it
-    releases the stock. An intent Stripe will not cancel (processing,
-    succeeded) leaves the order open for its webhook; the sweep reports
-    `skipped_open`. A retry closes the intent it replaces the same way before
-    it opens the new one (`PayWayService.process_payment`): otherwise the old
-    intent's client secret could still be confirmed after the sweep released
-    the stock. An intent past the point of no return refuses the retry
-    (`previous_payment_in_progress`), and a provider outage refuses it too
-    (`previous_payment_not_closed`).
+  - Stripe PaymentIntent the order holds (an agent's delegated card still
+    awaiting its confirmation, or an older order still holding a
+    client-confirmed intent, which checkout does not create): a PaymentIntent has no expiry, so the sweep
+    cancels it (`StripePaymentProvider.close_payment`, reason `abandoned`)
+    before it releases the stock. A succeeded intent is settled first (the
+    sweep reads it before it cancels anything); one Stripe will not cancel
+    (processing) leaves the order open for its webhook, and the sweep reports
+    `skipped_open`. A hosted link opened for such an order closes the intent
+    first the same way (`OrderViewSet._close_open_intent`), so the two are
+    never payable together.
 - **The expiry actually applied is the one stored.** The provider returns
   `expires_at` (Stripe's own value; for Viva, the reply time plus the timeout,
   never earlier than Viva's clock) and the caller stores it in
@@ -208,8 +200,8 @@ locks stock.
   asks for `min(now + hold, created_at + max)` (Viva is told the remaining
   seconds), so retries cannot chain the stock lock. When no link fits any more
   the endpoint answers 400 `payment_window_expired` before the provider is
-  called: for every start (`create_payment_intent`, `create_checkout_session`,
-  `retry-payment`, `confirm_agent_payment`) once the limit has passed, and for
+  called: for every start (`create_checkout_session`,
+  `confirm_agent_payment`) once the limit has passed, and for
   a hosted session also when less than the provider's `min_hosted_session` is
   left (Stripe: 31 minutes, because a shorter session cannot be opened and a
   longer one would outlive the limit). A retry inside the window works as
@@ -221,13 +213,34 @@ locks stock.
   accepts 0 to 60, `payment_hold.MAX_GRACE`) is added to
   the stored instant, and the 15 minute beat adds its own slack, so a
   confirmation already on its way reaches an open order. Only unpaid (`PENDING`
-  / `PENDING`) orders of an `ONLINE` pay way are swept; COD and
+  / `PENDING`) orders of an `ONLINE` pay way are swept, and such an order was
+  never confirmed, so its cancel is silent to the customer (no CANCELED email
+  or toast, [§6](emails-and-notifications.md)) while its stock and holds are
+  released; COD and
   carrier-collected orders are not ([§4.4](payments.md)). A `PENDING` order
   whose payment FAILED is swept too, `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES`
   (default 30) after the failure: a failed attempt does not end the payment,
   the shopper may confirm the same PaymentIntent with another card or retry the
-  same Viva payment order. Both buckets ask the provider to close the payment
-  first (`close_payment(order)`): Stripe cancels the PaymentIntent and the
+  same Viva payment order. Both buckets first read the provider for a payment
+  it took whose webhook never landed (`order.payments.settlement`), and settle
+  one through the code that webhook runs: Viva's charges listed on the order's
+  payment orders (`GET /api/transactions/?ordercode=`) as Transaction Payment
+  Created events (`viva_settlement.apply_event`), a succeeded Stripe intent
+  through `handle_payment_succeeded` and a paid Checkout Session through the
+  `checkout.session.completed` code (`stripe_settlement`). An intent that did
+  not succeed still has the recorded session read: opening a hosted link
+  cancels the open intent and leaves its `payment_id`. The order is then
+  paid, never canceled unpaid, the webhook that arrives later is a no-op, and
+  the sweep reports it as `settled`. Money the provider took that settles
+  nothing (a Viva payment refunded or disputed before its webhook, one the
+  checks refuse without a flag) flags the order once for the store's review
+  (`flag_payment_mismatch`), also reported `settled`: a read-back settles,
+  flags, or finds nothing taken, and never leaves an order for every run to
+  repeat. Only a Stripe payment still in flight waits for its webhook
+  (`skipped_open`). A provider that cannot be read leaves the order for the
+  next run (`skipped_open`): a payment may have landed. Only then
+  is the provider asked to close the payment (`close_payment(order)`): Stripe
+  cancels the PaymentIntent and the
   order is canceled at once, whatever its hold says. A provider with nothing to
   cancel (Viva, whose payment order stays payable after a failed transaction
   until its own expiry; a hosted Stripe Checkout Session, which records no
@@ -235,9 +248,12 @@ locks stock.
   (`payment_hold_expires_at`, plus the grace window) has ended and not before.
   A provider that cannot be built (its credentials were removed) cannot close
   anything and takes the same wait. A payment that is not closed (that wait, or
-  a Stripe intent that succeeded or is processing) leaves the order open for
-  its webhook and counts `skipped_open`.
-- **What a client reads** (#636). The order detail (`OrderDetailSerializer`:
+  a Stripe intent that is processing) leaves the order open for its webhook and
+  counts `skipped_open`. The cancel itself is decided on the payment the order
+  recorded before the provider was read (`OpenPayment`): under the row lock it
+  is refused when another link or intent was recorded meanwhile, and the next
+  run reads that one.
+- **What a client reads.** The order detail (`OrderDetailSerializer`:
   the owner's and staff's `GET /order/{id}`, the guest route
   `GET /order/uuid/{uuid}`, the agent gateway's
   `GET /agent/internal/order/{uuid}`) serves two instants, each null for
@@ -295,7 +311,7 @@ locks stock.
   `paymentDecidedBy` as the checkout's `expires_at`, so a platform polls until
   Django has decided the order and keeps no window of its own.
 - **A payment that still arrives after the cancel** is not lost: Viva
-  `_handle_payment_created` and Stripe `handle_payment_succeeded` /
+  `viva_settlement.handle_payment_created` and Stripe `handle_payment_succeeded` /
   `checkout.session.completed` route it to
   `OrderService.record_payment_after_cancel` ([§2.2](state-machines.md)): the
   money is booked, the order stays CANCELED, ops is alerted and the order
@@ -326,7 +342,7 @@ tracking poll sees the parcel move (voucher creation stores the tracking number
 but does not advance the status). In that window the courier may already hold
 the parcel, so a customer cancel is only accepted once the courier agrees:
 
-1. `OrderService._ask_courier_to_cancel` re-reads the order's status (an order
+1. `OrderLifecycleService._ask_courier_to_cancel` re-reads the order's status (an order
    that no longer allows a cancel gets the usual status error and the courier
    is not asked), then calls `ShippingService.cancel_shipment` — the same
    carrier path a staff cancel uses (`AcsService.cancel_voucher`,
@@ -367,7 +383,7 @@ the parcel, so a customer cancel is only accepted once the courier agrees:
    usual status error. The shipment was already canceled by then (at the
    courier, or locally when no voucher had been issued), so the order is live
    with no voucher behind it; any other failure of the locked cancel ends the
-   same way. `OrderService._note_shipment_canceled_without_order` logs an ERROR
+   same way. `OrderLifecycleService._note_shipment_canceled_without_order` logs an ERROR
    (the logged-errors alert) and leaves a staff-only NOTE
    (`The customer asked to cancel this order and its shipment was canceled, but the order itself was not canceled (its status is …)`)
    telling staff to create a new voucher. An order another request canceled in
@@ -382,12 +398,12 @@ customer who retries after a cancel that stopped half way is not refused
 ### 7.1.2 A staff or system cancel asks the courier after it has committed
 
 `_cancel_order_locked` holds the order's row lock and the locks of every
-product it restocks. Until #713 it also called the courier before it
-returned: all those rows stayed locked across the carrier's HTTP calls
-(BoxNow's lookup and cancel, ACS's delete), the connection's
-`idle_in_transaction_session_timeout` could end the cancel half way, and
-the shipment was locked after the order while a tracking sync took the two
-the other way round (#613, a deadlock reproduced with two connections). Now:
+product it restocks. Calling the courier before it returns would keep all
+those rows locked across the carrier's HTTP calls (BoxNow's lookup and
+cancel, ACS's delete), the connection's `idle_in_transaction_session_timeout`
+could end the cancel half way. The shipment is locked alone, after the
+order's commit: every path that holds both takes the order first
+(`shipping.locks.lock_with_order`). So:
 
 1. **The cancel commits first.** Step 3 writes
    `metadata['shipment_cancel_pending'] = true`
@@ -467,8 +483,8 @@ What each failure does:
   included) takes every CANCELED order with the flag whose cancel is older
   than `ORDER_SHIPMENT_CANCEL_SWEEP_AFTER_SECONDS` (env, default 600) and
   runs the same `cancel_attached_shipment` (which also asks again for a
-  courier that gave no answer, above). Before #713 such a stop rolled
-  the whole cancel back; without the sweep it would leave a canceled,
+  courier that gave no answer, above). Without the sweep a worker that
+  stops between the commit and the courier call would leave a canceled,
   refunded order with a live voucher.
 - **The sweep and a slow first attempt overlap, or two runs of the
   sweep do.** The sweep takes no lock of its own, because every overlap

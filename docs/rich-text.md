@@ -26,9 +26,9 @@ show less than what is stored.
 ## Typography belongs to the theme
 
 A store's typeface and type size are its theme's. Text pasted from Word or a
-web page carries its own (`font-family: arial; font-size: 14pt` drew a
-webside post's body at 18.7 px against the store's 20 px, and a named face
-is downloaded mid-render), so the policy drops, from every `style`:
+web page carries its own (`font-family: arial; font-size: 14pt` draws the body
+at 18.7 px against a store's 20 px, and a named face is downloaded
+mid-render), so the policy drops, from every `style`:
 
 - `font`, `font-family` and `font-size`;
 - Word's `mso-*` properties, which no browser reads;
@@ -40,20 +40,20 @@ or `class` left empty goes with its attribute. None of this is lost content,
 so a save is never refused for it.
 
 The editor agrees: `TINYMCE_DEFAULT_CONFIG` names no font family or size
-control (the Format menu is TinyMCE 7.8's default without `fontfamily
+control (the Format menu is TinyMCE's default without `fontfamily
 fontsize`) and sets `invalid_styles` to `font font-family font-size`, so a
-paste already shows what will be stored. Rows saved before are brought in
-line by `manage.py normalise_rich_text` (below), which stores what a save
-would (`stored_rich_text`).
+paste already shows what will be stored. `manage.py normalise_rich_text`
+(below) brings rows saved earlier in line, storing what a save would
+(`stored_rich_text`).
 
 A comment in a `style` is removed with them, and a property name spelled with
 a CSS escape is dropped: a browser reads `font-size/**/: 14pt` and
 `font-s9ze: 14pt` as a type size.
 
 The page builder's rich-text settings pass the same sanitiser when a draft is
-saved (`src/builder/validation.py`), so the rule holds for them from the next
-save. Builder documents are not backfilled: versions and releases are
-immutable, so a setting saved before keeps its typeface until it is edited.
+saved (`src/builder/validation.py`). Builder documents are not backfilled:
+versions and releases are immutable, so a setting saved earlier keeps its
+typeface until it is edited.
 The storefront therefore keeps its own rule that ignores a typeface and a
 size in rendered rich text.
 
@@ -89,7 +89,7 @@ Step 4 adds the file's real size beside the author's attributes:
 
 ### Backfill
 
-Rows saved before this existed are brought up to date with
+Rows saved before a rule changed are brought up to date with
 
 ```bash
 uv run python manage.py normalise_rich_text --all-tenants [--dry-run]
@@ -110,13 +110,13 @@ A rich-text field is indexed as the words a reader sees, not as HTML:
 `core.utils.html_text.visible_text` strips the tags, decodes entities and puts
 a space where each tag was. `BlogPostTranslation` (`body`, `body_greeklish*`)
 and `ProductTranslation` (`description`, `description_greeklish*`) do this in
-`get_additional_meili_fields`, which overrides the raw column. Before, tag and
-attribute text (`src` paths, `style`, `class`) was searchable. The search
-endpoints hydrate hits from the database, so what the storefront shows is
-unchanged.
+`get_additional_meili_fields`, which overrides the raw column, so tag and
+attribute text (`src` paths, `style`, `class`) is not searchable. The search
+endpoints hydrate hits from the database, so what the storefront shows is the
+stored markup.
 
-Documents indexed before this keep the raw HTML until reindexed. Once, after
-deploying it, per store:
+Documents indexed under another rule keep their old text until reindexed,
+per store:
 
 ```bash
 uv run python manage.py meilisearch_sync_index blog.BlogPostTranslation

@@ -16,6 +16,14 @@ from pytest_django.fixtures import validate_django_db
 from redis.exceptions import ConnectionError as RedisConnectionError
 
 from tests.db_lifecycle import django_db_keepdb  # noqa: F401
+from tests.response_contract import (  # noqa: F401
+    known_schema_drifts,
+    pytest_runtest_makereport,
+    pytest_sessionfinish,
+    pytest_terminal_summary,
+    pytest_testnodedown,
+    responses_match_the_schema,
+)
 
 # The logger Django reports a failed robust ``on_commit`` callback to.
 _on_commit_logger = logging.getLogger("django.db.backends.base")
@@ -358,7 +366,7 @@ def _queued_search_syncs_do_not_run(monkeypatch):
     """
     from unittest.mock import MagicMock
 
-    from core.tasks import sync_meilisearch_indexes
+    from meili.tasks import sync_meilisearch_indexes
 
     monkeypatch.setattr(sync_meilisearch_indexes, "apply_async", MagicMock())
 
@@ -676,7 +684,7 @@ def acs_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable ACS credentials.
 
     ACS credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
+    ``src/tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
     is_kind_enabled()``, the ACS fanout Celery tasks, and any test
     exercising ACS availability need an active tenant with
     ``Tenant.acs_*`` fields set. A ``SimpleNamespace`` is enough — the
@@ -725,13 +733,28 @@ def boxnow_configured_tenant(bind_tenant):
     """Bind a fake tenant with usable BoxNow credentials.
 
     BoxNow credentials are tenant-only (no settings fallback — see
-    ``tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
+    ``src/tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
     is_kind_enabled()``, the BoxNow fanout Celery tasks, and any test
     exercising BoxNow availability need an active tenant with
     ``Tenant.box_now_*`` fields set.
     """
     tenant = SimpleNamespace(
         schema_name="test-boxnow-tenant", **_BOXNOW_TENANT_FIELDS
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
+def boxnow_live_network(bind_tenant):
+    """Bind a fake tenant on BOX NOW's live network
+    (``Tenant.box_now_live_mode``): the only network whose lockers have
+    sizes (``shipping_boxnow.catalogue.sizes_exist``). A tenant without the
+    flag is on BOX NOW's stage network."""
+    tenant = SimpleNamespace(
+        schema_name="test-boxnow-live",
+        box_now_live_mode=True,
+        **_BOXNOW_TENANT_FIELDS,
     )
     bind_tenant(tenant)
     return tenant
@@ -837,17 +860,12 @@ def provision_meilisearch_indexes(attempts: int = 3) -> None:
 
 @pytest.fixture(scope="session")
 def openapi_schema() -> dict:
-    """The OpenAPI document ``manage.py spectacular`` writes, built once.
+    """The OpenAPI document ``manage.py spectacular`` writes, built once per
+    worker (``tests.utils.openapi.openapi_document``). Read it, never
+    mutate it."""
+    from tests.utils.openapi import openapi_document
 
-    The command is this same call plus rendering
-    (``drf_spectacular/management/commands/spectacular.py``), and one
-    generation takes seconds — it used to run once per test. Shared by
-    every test in the session: read it, never mutate it.
-    """
-    from drf_spectacular.settings import spectacular_settings
-
-    generator = spectacular_settings.DEFAULT_GENERATOR_CLASS()
-    return generator.get_schema(request=None, public=True)
+    return openapi_document()
 
 
 @pytest.fixture(scope="session")
@@ -903,7 +921,7 @@ def _retry_meili_connection_errors(attempts: int = 3) -> None:
 def checkout_legal_documents(db):
     """The store's terms of use and privacy policy, published in every
     language, as every store that takes orders has them. A checkout test
-    that creates a payment intent or an order needs them
+    that creates an order needs them
     (``tests/utils/legal.py``)."""
     from tests.utils.legal import publish_checkout_legal_documents
 
@@ -911,34 +929,7 @@ def checkout_legal_documents(db):
 
 
 @pytest.fixture
-def trust_intent_binding():
-    """Let a test whose mocked provider returns a bare intent create an order.
-
-    ``OrderService.create_order_from_cart`` refuses an intent whose
-    server-set metadata does not name the cart
-    (``order.payments.payment_binding``). Tests about something else (stock,
-    totals, attribution) mock the provider with no metadata; this accepts
-    their intent so they stay about that. The refusal itself is covered,
-    unpatched, in ``tests/integration/order/test_payment_binding.py``.
-    """
-    from unittest.mock import patch
-
-    from order.services import OrderService
-
-    with patch.object(OrderService, "_verify_intent_binding"):
-        yield
-
-
-@pytest.fixture(scope="session")
-def generated_schema():
-    """The OpenAPI document the code generates, built once per worker."""
-    from drf_spectacular.generators import SchemaGenerator
-
-    return SchemaGenerator().get_schema(request=None, public=True)
-
-
-@pytest.fixture
-def documented(generated_schema):
+def documented(openapi_schema):
     """Check a real response body against what its operation documents.
 
     ``documented(response, "/api/v1/product/{id}", "get")`` validates the
@@ -951,8 +942,8 @@ def documented(generated_schema):
 
     def check(response, path, method):
         declared = response_schema(
-            generated_schema, path, method, str(response.status_code)
+            openapi_schema, path, method, str(response.status_code)
         )
-        validate_against(generated_schema, declared, response.json())
+        validate_against(openapi_schema, declared, response.json())
 
     return check

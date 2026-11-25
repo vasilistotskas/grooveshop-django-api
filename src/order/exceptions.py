@@ -27,10 +27,8 @@ Exception Hierarchy:
     │   └── OrderNotCancelableError
     │   └── ParcelWithCourierError
     └── PaymentError
-        ├── PaymentNotFoundError
         ├── PaymentStatusUnavailableError
-        ├── PaymentVerificationError
-        ├── OrderChangedDuringPaymentError
+        │   └── ProviderTransactionUnknownError
         └── WebhookVerificationError
 """
 
@@ -284,7 +282,7 @@ class LoyaltyRedemptionError(InvalidOrderDataError):
     is more than the products).
 
     The shopper was shown the discount, so it is never dropped: the
-    quote, the payment intent or the order is refused instead.
+    quote or the order is refused instead.
 
     A subclass of ``InvalidOrderDataError`` so order creation passes it
     on as it passes its other refusals, with the program's message under
@@ -332,6 +330,19 @@ class ShippingRefusedError(InvalidOrderDataError):
         super().__init__(
             message, field_errors={"shipping_provider_code": [message]}
         )
+
+
+class PickupPointUnfitError(InvalidOrderDataError):
+    """Raised when the chosen pickup point cannot be confirmed to take the
+    cart's parcel (``shipping.interfaces.PickupPointUnfit``). Answered as
+    the field error ``code`` (``pickup_point_too_small``,
+    ``pickup_point_size_unknown``) on the carrier's location field."""
+
+    def __init__(self, field: str, message: str, code: str):
+        self.field = field
+        self.message = message
+        self.code = code
+        super().__init__(message, field_errors={field: [message]})
 
 
 class ShippingPriceUnresolvedError(InvalidOrderDataError):
@@ -561,7 +572,7 @@ class PaymentError(OrderServiceError):
     Base exception for payment-related errors.
 
     Raised when operations involving payment processing fail. This includes
-    payment intent creation, verification, webhook processing, and other
+    opening a payment, reading its status, webhook processing, and other
     payment-related issues.
     """
 
@@ -595,28 +606,6 @@ class RefundOutstandingError(OrderServiceError):
         )
 
 
-class PaymentNotFoundError(PaymentError):
-    """
-    Raised when a payment intent doesn't exist.
-
-    This exception is raised when attempting to perform operations on a payment
-    intent that cannot be found in the payment gateway or database.
-
-    Attributes:
-        payment_id (str): The ID of the payment intent that was not found
-    """
-
-    def __init__(self, payment_id: str):
-        """
-        Initialize PaymentNotFoundError with payment ID.
-
-        Args:
-            payment_id: The ID of the payment intent that was not found
-        """
-        self.payment_id = payment_id
-        super().__init__(f"Payment intent with ID {payment_id} not found")
-
-
 class PaymentInProgressError(PaymentError):
     """Raised when a hosted payment session of an order has been paid
     and the order does not know it yet: the provider's webhook has not
@@ -648,99 +637,16 @@ class PaymentStatusUnavailableError(PaymentError):
         )
 
 
-class OrderChangedDuringPaymentError(PaymentError):
+class ProviderTransactionUnknownError(PaymentStatusUnavailableError):
     """
-    Raised when an order changed while a payment was being opened for it.
+    Raised when the provider answers that the transaction does not exist
+    (Viva's Retrieve Transaction: 404, "Transaction Id does not exist").
 
-    The provider call runs without the order row lock. If a cancel, or a
-    webhook for the order's previous payment, landed meanwhile, that
-    change wins: the new payment is not recorded, and its client secret
-    must not reach the customer, so it can never be confirmed.
-
-    Attributes:
-        order_id (int): The ID of the order that changed
+    Unavailable to a caller that knows no more: under another store's
+    credentials a real transaction reads the same, so a webhook that names
+    it is retried and tried against the next store. A caller that already
+    verified the rest skips it (a reversal's ``ParentId``).
     """
-
-    def __init__(self, order_id: int):
-        self.order_id = order_id
-        super().__init__(
-            f"Order {order_id} changed while a payment was being opened"
-        )
-
-
-class PaymentVerificationError(PaymentError):
-    """
-    Raised when payment verification fails.
-
-    This exception is raised when attempting to verify a payment and the
-    verification fails due to invalid payment status, mismatched amounts,
-    or other verification issues.
-
-    Attributes:
-        payment_id (str): The ID of the payment that failed verification
-        reason (str): The reason for verification failure
-    """
-
-    def __init__(self, payment_id: str, reason: str):
-        """
-        Initialize PaymentVerificationError with verification details.
-
-        Args:
-            payment_id: The ID of the payment that failed verification
-            reason: The reason for verification failure
-        """
-        self.payment_id = payment_id
-        self.reason = reason
-        super().__init__(
-            f"Payment verification failed for {payment_id}: {reason}"
-        )
-
-
-class PaymentAmountMismatchError(PaymentError):
-    """
-    Raised when the provider's payment amount does not match the
-    server-calculated order total.
-
-    This prevents a class of attack where a tampered client submits a
-    payment intent created for a lower amount than the actual cart total.
-
-    Attributes:
-        provider_amount_cents (int): Amount reported by the payment provider
-            (in EUR cents).
-        calculated_amount_cents (int): Amount calculated server-side
-            (in EUR cents).
-    """
-
-    def __init__(
-        self, provider_amount_cents: int, calculated_amount_cents: int
-    ):
-        self.provider_amount_cents = provider_amount_cents
-        self.calculated_amount_cents = calculated_amount_cents
-        super().__init__(
-            f"Provider amount {provider_amount_cents} cents != "
-            f"calculated {calculated_amount_cents} cents"
-        )
-
-
-class PaymentCurrencyMismatchError(PaymentError):
-    """
-    Raised when the provider's payment currency does not match the
-    project's configured default currency (EUR).
-
-    Attributes:
-        provider_currency (str): Currency code reported by the payment
-            provider (lower-case ISO 4217).
-        expected_currency (str): The project's configured default currency
-            (lower-case ISO 4217).
-    """
-
-    def __init__(self, provider_currency: str, expected_currency: str):
-        self.provider_currency = provider_currency
-        self.expected_currency = expected_currency
-        super().__init__(
-            f"Provider currency '{provider_currency}' != "
-            f"expected '{expected_currency}'"
-        )
 
 
 class WebhookVerificationError(PaymentError):

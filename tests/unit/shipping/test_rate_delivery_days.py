@@ -77,7 +77,7 @@ def _boxnow_option():
 
 def test_options_expose_the_rates_days(boxnow_configured_tenant):
     ShippingRate.objects.filter(
-        provider__code="boxnow", country_id="GR"
+        provider__code="boxnow", zone__country_id="GR"
     ).update(delivery_days_min=1, delivery_days_max=3)
     option = _boxnow_option()
     assert option["delivery_days_min"] == 1

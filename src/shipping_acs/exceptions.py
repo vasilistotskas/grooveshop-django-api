@@ -23,6 +23,7 @@ ACS error semantics (per PDF):
 from __future__ import annotations
 
 from shipping.exceptions import (
+    CarrierAPIError,
     CarrierBusyError,
     CarrierError,
     CarrierUnavailableError,
@@ -37,7 +38,7 @@ class AcsConfigError(AcsError, CarrierUnavailableError):
     """Raised when required ACS credentials or settings are missing."""
 
 
-class AcsAPIError(AcsError):
+class AcsAPIError(AcsError, CarrierAPIError):
     """Raised when ACS reports a business error.
 
     Attributes:
@@ -68,6 +69,10 @@ class AcsAPIError(AcsError):
                 f"{self.error_message}"
             )
         return f"ACS [{self.alias}]: {self.error_message}"
+
+    @property
+    def text(self) -> str:
+        return self.error_message
 
 
 class AcsUndocumentedHttpError(AcsAPIError):

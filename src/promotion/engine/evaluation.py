@@ -3,7 +3,9 @@ with, and the classification the coupon picker shares."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from djmoney.money import Money
@@ -14,7 +16,11 @@ from promotion.engine.benefits import (
     benefit_amount,
     gift_entitlement,
 )
-from promotion.engine.eligibility import check_eligibility, collect_candidates
+from promotion.engine.eligibility import (
+    automatic_candidates,
+    check_eligibility,
+    collect_candidates,
+)
 from promotion.engine.results import (
     NEW_LINE_PK,
     AppliedPromotion,
@@ -31,6 +37,9 @@ from promotion.engine.teasers import (
 )
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.models import Promotion, PromotionCode
+
+if TYPE_CHECKING:
+    from cart.models import CartItem
 
 
 class PromotionEngine:
@@ -59,15 +68,20 @@ class PromotionEngine:
         user=None,
         email: str = "",
         lock: bool = False,
+        items: Sequence[CartItem] | None = None,
     ) -> CartDiscountResult:
         """Compute the discount the cart is entitled to right now.
 
         ``lock=True`` takes ``select_for_update`` on the candidate
         Promotion rows — use it ONLY inside the order-create
         transaction so usage-limit enforcement is race-free. The
-        preview surfaces (cart read, payment-intent create) evaluate
-        without locks; the order-create verification recomputes with
-        the lock held and is the source of truth.
+        preview surfaces (cart read, the checkout quote) evaluate
+        without locks; order creation recomputes with the lock held
+        and is the source of truth.
+
+        ``items`` are the cart's lines as the caller already read them:
+        the checkout quote prices the lines it evaluated, from one read.
+        Without them the engine reads the lines itself.
         """
         result = CartDiscountResult()
         if not cls.is_enabled():
@@ -77,7 +91,7 @@ class PromotionEngine:
         # merchant explicitly opts in (B2B_ALLOW_PROMOTIONS) — a
         # negotiated B2B price plus a retail promo double-discounts
         # silently. One gate here covers every caller (cart preview,
-        # payment intent, order create), because pricing always binds
+        # quote, order create), because pricing always binds
         # before evaluation on those paths. Attached codes surface as
         # COMBINATION_DISALLOWED (non-blocking, ACP vocabulary): a new
         # apply_coupon gets a clear refusal instead of silently
@@ -92,15 +106,20 @@ class PromotionEngine:
             B2BPricingService.cart_pricing_active(cart)
             and not B2BService.promotions_allowed()
         ):
+            result.codes = list(
+                cart.applied_codes.values_list("code__code", flat=True)
+            )
             result.rejected.extend(
                 (code, str(CouponRejectionReason.COMBINATION_DISALLOWED))
-                for code in cart.applied_codes.values_list(
-                    "code__code", flat=True
-                )
+                for code in result.codes
             )
             return result
 
-        cart_items = list(cart.items.select_related("product"))
+        cart_items = (
+            list(items)
+            if items is not None
+            else list(cart.items.select_related("product"))
+        )
         if not cart_items:
             return result
 
@@ -109,7 +128,7 @@ class PromotionEngine:
             (item.total_price.amount for item in cart_items), Decimal(0)
         )
 
-        candidates, rejected = collect_candidates(cart, lock=lock)
+        candidates, rejected, result.codes = collect_candidates(cart, lock=lock)
         result.rejected.extend(rejected)
 
         monetary, applicable_free_shipping = cls.classify(
@@ -179,6 +198,39 @@ class PromotionEngine:
             currency,
         )
         return sum((entry.amount.amount for entry in chosen), Decimal(0))
+
+    @classmethod
+    def evaluate_single_unit(cls, product) -> CartDiscountResult:
+        """What a cart holding one ``product`` and nothing else gets.
+
+        For a shopper not known yet and no code applied: the automatic
+        promotions only, through the classification, stacking and clamp
+        :meth:`evaluate` charges a cart with, over a one-line cart priced
+        as a cart line is (``product.final_price``). The discount, the
+        free shipping and the gifts it grants are the ones checkout
+        would grant that cart, so a product page can quote that cart's
+        shipping. ``first_order_only`` promotions are left out, as for
+        any anonymous cart (``check_eligibility``).
+        """
+        result = CartDiscountResult()
+        if not cls.is_enabled():
+            return result
+        line = SimulatedLine(NEW_LINE_PK, product, 1, product.final_price)
+        items = [line]
+        currency = settings.DEFAULT_CURRENCY
+        monetary, free_shipping = cls.classify(
+            automatic_candidates(),
+            cart_items=items,
+            items_total=line.total_price.amount,
+            currency=currency,
+            user=None,
+            email="",
+            result=result,
+        )
+        chosen = clamp(resolve_stacking(monetary, result), items, currency)
+        result.applied = [e for e in chosen if e.amount.amount > 0]
+        result.free_shipping = free_shipping
+        return result
 
     @classmethod
     def _teaser_holds(

@@ -87,8 +87,8 @@ def store_settings(names: Iterable[str]) -> dict[str, Any]:
 # ``tests/integration/core/test_settings_public_api.py`` refuses one.
 PUBLIC_SETTING_KEYS = frozenset(
     {
-        # Shipping price/free-threshold is a per-country ``ShippingRate``
-        # row now (``/api/v1/shipping/options`` and
+        # Shipping price/free-threshold is a ``ShippingRate`` row of a
+        # shipping zone now (``/api/v1/shipping/options`` and
         # ``/api/v1/shipping/free-shipping-info``), not a Setting. The
         # carriers' own settings (e.g. ACS_DYNAMIC_PRICING_ENABLED) are
         # server-side only and stay admin-gated.

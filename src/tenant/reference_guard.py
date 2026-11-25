@@ -10,7 +10,7 @@ gone, or the delete fails on a table that is not there.
 
 This module asks every store's schema instead. It finds the references
 from the models' own reverse relations (hidden ones included, which is
-where ``ShippingRate.country`` and ``PayWay.country`` are, both
+where ``ShippingZone.country`` and ``PayWay.country`` are, both
 ``related_name="+"``), so a new model that points at a country is covered
 the day it is added.
 

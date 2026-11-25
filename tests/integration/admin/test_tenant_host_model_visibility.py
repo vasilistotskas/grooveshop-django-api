@@ -196,7 +196,7 @@ class TestReferenceDataIsReadOnlyOnAStore(TestCase):
 
     def test_every_store_role_may_view_it(self):
         from tenant.auth_backends import _permissions_for_role
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
 
         for role in (
             TenantMembershipRole.STAFF,

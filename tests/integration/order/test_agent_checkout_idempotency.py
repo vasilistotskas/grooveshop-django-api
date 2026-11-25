@@ -9,7 +9,7 @@ unknown.
 What is pinned here:
 
 * the order stores the checkout, and a repeat is answered with that order,
-  201 with the same body, on either creation path: no second order, the
+  201 with the same body, whatever the pay way: no second order, the
   stock taken once, even after the first order kept, emptied or deleted
   the cart;
 * only the gateway can name a checkout: without its secret the field is
@@ -26,7 +26,7 @@ What is pinned here:
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -42,7 +42,6 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from country.factories import CountryFactory
 from order.checkout.attribution import AttributionInput
-from order.enum.status import PaymentStatus
 from order.exceptions import AgentCheckoutOrderedError
 from order.factories.order import OrderFactory
 from order.models.order import Order
@@ -113,8 +112,8 @@ class _Cart:
         }
 
     def order(self, checkout: UUID | None, *, pay_way=None) -> Order:
-        """Place an agent order the order-first way (Viva unless told)."""
-        return OrderService.create_order_from_cart_offline(
+        """Place an agent order (Viva unless told)."""
+        return OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=self.cart,
@@ -124,30 +123,6 @@ class _Cart:
                 agent_checkout=checkout,
             )
         )
-
-    def pay_first(
-        self, checkout: UUID, *, payment_intent_id: str = "pi_agent_checkout"
-    ) -> Order:
-        """Place an agent order the payment-first way, on a Stripe intent."""
-        provider = Mock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        with patch(
-            "order.payments.payment.get_payment_provider", return_value=provider
-        ):
-            return OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=self.cart,
-                    shipping_address=self.address(),
-                    payment_intent_id=payment_intent_id,
-                    pay_way=PayWayFactory.create_online_payment("stripe"),
-                    attribution=AGENT,
-                    agent_checkout=checkout,
-                )
-            )
 
     def stock(self) -> int:
         self.product.refresh_from_db()
@@ -175,22 +150,21 @@ class TestTheServiceAnswersARepeatWithTheOrder:
         assert list(Order.objects.values_list("pk", flat=True)) == [first.pk]
         assert cart.stock() == STOCK - 1
 
-    @pytest.mark.usefixtures("trust_intent_binding")
-    def test_the_payment_first_path_stores_and_answers_it_too(self):
-        """The repeat comes on another intent, so only the checkout can
-        name the first order (a repeat of the intent is answered by it
-        too, ``test_payment_intent_idempotency``)."""
+    def test_a_stripe_order_stores_and_answers_it_too(self):
+        """Stripe is paid on its hosted page after the order, like Viva:
+        the cart is kept, and the repeat is answered with the first
+        order, not refused or ordered twice."""
         cart = _Cart()
         checkout = uuid4()
-        first = cart.pay_first(checkout)
+        stripe = PayWayFactory.create_online_payment("stripe")
+        first = cart.order(checkout, pay_way=stripe)
 
-        second = cart.pay_first(
-            checkout, payment_intent_id="pi_agent_checkout_repeat"
-        )
+        second = cart.order(checkout, pay_way=stripe)
 
         assert first.agent_checkout == checkout
         assert second.pk == first.pk
         assert Order.objects.count() == 1
+        assert cart.stock() == STOCK - 1
 
     def test_a_repeat_does_not_send_a_second_confirmation(self):
         cart = _Cart()
@@ -551,7 +525,7 @@ class TestTwoCallsOfOneCheckoutRacing:
 
         placed, failures = race(
             lambda: (
-                OrderService.create_order_from_cart_offline(
+                OrderService.create_order_from_cart(
                     **priced(
                         legal_acceptance=acceptance,
                         cart=cart.cart,

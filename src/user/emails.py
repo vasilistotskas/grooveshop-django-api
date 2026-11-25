@@ -1,9 +1,8 @@
 """The account emails: their types, builders and samples.
 
 The data-export link, the newsletter's double opt-in and the re-engagement
-mail. ``emails.EmailsConfig`` imports this module at boot; the tasks
-(``user.tasks``, ``core.tasks``) choose WHEN to send and keep the
-bookkeeping after a send.
+mail. ``emails.EmailsConfig`` imports this module at boot; ``user.tasks``
+chooses WHEN to send and keeps the bookkeeping after a send.
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ from emails.gates import FeatureGate, ScheduleGate
 from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
 from tenant.customer_accounts import customer_accounts_on
-from user.utils.subscription import subscription_confirmation_url
+from user.services.subscription_mail import subscription_confirmation_url
 
 if TYPE_CHECKING:
     from user.models import UserAccount, UserDataExport, UserSubscription

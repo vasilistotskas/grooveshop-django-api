@@ -171,14 +171,14 @@ class YourCategoryManager(TreeTranslatableManager):
 
 ### For Soft-Deletable Models
 
-Add `SoftDeleteQuerySetMixin` from `core.mixins.queryset`:
+Add `SoftDeleteQuerySetMixin` from `core.mixins` (`src/core/mixins/soft_delete.py`, the one soft-delete implementation; its bulk `delete()` soft-deletes, `hard_delete()` removes rows):
 
 ```python
 from core.managers.base import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
 )
-from core.mixins.queryset import SoftDeleteQuerySetMixin
+from core.mixins import SoftDeleteQuerySetMixin
 
 
 class YourModelQuerySet(SoftDeleteQuerySetMixin, TranslatableOptimizedQuerySet):
@@ -193,6 +193,8 @@ class YourModelQuerySet(SoftDeleteQuerySetMixin, TranslatableOptimizedQuerySet):
 ```
 
 ### Annotation Methods (for counts/aggregates)
+
+A queryset that carries several annotations uses correlated subqueries, not `Count`/`Avg` joins: each aggregate join puts every other annotation into the `GROUP BY` and multiplies the rows (`.claude/rules/domain-patterns.md`, "Computed properties"). Two aggregates over different multi-valued joins are wrong even alone: `Avg("reviews__rate")` beside `Count("reviews__votes")` averages each review once per vote. `Count`/`Avg` below fits only a queryset whose aggregates all read one multi-valued relation and that carries no other annotation; otherwise use a correlated subquery per aggregate.
 
 ```python
 from django.db.models import Avg, Count, F, Q, Value
@@ -534,13 +536,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.views import BaseModelViewSet
 from your_app.filters import YourModelFilter
 from your_app.models import YourModel
 from your_app.serializers import (
@@ -998,14 +1000,14 @@ from core.api.views import BaseModelViewSet
 
 # Serializers
 from core.api.serializers import ErrorResponseSerializer
-from core.api.schema import generate_schema_multi_lang
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
-    TranslatedFieldExtended,
     create_schema_view_config,
     crud_config,
 )
+from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 
 # Managers
 from core.managers.base import (
@@ -1015,7 +1017,7 @@ from core.managers.base import (
     TranslatableOptimizedQuerySet,
 )
 from core.managers.tree import TreeTranslatableManager, TreeTranslatableQuerySet
-from core.mixins.queryset import SoftDeleteQuerySetMixin
+from core.mixins import SoftDeleteQuerySetMixin
 
 # Filters
 from core.filters.core import (

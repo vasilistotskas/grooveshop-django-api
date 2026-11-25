@@ -1,7 +1,8 @@
 """URL patterns for the shipping_acs app.
 
-Mounted at ``api/v1/`` inside ``i18n_patterns`` in ``src/core/urls.py``.
-ACS does not have webhooks — there is no root-level URL.
+The carrier's ``api_urlconf``, mounted at ``api/v1/`` after
+``shipping.urls`` on a store's host. ACS has no webhook, so no
+``webhook_urlconf``.
 """
 
 from __future__ import annotations

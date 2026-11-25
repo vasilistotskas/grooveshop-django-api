@@ -12,9 +12,7 @@ and says which file holds each § number used here.
 **retail** documents only, over the ERP `SendInvoices` channel, with the
 tenant's own credentials (`tenant.credentials.mydata_credentials()`):
 
-- **11.1 retail receipt** (ΕΛΠ art. 12(1)): the order's `Invoice` row. The
-  model keeps its name from when it also carried B2B invoices; it is the
-  receipt now.
+- **11.1 retail receipt** (ΕΛΠ art. 12(1)): the order's `Invoice` row.
 - **11.4 retail credit document** (art. 12(4)): a `RetailCredit` row. AADE
   forbids `correlatedInvoices` on 11.4 (error 205, confirmed against the dev
   API on 2026-10-12), so the payload names no receipt and
@@ -65,9 +63,9 @@ by `OrderDetail.hasSpecimenReceipt`: a demo store AND `receipt_issuable(order)`
 (a RECEIPT order at SHIPPED onwards, `RECEIPT_ISSUING_STATUSES`); any other
 store and any earlier status answer 404 and `false`. It never issues: no
 `Invoice` row, no `InvoiceCounter` slot, no stored file, no myDATA call,
-nothing emailed; the PDF is streamed and forgotten. The API only exposes the
-flag and the download; the storefront button, when it lands, is to sit beside
-(never instead of) the real receipt's `hasInvoice`. Access is the same as the
+nothing emailed; the PDF is streamed and forgotten. The API exposes the
+flag and the download; the storefront button sits beside (never instead of) the
+real receipt's `hasInvoice`. Access is the same as the
 receipt's: the owner, staff, or a guest holding the order's `?uuid=`
 (`/invoice`, `/invoice/download` and the specimen route are all in
 `GUEST_UUID_QUERY_ACTIONS`; a uuid never opens an account-owned order, and the
@@ -85,10 +83,12 @@ date). `MyDataConfig.is_ready()` needs both (the ground unless
 `prod` is refused, never guessed), plus the tenant's credentials; until then
 nothing is built or sent, whoever asks: `generate_invoice` refuses to issue
 (`ReceiptNotIssuable`), the order's "Invoicing & myDATA" actions are hidden and
-refused (`has_retail_documents_permission`), the order's Receipt card says the
+refused (`OrderAdmin.has_issuing_permission`), the order's Receipt card says the
 store issues the receipt outside the platform, and the dashboard shows a danger
 alert when the switch is on but the ground is blank (outside the sandbox
-exception), or when the environment is invalid. "Regenerate receipt" only
+exception), or when the environment is invalid. Both read
+`MyDataConfig.unmet()`, the list of conditions not met, which `is_ready()` is
+true exactly when empty, so the dashboard and the issuing gate cannot disagree. "Regenerate receipt" only
 re-renders a receipt that exists; it never creates one. The customer sees a
 receipt (`hasInvoice`, `/order/{id}/invoice`, `/invoice/download`; a guest with
 the order's `?uuid=` too) only once AADE registered it
@@ -124,8 +124,8 @@ payment rows are the ones `src/order/accounting/mydata/builder.py` always emitte
 code). A refused or unanswered receipt is **never emailed**: the customer's
 email (`send_invoice_email`, "Receipt ...") goes out only after AADE registered
 it and the PDF carries the MARK; staff resubmit with "Send receipt to myDATA".
-The 228 duplicate-uid MARK recovery through `RequestTransmittedDocs` is
-unchanged. The PDF rendered before the registration prints no MARK, so the
+A 228 duplicate-uid answer is recovered through `RequestTransmittedDocs`.
+The PDF rendered before the registration prints no MARK, so the
 save that records the MARK clears it (`service._drop_the_unregistered_pdf`)
 and `send_invoice_to_mydata` renders the registered one: until then the
 receipt is not deliverable (no stored PDF), and a render that fails leaves
@@ -164,7 +164,7 @@ per rate at what each holds, to the cent, the net derived cumulatively), so the
 PDF, `Invoice.total`, `vat_breakdown` and the myDATA payload (`_receipt_lines`
 uses the frozen breakdown, one line per rate, when the order's own lines no
 longer add up to the receipt) agree. A refund AFTER the receipt row existed
-gets its credit as before: `create_pending_credits` only reads REFUND rows
+gets its credit: `create_pending_credits` only reads REFUND rows
 created at or after `invoice.created_at`, which is the other half of this rule.
 If everything was returned before issuance there is no consideration left and
 no receipt: `generate_invoice` refuses with `ReceiptNotIssuable` ("refunded in
@@ -206,7 +206,7 @@ row's creation to `refunded_before_receipt` as `before`); a receipt with a
 MARK is frozen.
 
 **A chargeback owes a credit document only when the goods came back, and staff
-say so (decision M6, refined).** A lost dispute is the card network taking
+say so.** A lost dispute is the card network taking
 money back, not the merchant reversing the sale, so the receipt stands when the
 customer kept the goods. When they came back or never arrived the sale is
 reversed in fact, and art. 12(4) (a credit "in the case of discounts or
@@ -219,8 +219,8 @@ CHARGEBACK row (no row = undecided), for every chargeback of the order, with
 through the one credit path: `create_pending_credits` credits each such
 chargeback once (`RetailCredit.reason` CHARGEBACK, `chargeback` one-to-one with
 the ledger row), for what the chargeback took, capped at what the receipt still
-holds (`_capped_to_receipt`; a receipt with nothing left is refused with a
-note, as for a refund), on the same cut-off as a refund with the decision as
+holds (a receipt with nothing left is refused with a note, as for a
+refund), on the same cut-off as a refund with the decision as
 its moment: a decision made before the receipt row existed nets the receipt
 (`PaymentLedger.chargebacks_returned` inside `refunded_before_receipt`, so a
 full return means no receipt), one made after it is credited. Kept credits
@@ -240,7 +240,7 @@ is the one reconciliation (under the order row lock, idempotent) and the
 registered yet. It is dispatched by:
 
 - `handle_order_refunded`: every refund path ends in
-  `PaymentLedger.record_refund` and signals `order_refunded` once per REFUND
+  `RefundService.book_refund` and signals `order_refunded` once per REFUND
   row (in-app refund, the staff "Refund" action, `cancel_order`, Stripe
   `refund.created`, Viva reversal 1797), so each refund gets one document,
   `RetailCredit.refund` being one-to-one;
@@ -281,13 +281,32 @@ before that has it canceled
 ([`fiscal-movement-receipts.md`](fiscal-movement-receipts.md)). The admin actions ("Cancel receipt in myDATA
 (issued in error)", and "Cancel in myDATA" on the Retail Credit Documents list)
 do not enforce the "never used" rule yet; the guard is listed in issue #197.
+Both are offered only where the platform issues the store's documents
+(`MyDataConfig.is_ready`): the receipt's to whoever may change the order, the
+credit's to whoever holds `order.change_retailcredit`, STAFF included
+(`RetailCreditAdmin.has_cancel_in_mydata_permission`; the register itself
+refuses `change`, so a credit document is never edited there). The credit's
+action is a detail action on the credit's own page, one credit at a time, never
+a changelist bulk action: a cancellation at AADE cannot be undone, so no filter
+or "select all" can cancel a batch. It cancels only a credit AADE registered
+(it has a MARK) and has not canceled; for any other it queues nothing and says
+why. The permission is the role gate alone, because one that failed on the
+credit would answer the click with a bare 403. Both cancel actions (the
+receipt's and the credit's) confirm through an Unfold dialog first, so the
+irreversible `CancelInvoice` runs only on a CSRF-protected POST, never on a
+GET of the action link. The task takes one claim per document before it reads
+the document again and sends (`order.tasks._cancel_registered_document`; a
+receipt's claim is the one `settle_canceled_receipt` takes, so a staff cancel
+and the automatic settle exclude each other): a second click, or a cancel racing
+the settle, sends nothing, and one that finds the document already canceled
+sends nothing and writes no note.
 
 **Invoices (B2B) are not issued by the platform.** From 2.11.2026 AADE decision
 Α.1128/2025 art. 1(2) requires 1.1 and 5.1 documents to come from a licensed
 provider or AADE's free timologio app; an ERP-issued invoice counts as not
 issued (circular Ε.2004/2026). A `document_type=INVOICE` order therefore
 produces no `Invoice`, no PDF, no email and no myDATA submission
-(`receipt_issuable` refuses it; the 1.1 builder is gone). The checkout still
+(`receipt_issuable` refuses it). The checkout still
 collects the buyer's company details; the order admin's "Billing / Invoice" tab
 shows staff what timologio needs (`OrderAdmin.timologio_summary`: the identity
 and the VAT rows of the order, from `src/order/accounting/taxation.py`) and records what
@@ -295,7 +314,7 @@ they issued (`Order.timologio_invoice_number` / `_mark`,
 `timologio_credit_number` / `_mark`). The order confirmation says an invoice
 was *requested* ("Invoice request"), never that one is attached.
 
-**Settled questions** (research of 2026-10-14, primary sources in issue #197):
+**Settled questions** (primary sources in issue #197):
 an e-shop needs a ΦΗΜ or a licensed provider for its retail receipts, so the
 ERP channel needs a recorded exemption (above); the law sets no deadline for a
 retail credit document (the "15th of the next month" rule is for credit

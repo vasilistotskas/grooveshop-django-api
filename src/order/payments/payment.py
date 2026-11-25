@@ -5,8 +5,9 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, ClassVar, cast
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import moneyed
@@ -23,6 +24,7 @@ from order.enum.status import PaymentStatus
 from order.exceptions import (
     PaymentInProgressError,
     PaymentStatusUnavailableError,
+    ProviderTransactionUnknownError,
 )
 from order.payments.payment_binding import PaymentPurpose, binding_metadata
 
@@ -51,6 +53,19 @@ class ProviderRefund:
 
 
 @dataclass(frozen=True, slots=True)
+class LandedCharge:
+    """A payment Viva lists as having taken money on one of an order's
+    payment orders (:meth:`VivaWalletPaymentProvider.landed_charges`)."""
+
+    order_code: str
+    transaction_id: str
+    #: Viva's ``StatusId`` for it now: ``F`` finished, or refunded or
+    #: disputed since (``VIVA_MONEY_TAKEN_STATUS_IDS``).
+    status_id: str
+    amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class LiveCheckoutSession:
     """A hosted payment session of an order that can still be paid: the
     link a new request for one gets back (``live_checkout_session``)."""
@@ -66,11 +81,10 @@ class OpenPayment:
     opens a new one: the state, the client-confirmed payment
     (``payment_id``) and the hosted session (``recorded_checkout_session``).
 
-    Every write of a newly opened payment, a hosted session
-    (``create_checkout_session``) or a client-confirmed intent
-    (``PayWayService.process_payment``), goes through :meth:`lock_unchanged`,
-    so an order has one payable instrument: a request that finds another
-    opened, paid or canceled since it read the order records nothing (#643).
+    Every write of a newly opened hosted session
+    (``create_checkout_session``) goes through :meth:`lock_unchanged`, so an
+    order has one payable instrument: a request that finds another opened,
+    paid or canceled since it read the order records nothing (#643).
     """
 
     status: str
@@ -133,14 +147,15 @@ class PaymentProvider(ABC):
     #: end sooner than this cannot be created, so the caller refuses.
     min_hosted_session: ClassVar[timedelta] = timedelta(0)
 
-    #: Intent-first: an intent is minted before the order exists and the
-    #: shopper confirms it client-side. The order-creation path can then
-    #: demand a ``payment_intent_id``.
+    #: The PSP mints a client-confirmed intent the shopper confirms in the
+    #: browser (``process_payment``): how a gift-card purchase is paid. An
+    #: order's open intent of this kind (an agent's delegated card) is
+    #: closed before a hosted link opens. Only providers declaring this
+    #: implement ``process_payment``.
     supports_payment_intent: ClassVar[bool] = False
 
-    #: Order-first: the shopper is redirected to a page the PSP hosts,
-    #: so the order must exist before any money moves and a partial
-    #: deduction is not a client error the way it is for intent-first.
+    #: The shopper is redirected to a page the PSP hosts, for an order
+    #: that already exists: how every order is paid online.
     supports_hosted_checkout: ClassVar[bool] = False
 
     #: The PSP can confirm a payment the buyer authorised elsewhere and
@@ -221,6 +236,14 @@ class PaymentProvider(ABC):
         a concurrent request recorded its own first. Default nothing."""
         return
 
+    @classmethod
+    def captured(cls, status: PaymentStatus, data: dict[str, Any]) -> bool:
+        """Whether :meth:`get_payment_status`'s answer (*status*, *data*) is
+        a payment that took the money, whatever happened to it since.
+        Default: paid, or refunded afterwards (Stripe keeps a refunded
+        PaymentIntent ``succeeded``)."""
+        return status in {PaymentStatus.COMPLETED, PaymentStatus.REFUNDED}
+
     def close_payment(self, order: Order) -> bool:
         """Stop accepting payment on *order*; True once none can land.
 
@@ -239,12 +262,6 @@ class PaymentProvider(ABC):
         from order.payments import payment_hold
 
         return payment_hold.hold_ended(order)
-
-    @abstractmethod
-    def process_payment(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        pass
 
     @abstractmethod
     def refund_payment(
@@ -322,7 +339,7 @@ class StripePaymentProvider(PaymentProvider):
     a cross-tenant race under ASGI/threads. Webhook verification is
     dj-stripe's job: its UUID-routed webhook view verifies against the
     per-schema ``WebhookEndpoint`` row secret (see
-    ``tenant/management/commands/bootstrap_stripe.py``).
+    ``src/tenant/management/commands/bootstrap_stripe.py``).
     """
 
     code: ClassVar[str] = "stripe"
@@ -337,8 +354,8 @@ class StripePaymentProvider(PaymentProvider):
     min_hosted_session: ClassVar[timedelta] = (
         MIN_SESSION_LIFETIME + SESSION_MARGIN
     )
-    # Both: PaymentIntents for the intent-first checkout, and hosted
-    # Checkout Sessions for the pay-later/retry links.
+    # Hosted Checkout Sessions pay every order; a client-confirmed
+    # PaymentIntent pays a gift-card purchase.
     supports_payment_intent: ClassVar[bool] = True
     supports_hosted_checkout: ClassVar[bool] = True
     supports_delegated_payment: ClassVar[bool] = True
@@ -384,7 +401,7 @@ class StripePaymentProvider(PaymentProvider):
             logger.warning("Checkout Session %s could not be read", session_id)
             raise PaymentStatusUnavailableError(session_id) from e
         if session.status == "complete":
-            if self._session_payment_may_land(session):
+            if self.session_payment_may_land(session):
                 raise PaymentInProgressError(
                     f"Checkout Session {session_id} of order {order.id} is "
                     "paid or being paid and the order is unpaid"
@@ -406,7 +423,7 @@ class StripePaymentProvider(PaymentProvider):
     )
 
     @classmethod
-    def _session_payment_may_land(cls, session: Any) -> bool:
+    def session_payment_may_land(cls, session: Any) -> bool:
         """Whether a ``complete`` session was paid or is being paid:
         ``payment_status`` "paid" or "no_payment_required", or an
         "unpaid" one whose PaymentIntent is still in flight. One whose
@@ -452,7 +469,8 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        # Outside the try, as in ``process_payment``.
+        # Outside the try: a caller that forgets to say what the session
+        # is for is a bug to see, not a payment failure to report.
         binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
         try:
             logger.info(
@@ -634,9 +652,10 @@ class StripePaymentProvider(PaymentProvider):
 
         A hosted Checkout Session ends at its ``expires_at`` (the stored
         hold) and records no ``payment_id`` on the order, so it has nothing
-        to cancel here and waits for the hold like any link. An
-        intent opened by ``process_payment`` stays confirmable until
-        canceled, so it is canceled here before the stock is released.
+        to cancel here and waits for the hold like any link. An intent
+        the order records (an agent's delegated card awaiting its
+        confirmation) stays confirmable until canceled, so it is canceled
+        here before the stock is released.
         Stripe refuses once the intent is processing or succeeded (or
         belongs to a Checkout Session, which can only be expired); the
         intent is then read back and the order stays open unless it is
@@ -733,11 +752,23 @@ class StripePaymentProvider(PaymentProvider):
             return False, {"error": str(e), "stripe_error": True}
 
     def process_payment(
-        self, amount: Money, order_id: str, **kwargs
+        self,
+        amount: Money,
+        order_id: str,
+        *,
+        order_uuid: str,
+        customer_email: str,
+        purpose: PaymentPurpose,
+        subject: str,
     ) -> tuple[bool, dict[str, Any]]:
-        # Outside the try: a caller that forgets to say what the intent is
-        # for is a bug to see, not a payment failure to report.
-        binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
+        """Mint a client-confirmed PaymentIntent for *amount*.
+
+        Bound to what it pays for (``purpose``/``subject``, the binding
+        metadata), and idempotent on ``order_uuid``: the same purchase
+        asked again gets the same intent back. Its ``client_secret`` is a
+        bearer credential and is never logged.
+        """
+        binding = binding_metadata(purpose, subject)
         try:
             logger.info(
                 "Processing Stripe payment",
@@ -777,19 +808,6 @@ class StripePaymentProvider(PaymentProvider):
             if tenant_connect_id:
                 metadata["tenant_stripe_account"] = tenant_connect_id
 
-            # Add cart_item_ids if provided
-            cart_item_ids = kwargs.get("cart_item_ids")
-            if cart_item_ids is not None:
-                # Convert list to comma-separated string for Stripe metadata
-                if isinstance(cart_item_ids, list):
-                    metadata["cart_item_ids"] = ",".join(
-                        str(item_id) for item_id in cart_item_ids
-                    )
-                else:
-                    metadata["cart_item_ids"] = str(cart_item_ids)
-
-            # Add customer_email if provided
-            customer_email = kwargs.get("customer_email")
             if customer_email:
                 metadata["customer_email"] = customer_email
 
@@ -802,34 +820,11 @@ class StripePaymentProvider(PaymentProvider):
                 },
             }
 
-            # Add idempotency key using order_uuid if provided
-            order_uuid = kwargs.get("order_uuid")
-            idempotency_key = None
-            if order_uuid:
-                idempotency_key = f"order_{order_uuid}"
-                logger.info(
-                    "Using idempotency key for payment intent",
-                    extra={
-                        "idempotency_key": idempotency_key,
-                        "order_id": order_id,
-                    },
-                )
-
-            customer_id = kwargs.get("customer_id")
-            if customer_id:
-                payment_intent_data["customer"] = customer_id
-
-            # Create payment intent with idempotency key if provided
-            if idempotency_key:
-                stripe_pi = stripe.PaymentIntent.create(
-                    **payment_intent_data,
-                    idempotency_key=idempotency_key,
-                    api_key=self.api_key,
-                )
-            else:
-                stripe_pi = stripe.PaymentIntent.create(
-                    **payment_intent_data, api_key=self.api_key
-                )
+            stripe_pi = stripe.PaymentIntent.create(
+                **payment_intent_data,
+                idempotency_key=f"order_{order_uuid}",
+                api_key=self.api_key,
+            )
             logger.info("Stripe PaymentIntent created: %s", stripe_pi.id)
 
             try:
@@ -1173,6 +1168,23 @@ def money_from_minor_units(minor: int, currency: str) -> Money:
     return Money(Decimal(minor) / moneyed.get_currency(code).sub_unit, code)
 
 
+def provider_amount(reported: object) -> Decimal | None:
+    """An amount a provider reported, as a finite ``Decimal``; ``None``
+    when it is absent or no finite number.
+
+    Viva's JSON numbers reach us as ``float``, and ``requests`` parses the
+    ``NaN`` and ``Infinity`` tokens too, which ``Decimal`` accepts: they
+    are no amount, and comparing NaN raises ``InvalidOperation``.
+    """
+    if reported is None or reported == "":
+        return None
+    try:
+        amount = Decimal(str(reported))
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None
+
+
 #: Viva ``StatusId`` of a transaction that completed successfully. A
 #: refund is a transaction of its own and carries this status too; ``R``
 #: ("fully or partially refunded") belongs to the ORIGINAL payment.
@@ -1221,6 +1233,16 @@ VIVA_DISPUTE_OPEN_STATUS_IDS: frozenset[str] = frozenset({"M", "MA", "MI"})
 VIVA_DISPUTE_LOST_STATUS_ID = "ML"
 #: ``MW``: "Dispute Won".
 VIVA_DISPUTE_WON_STATUS_ID = "MW"
+#: ``StatusId`` of a payment that took the money, whatever happened to it
+#: since (developer.viva.com/integration-reference/response-codes/,
+#: StatusId table): finished, ``R`` refunded in full or in part (the
+#: original's status, not the refund's), or disputed at any stage, ``MS``
+#: (Suspected Dispute) included.
+VIVA_MONEY_TAKEN_STATUS_IDS: frozenset[str] = frozenset(
+    {VIVA_STATUS_FINISHED, "R", "MS"}
+    | VIVA_DISPUTE_OPEN_STATUS_IDS
+    | {VIVA_DISPUTE_LOST_STATUS_ID, VIVA_DISPUTE_WON_STATUS_ID}
+)
 # Why a Viva refund was refused before anything was sent (the order's
 # history shows it to staff).
 VIVA_REFUND_NEEDS_BASIC_PAIR = (
@@ -1279,9 +1301,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
     TIME_ZONE: ClassVar[ZoneInfo] = ZoneInfo("Europe/Athens")
     #: A read made while a shopper waits for their payment link.
     READ_TIMEOUT_SECONDS: ClassVar[int] = 15
-    # Hosted redirect only. ``process_payment`` below delegates straight
-    # to ``create_checkout_session`` — there is no intent to confirm, so
-    # an order using Viva is created BEFORE any money moves.
+    # Hosted redirect only: there is no intent to confirm, and the order
+    # is paid through ``create_checkout_session``.
     supports_payment_intent: ClassVar[bool] = False
     supports_hosted_checkout: ClassVar[bool] = True
 
@@ -1451,6 +1472,90 @@ class VivaWalletPaymentProvider(PaymentProvider):
     def _checkout_link(self, code: str) -> str:
         return f"{self.checkout_url}/web/checkout?ref={code}"
 
+    def _order_transactions(
+        self, order_code: str, *, timeout: int
+    ) -> list[dict[str, Any]]:
+        """Every transaction Viva holds for the payment order *order_code*
+        (``GET /api/transactions/?ordercode=``, Basic auth, the call Viva
+        documents for the ISV API). Raises what ``requests`` raises, and
+        ``TypeError`` for an answer with no ``Transactions`` list: only an
+        explicit empty list says the code holds none."""
+        import requests
+
+        response = requests.get(
+            f"{self.transactions_url}/api/transactions/",
+            headers={"Authorization": self._get_basic_auth_header()},
+            params={"ordercode": order_code},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        body = response.json()
+        rows = body.get("Transactions") if isinstance(body, dict) else None
+        if not isinstance(rows, list):
+            raise TypeError(
+                f"Viva listed payment order {order_code} with no Transactions"
+            )
+        return rows
+
+    def landed_charges(self, order: Order) -> list[LandedCharge]:
+        """The payments Viva took on the order's payment orders: in a
+        status of money taken (``VIVA_MONEY_TAKEN_STATUS_IDS``: finished,
+        refunded since, or disputed), for a positive amount and with no
+        ``ParentId``, which a refund carries (its amount is negative and
+        its parent is the payment it reverses; seen on a demo refund
+        2026-11-08). Every code is read: a payment on any of them is the
+        order's (``viva_order_code_q``).
+
+        Raises ``PaymentStatusUnavailableError`` when a code could not be
+        read, or the store has no Merchant ID and API Key to read it with.
+        """
+        if not self.has_basic_credentials:
+            logger.warning(
+                "Viva payments of order %s not read: the store has no Viva "
+                "Merchant ID and API Key",
+                order.id,
+            )
+            raise PaymentStatusUnavailableError(str(order.id))
+        landed: list[LandedCharge] = []
+        for code in order_viva_codes_in_order(order):
+            try:
+                rows = self._order_transactions(
+                    code, timeout=self.READ_TIMEOUT_SECONDS
+                )
+            except Exception as e:
+                logger.warning(
+                    "Viva payments of payment order %s could not be read",
+                    code,
+                )
+                raise PaymentStatusUnavailableError(code) from e
+            for row in rows:
+                status_id = row.get("StatusId")
+                if not (
+                    status_id in VIVA_MONEY_TAKEN_STATUS_IDS
+                    and not row.get("ParentId")
+                    and row.get("TransactionId")
+                ):
+                    continue
+                amount = provider_amount(row.get("Amount"))
+                if amount is None:
+                    # A finished payment whose amount cannot be read is an
+                    # answer that cannot be read, never "no payment".
+                    logger.warning(
+                        "Viva payment order %s lists an unreadable amount",
+                        code,
+                    )
+                    raise PaymentStatusUnavailableError(code)
+                if amount > 0:
+                    landed.append(
+                        LandedCharge(
+                            order_code=code,
+                            transaction_id=str(row["TransactionId"]),
+                            status_id=str(status_id),
+                            amount=amount,
+                        )
+                    )
+        return landed
+
     def __init__(self):
         from tenant.credentials import viva_wallet_credentials
 
@@ -1563,6 +1668,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
             f"{self.merchant_id}:{self.api_key}".encode()
         ).decode()
         return f"Basic {credentials}"
+
+    @classmethod
+    def captured(cls, status: PaymentStatus, data: dict[str, Any]) -> bool:
+        """Viva's own ``StatusId`` says it: finished, refunded since, or
+        disputed at any stage (``VIVA_MONEY_TAKEN_STATUS_IDS``). The mapped
+        status cannot: an open dispute maps to ``PROCESSING``."""
+        return data.get("raw_status") in VIVA_MONEY_TAKEN_STATUS_IDS
 
     def _map_viva_status(self, status_id: str) -> PaymentStatus:
         status_mapping = {
@@ -1707,11 +1819,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 extra={"order_id": order_id},
             )
             return False, {"error": str(e)}
-
-    def process_payment(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        return self.create_checkout_session(amount, order_id, **kwargs)
 
     def refund_payment(
         self, payment_id: str, amount: Money, *, idempotency_key: str
@@ -1864,7 +1971,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
         refund made, ``E`` one that failed; any other status is not a
         decision. ``None`` when Viva could not be read.
         """
-        import requests
 
         if not self.has_basic_credentials:
             logger.warning(
@@ -1873,18 +1979,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
             return None
-        authorization = self._get_basic_auth_header()
         found: dict[str, ProviderRefund] = {}
         try:
             for order_code in sorted(order_viva_codes(order)):
-                response = requests.get(
-                    f"{self.transactions_url}/api/transactions/",
-                    headers={"Authorization": authorization},
-                    params={"ordercode": order_code},
-                    timeout=30,
-                )
-                response.raise_for_status()
-                for row in response.json().get("Transactions") or []:
+                for row in self._order_transactions(order_code, timeout=30):
                     refund = self._refund_child(row, payment_id, amount)
                     if refund is not None:
                         found[refund.refund_id] = refund
@@ -1932,10 +2030,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
         status_id = row.get("StatusId")
         if status_id not in {VIVA_STATUS_FINISHED, VIVA_STATUS_ERROR}:
             return None
-        try:
-            moved = abs(Decimal(str(row.get("Amount"))))
-        except ArithmeticError:
+        reported = provider_amount(row.get("Amount"))
+        if reported is None:
             return None
+        moved = abs(reported)
         if moved != amount.amount or not row.get("TransactionId"):
             return None
         return ProviderRefund(
@@ -1958,7 +2056,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
             access_token = self._get_access_token()
 
             response = requests.get(
-                f"{self.api_url}/checkout/v2/transactions/{payment_id}",
+                # The id can come from a webhook body (a 1797's ParentId):
+                # one path segment, whatever it holds.
+                f"{self.api_url}/checkout/v2/transactions/"
+                f"{quote(payment_id, safe='')}",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                 },
@@ -2002,6 +2103,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 error_body,
                 extra={"payment_id": payment_id},
             )
+            if e.response is not None and e.response.status_code == 404:
+                raise ProviderTransactionUnknownError(payment_id) from e
             raise PaymentStatusUnavailableError(payment_id) from e
         except Exception as e:
             logger.exception(

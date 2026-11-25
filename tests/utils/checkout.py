@@ -37,7 +37,7 @@ def quoted_total(
     loyalty_points_to_redeem: int | None = None,
     gift_card_codes: list[str] | None = None,
 ) -> ExpectedTotal:
-    """The ``expected_total`` for ``OrderService.create_order_from_cart*``
+    """The ``expected_total`` for ``OrderService.create_order_from_cart``
     called with these arguments: the quote of the same order, priced as
     creation prices it (the cart's wholesale prices bound first)."""
     B2BPricingService.bind_cart(cart, user)
@@ -81,7 +81,7 @@ def quoted_body(client, body: dict[str, Any], **request) -> dict[str, Any]:
 
 
 def priced(**creation) -> dict[str, Any]:
-    """The arguments of ``OrderService.create_order_from_cart*`` with the
+    """The arguments of ``OrderService.create_order_from_cart`` with the
     ``expected_total`` a client would send for them (``quoted_total``),
     unless they name one of their own."""
     if "expected_total" in creation:

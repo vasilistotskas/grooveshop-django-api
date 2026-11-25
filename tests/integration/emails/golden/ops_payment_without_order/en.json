@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] Payment pi_3QxExample has no order",
+  "to": [
+    "owner@store.test"
+  ]
+}

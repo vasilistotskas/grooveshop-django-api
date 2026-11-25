@@ -11,7 +11,6 @@ import logging
 from django import forms
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import date_format
@@ -35,6 +34,7 @@ from unfold.widgets import (
 from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from admin.responses import hx_redirect
 from order.models.order import Order
 from shipping_acs import voucher_hold
 from shipping_acs.attention import (
@@ -104,7 +104,7 @@ def _back_to_changelist(model_admin):
     ``save_model``, not routed as a URL.
     """
     opts = model_admin.model._meta
-    return redirect(
+    return hx_redirect(
         reverse(f"admin:{opts.app_label}_{opts.model_name}_changelist")
     )
 
@@ -695,8 +695,17 @@ class AcsShipmentAdmin(BaseModelAdmin):
         description=_("Issue ACS pickup list now"),
         permissions=["change"],
         variant=ActionVariant.PRIMARY,
+        dialog=ActionDialog(
+            title=_("Issue the ACS pickup list"),
+            description=_(
+                "Issues today's ACS pickup list now, without waiting for the "
+                "daily run. ACS refuses it while a voucher on it is unprinted."
+            ),
+        ),
     )
-    def issue_pickup_list_now(self, request):
+    def issue_pickup_list_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         """Re-run the daily manifest without waiting for 16:30.
 
         ACS rejects the whole pickup list when any voucher on it is
@@ -748,11 +757,19 @@ class AcsShipmentAdmin(BaseModelAdmin):
         description=_("Re-poll ACS tracking"),
         permissions=["change"],
         variant=ActionVariant.INFO,
+        dialog=ActionDialog(
+            title=_("Re-poll ACS tracking"),
+            description=_(
+                "Asks ACS for this parcel's latest tracking checkpoints now."
+            ),
+        ),
     )
-    def repoll_tracking(self, request, object_id):
+    def repoll_tracking(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         from shipping_acs.tasks import poll_acs_tracking_one
 
-        poll_acs_tracking_one.delay(int(object_id))
+        poll_acs_tracking_one.delay(AcsShipment.objects.get(pk=object_id).pk)
         messages.info(request, _("Tracking poll dispatched."))
         return _back_to_changelist(self)
 
@@ -981,8 +998,17 @@ class AcsShipmentAdmin(BaseModelAdmin):
         description=_("Issue ACS voucher now"),
         permissions=["change"],
         variant=ActionVariant.PRIMARY,
+        dialog=ActionDialog(
+            title=_("Issue the ACS voucher"),
+            description=_(
+                "Creates an ACS voucher for this shipment now. A cancelled "
+                "voucher is reset and a new one is issued."
+            ),
+        ),
     )
-    def issue_voucher_now(self, request, object_id):
+    def issue_voucher_now(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         from shipping_acs.models import AcsShipment as _Shipment
         from shipping_acs.services import AcsService
         from shipping_acs.tasks import create_acs_voucher_for_order
@@ -993,12 +1019,23 @@ class AcsShipmentAdmin(BaseModelAdmin):
             messages.error(request, _("Shipment not found."))
             return _back_to_changelist(self)
 
-        # The mint itself refuses an unpaid online order
-        # (``ShipmentAwaitingPaymentError`` in
-        # ``AcsService.create_voucher_for_order``), but it runs in a
+        # The mint itself refuses an order that ships nothing
+        # (``ShipmentNotNeededError``) and an unpaid online order
+        # (``ShipmentAwaitingPaymentError``) in
+        # ``AcsService.create_voucher_for_order``, but it runs in a
         # Celery task, so its refusal never reaches this page. Say so
         # here, before resetting anything, instead of reporting a
         # dispatch that is bound to be refused.
+        if shipment.order.ships_nothing:
+            messages.error(
+                request,
+                _(
+                    "Order #%(order)s is canceled or its payment was refunded "
+                    "in full — a voucher would ship an order nobody pays for."
+                )
+                % {"order": shipment.order_id},
+            )
+            return _back_to_changelist(self)
         if shipment.order.awaits_online_payment:
             messages.error(
                 request,
@@ -1623,8 +1660,17 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         description=_("Run COD reconciliation now"),
         permissions=["change"],
         variant=ActionVariant.PRIMARY,
+        dialog=ActionDialog(
+            title=_("Run COD reconciliation"),
+            description=_(
+                "Matches ACS's cash-on-delivery payouts with the orders now, "
+                "without waiting for the scheduled run."
+            ),
+        ),
     )
-    def run_reconciliation(self, request):
+    def run_reconciliation(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
         from shipping_acs.tasks import reconcile_acs_cod_payouts
 
         reconcile_acs_cod_payouts.delay()

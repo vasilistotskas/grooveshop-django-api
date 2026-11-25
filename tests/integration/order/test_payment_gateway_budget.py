@@ -9,7 +9,9 @@ calls cannot spend another's, nor can a uuid that opens nothing.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 from django.urls import reverse
@@ -17,15 +19,11 @@ from rest_framework.test import APIClient
 
 from cart.agent_token import mint_cart_token
 from cart.models import Cart
-from core.api.throttling import (
-    PaymentAttemptAnonThrottle,
-    PaymentAttemptThrottle,
-)
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.throttles import PaymentAttemptAnonThrottle, PaymentAttemptThrottle
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
-from tests.utils.fake_stripe import fake_stripe
 from tests.utils.redis import private_cache
 
 SECRET = "gateway-shared-secret"
@@ -33,12 +31,34 @@ SECRET = "gateway-shared-secret"
 
 @pytest.fixture(autouse=True)
 def _no_provider():
-    """The route that is not throttled goes on to start a payment: the
-    provider is in memory (as in the payment-intent tests), so the result
-    never depends on credentials in the environment. A call the budget
-    lets through is a payment started (200), so an order the route refuses
-    for another reason cannot pass for one the budget allowed."""
-    with fake_stripe():
+    """The route that is not throttled goes on to open a hosted checkout
+    session: the provider is a stand-in, so the result never depends on
+    credentials in the environment. A call the budget lets through is a
+    session opened (200), so an order the route refuses for another
+    reason cannot pass for one the budget allowed."""
+    provider = Mock(code="stripe", min_hosted_session=timedelta(0))
+    provider.recorded_checkout_session.return_value = None
+    provider.live_checkout_session.return_value = None
+    provider.checkout_session_params.return_value = {}
+    provider.create_checkout_session.side_effect = lambda **kwargs: (
+        True,
+        {
+            "session_id": f"cs_{kwargs['order_uuid']}",
+            "checkout_url": "https://checkout.example/session",
+            "status": "open",
+            "amount": str(kwargs["amount"].amount),
+            "currency": str(kwargs["amount"].currency),
+            "provider": "stripe",
+            "expires_at": kwargs["expires_at"],
+        },
+    )
+    with (
+        patch(
+            "pay_way.services.PayWayService.is_provider_configured",
+            return_value=True,
+        ),
+        patch("order.views.order.get_payment_provider", return_value=provider),
+    ):
         yield
 
 
@@ -72,9 +92,15 @@ def _order():
 
 
 def _pay(client: APIClient, order, uuid_value=None, **headers) -> int:
-    url = reverse("order-create-payment-intent", kwargs={"pk": order.pk})
+    url = reverse("order-create-checkout-session", kwargs={"pk": order.pk})
     return client.post(
-        f"{url}?uuid={uuid_value or order.uuid}", format="json", headers=headers
+        f"{url}?uuid={uuid_value or order.uuid}",
+        {
+            "successUrl": "https://shop.example/ok",
+            "cancelUrl": "https://shop.example/no",
+        },
+        format="json",
+        headers=headers,
     ).status_code
 
 

@@ -23,6 +23,7 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.stock_log import StockLog
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -49,7 +50,7 @@ def _order():
     # A ShippingRate is per-country now — this ad-hoc country has none
     # until this call.
     enable_rate(country)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,
@@ -88,7 +89,7 @@ class TestCancelReasonInStockLog:
     def test_no_reason_leaves_no_trailing_colon(self):
         order = _order()
 
-        OrderService.cancel_order(order=order, refund_payment=False)
+        OrderLifecycleService.cancel_order(order=order, refund_payment=False)
 
         reasons = _restore_reasons(order)
         assert reasons, "sanity: cancelling restored stock and logged it"
@@ -102,7 +103,7 @@ class TestCancelReasonInStockLog:
         """The fix must not swallow the reason when there is one."""
         order = _order()
 
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order=order, reason="customer changed mind", refund_payment=False
         )
 

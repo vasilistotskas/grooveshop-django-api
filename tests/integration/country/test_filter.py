@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from country.models import Country
-from shipping.models import ShippingRate
+from shipping.models import ShippingZone
 
 
 class CountryFilterTest(APITestCase):
@@ -14,7 +14,7 @@ class CountryFilterTest(APITestCase):
     def setUpTestData(cls):
         # The assertions cover the whole list, so the ISO seed goes —
         # inside the class transaction, which puts it back afterwards.
-        ShippingRate.objects.all().delete()
+        ShippingZone.objects.all().delete()
         Country.objects.all().delete()
 
         cls.now = timezone.now()

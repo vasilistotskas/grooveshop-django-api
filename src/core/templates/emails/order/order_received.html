@@ -33,7 +33,8 @@
     <h3>{% trans "Shipping Address" %}</h3>
     <p>
         {{ order.first_name }} {{ order.last_name }}<br>
-        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.street }} {{ order.street_number }}<br>{% if order.address_line_2 %}
+        {{ order.address_line_2 }}<br>{% endif %}
         {{ order.city }}, {{ order.zipcode }}<br>
         {{ order.country }}
     </p>

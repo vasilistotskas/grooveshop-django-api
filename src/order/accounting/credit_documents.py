@@ -7,7 +7,7 @@ ships). Once that receipt carries a MARK, money going back owes a credit
 document:
 
 * every REFUND row on the payment ledger gets one, for exactly the amount
-  refunded (``PaymentLedger.record_refund`` is where every refund path
+  refunded (``RefundService.book_refund`` is where every refund path
   ends, so this is the one place to read them from);
 * an order that closes without a sale after its receipt was issued (a
   collect-on-delivery parcel that came back, a fully refunded order whose

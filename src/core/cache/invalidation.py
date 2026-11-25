@@ -202,6 +202,15 @@ def mark_surface_stale(code: str) -> None:
     _mark_stale(code)
 
 
+def mark_model_stale(model) -> None:
+    """:func:`mark_surface_stale` for every surface that declares
+    ``model`` in ``invalidated_by``: a write to it that no signal reports
+    (a queryset ``update``, a ``bulk_create``) purges what a save would."""
+
+    for code in surfaces_invalidated_by(model):
+        mark_surface_stale(code)
+
+
 def _make_receiver(
     code: str,
     ignored_update_fields: frozenset[str],

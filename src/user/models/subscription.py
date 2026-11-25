@@ -151,7 +151,7 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
     A guest row (``user`` null) is keyed by ``email``; it is created by
     the storefront newsletter form and always starts PENDING (double
     opt-in). It is attached to an account once that account verifies
-    the same address (``user.utils.subscription.claim_guest_subscriptions``).
+    the same address (``user.services.subscription.claim_guest_subscriptions``).
 
     The ``consent_*`` fields are the proof of consent for a form
     subscription: the exact sentence the visitor agreed to, in the

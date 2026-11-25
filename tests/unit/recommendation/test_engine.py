@@ -30,7 +30,7 @@ from recommendation.strategies.base import (
     TenantContext,
     register_strategy,
 )
-from tenant.models import TenantPlan
+from tenant.enum import TenantPlan
 
 pytestmark = pytest.mark.django_db
 

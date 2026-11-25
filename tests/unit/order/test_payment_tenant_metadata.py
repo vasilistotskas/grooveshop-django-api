@@ -59,8 +59,10 @@ class TestProcessPaymentMetadata:
         provider.process_payment(
             amount,
             order_id="order-1",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+            order_uuid="giftcard_purchase-uuid",
+            customer_email="",
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject="purchase-uuid",
         )
 
         mock_create.assert_called_once()
@@ -82,8 +84,10 @@ class TestProcessPaymentMetadata:
         provider.process_payment(
             amount,
             order_id="order-2",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+            order_uuid="giftcard_purchase-uuid",
+            customer_email="",
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject="purchase-uuid",
         )
 
         metadata = mock_create.call_args.kwargs["metadata"]
@@ -103,8 +107,10 @@ class TestProcessPaymentMetadata:
         provider.process_payment(
             amount,
             order_id="order-3",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+            order_uuid="giftcard_purchase-uuid",
+            customer_email="",
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject="purchase-uuid",
         )
 
         metadata = mock_create.call_args.kwargs["metadata"]
@@ -138,8 +144,10 @@ class TestProcessPaymentMetadata:
         provider.process_payment(
             amount,
             order_id="order-4",
-            purpose=PaymentPurpose.ORDER,
-            subject="order-uuid",
+            order_uuid="giftcard_purchase-uuid",
+            customer_email="",
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject="purchase-uuid",
         )
 
         metadata = mock_create.call_args.kwargs["metadata"]

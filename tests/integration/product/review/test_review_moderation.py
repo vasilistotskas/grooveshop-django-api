@@ -77,7 +77,7 @@ def product():
 
 @pytest.fixture
 def staff_api():
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
     from tests.utils.staff import (
         bind_store_tenant,
         store_staff,
@@ -628,10 +628,13 @@ class TestTheAdmin:
         review = _review(owner, product, ReviewStatus.NEW)
         url = reverse("admin:product_productreview_" + name, args=[review.pk])
 
-        response = staff_client.get(url)
+        assert staff_client.get(url).status_code == 200
+        assert _stored(review).status == ReviewStatus.NEW
 
-        assert response.status_code == 302
-        assert response.url == reverse(
+        response = staff_client.post(url, {"_form_submitted": "on"})
+
+        assert response.status_code == 200
+        assert response["HX-Redirect"] == reverse(
             "admin:product_productreview_change", args=[review.pk]
         )
         stored = _stored(review)

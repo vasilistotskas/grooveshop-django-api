@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.caches import CustomCache
+from core.cache_backend import CustomCache
 
 
 class WorkerScopedCache(CustomCache):

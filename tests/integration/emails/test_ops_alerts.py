@@ -70,6 +70,7 @@ OPS_KEYS = {
     # Not settings-era alerts: added with #622.
     "ops.acs_voucher_request_unknown",
     "ops.acs_unrecognised_vouchers",
+    "ops.payment_without_order",
 }
 
 

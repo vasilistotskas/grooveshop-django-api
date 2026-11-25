@@ -23,7 +23,7 @@ a refund by lines its own pieces at their own rates ("Refund by lines" in [§7.2
 laid over its shares in order, and the claim is REFUSED before any provider is
 called when the headroom cannot hold it); a **booked refund row no attempt
 claimed** (a provider's webhook or dashboard refund,
-`PaymentLedger.record_refund`: allocated when booked, pro rata over the
+`RefundService.book_refund`: allocated when booked, pro rata over the
 headroom then, capped, the one rule for money nobody claimed); a
 **goods-returned chargeback** (`decide_chargebacks`: allocated at the staff
 decision, capped to the headroom, so the credit is for what the receipt can
@@ -68,7 +68,7 @@ too).
 
 **Who calls it.** `generate_invoice` (new receipts, before the VAT breakdown),
 `create_pending_credits`, a NEW refund claim (`_claim_refund`),
-`PaymentLedger.record_refund` (a refund nobody claimed is decided there, over
+`RefundService.book_refund` (a refund nobody claimed is decided there, over
 the headroom of that moment) and `decide_chargebacks` (once, after it changed
 its decisions; `credit_allocation.drop(decision__in=...)` clears the changed
 ones first). A read path (a specimen render, the admin) never calls it. The
@@ -78,13 +78,11 @@ periodic task `allocate_credit_sources` (every five minutes, through
 touched since, so a source that waited for a claim is decided within five
 minutes of the claim resolving, whichever path resolved it (reconciliation, the
 admin outcome action, the provider's webhook, a decline); when it decided
-sources of an order that has a receipt it requests the credit documents. There
-is no data migration: the 0102 table is created empty and migrations stay
-additive. A gift card return booked without an allocation (the previous release
-serving after the migration) is found by `owing_sources` like any other source,
-valued from the gift-card ledger and moved when it put value back; one that
-moved before an existing receipt is left alone. `RefundAttempt` resolution
-books a refund only for an attempt still PENDING (`OrderService.book_share`
+sources of an order that has a receipt it requests the credit documents. A gift
+card return booked without an allocation is found by `owing_sources` like any
+other source, valued from the gift-card ledger and moved when it put value
+back; one that moved before an existing receipt is left alone. `RefundAttempt` resolution
+books a refund only for an attempt still PENDING (`RefundService.book_share`
 re-reads it under the order lock): a refund the provider made for an attempt
 staff declined meanwhile is booked as a refund nobody claimed, never reviving
 the attempt. `receipt_deferred` means "waiting for undecided sources" and
@@ -160,7 +158,7 @@ each provider source that moved before that moment, the goods it returned
 before any reversal (`CreditAllocation.goods_claimed`: what it owed after the
 duplicate payment, kept on the source's first row and never scaled) less what
 the provider reported failed of it BY THAT CUT
-(`credit_allocation.goods_returned`; a reversal booked at or after the cut is
+(`PaymentLedger.goods_returned`; a reversal booked at or after the cut is
 not known there, so a source decided late owes what it would have owed decided
 on time). The excess is also capped by money: at most what the provider still
 holds (captures less refunds less every dispute, `PaymentLedger.excess_held`),
@@ -187,8 +185,8 @@ means the receipt stands: a chargeback never reduces what the order is still
 for and never eats the duplicate) or decided returned (its credit comes from
 its own allocation, at the decision), so the excess never depends on when staff
 decide and nothing waits for them; `sync_overcharge` stamps
-`Order.overcharged_at` from `overcharge_held`, written once a refund's
-allocation is decided) back first: that part gives a duplicate payment back, it
+`Order.overcharged_at` from `overcharge_held`. A refund pays the duplicate part
+back first: that part gives a duplicate payment back, it
 does not reverse the sale, so it takes no room on the receipt and gets no
 credit document (`PaymentLedger.refundable_excess`, read as it stood at the
 source's own moment: the ledger rows before that row, ties by id, which already
@@ -251,7 +249,7 @@ is on the dashboard's chargebacks-to-settle worklist, and a decision requests
 the credit documents again), and what a chargeback took whose goods the
 customer kept is left out of it, so "goods kept" means no credit for that part,
 ever. A booked refund that a `RefundAttempt` later claims
-(`PaymentLedger.settle_attempt`) drops its own allocation and the attempt's is
+(`RefundService.book_refund`) drops its own allocation and the attempt's is
 scaled to what really moved (`credit_allocation.link_attempt`). The settlement
 of a closed order is the one credit without an allocation: it takes what the
 receipt still holds at every rate.

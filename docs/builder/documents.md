@@ -11,8 +11,8 @@
   `draft_catalogue_hash`, `updated_by_staff_id`. Only pages are deleted
   (soft); the other kinds are fixed keys.
 - `BuilderVersion`: an immutable snapshot (`data`, `i18n`), numbered per
-  document, with the derived `block_types` (`type@version`, GIN-indexed, for
-  the usage gate that will guard removing a block type), `refs`,
+  document, with the derived `block_types` (`type@version`, GIN-indexed, so
+  the documents that use a block type can be found), `refs`,
   `catalogue_hash`, `content_hash` (sha256 of the canonical encoding) and
   `size_bytes`. `kind` is `checkpoint` (a named save), `publish` or `restore` (a
   restored version; `restored_from` is the number it restores, `null` for
@@ -90,6 +90,25 @@ pointer cannot equal, lie under or hold a `translatable` pointer (`*`
 counts). `tests/unit/builder/test_real_catalogue.py` holds the pinned real
 catalogue to this: each `linkRefs` is exactly the settings its schema marks
 `x-builder-link`.
+
+`icons` (required) is every icon the builder offers, `[{name, labels}]`: the
+name as a store saves it (`i-fa6-solid-robot`) and the editor's label for it in
+every language of `settings.LANGUAGES` (`CatalogueIcon`, `Catalogue.icon`). The
+storefront's one list (`shared/builder/icons.ts`, `BUILDER_ICONS`) reaches the
+blocks as each icon setting's `enum`; this key states it once, for a field that
+holds one icon outside a block. A blog category's `icon` is the first, and
+both writers, the API's write serializer and the admin form, apply one rule,
+`check_icon` (`src/blog/icons.py`): a changed icon the store's catalogue does
+not offer is refused (`unknown_icon`, a 400 on the API), and a changed icon
+while the storefront does not answer is refused because it cannot be checked
+(`storefront_unavailable`, a 503 on the API, a field error in the admin, never
+a silent save without it). An unchanged or cleared icon is not checked, so an
+icon the builder stopped offering blocks no other edit of its category. The
+admin offers the icons by their label in the admin's language (a regional
+variant such as `en-us` reads its language); a form opened with no catalogue
+shows the saved icon unchangeable and the rest of the form saves. A name or a
+language without a label is a catalogue bug, refused when the catalogue is
+read.
 
 ## What a save checks
 
@@ -254,8 +273,7 @@ theme is.
 
 ### Typed data props (`src/builder/data_sources.py`)
 
-A block can declare a setting in the catalogue's `data` map, beside `refs`
-(both are read until the storefront stops serving `refs`):
+A block can declare a setting in the catalogue's `data` map, beside `refs`:
 
 - `{field: "ref", kind, onMissing}`: the setting holds one record's id (a slug
   for a page), checked like a `refs` entry;

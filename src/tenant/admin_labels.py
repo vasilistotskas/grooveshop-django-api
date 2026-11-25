@@ -15,7 +15,8 @@ from django.template.loader import render_to_string
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 
-from tenant.models import Tenant, TenantPlan
+from tenant.enum import TenantPlan
+from tenant.models import Tenant
 
 PLAN_BADGES: dict[str, tuple[str, str]] = {
     TenantPlan.TRIAL: ("schedule", "warning"),

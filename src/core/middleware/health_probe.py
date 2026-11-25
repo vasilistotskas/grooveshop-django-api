@@ -9,7 +9,7 @@ though the worker is perfectly healthy.
 Answered here, before ``TenantMainMiddleware``, the probe exercises
 the full ASGI → Django middleware entry path while touching no
 backing service (no DB tenant lookup, no Redis) — the same contract as
-``core.api.views.health_live``, which stays mounted for documentation
+``core.api.health_api.health_live``, which stays mounted for documentation
 and any probe that DOES send a real tenant host. The root ``/health/``
 liveness probe is answered even earlier, at the ASGI layer
 (``asgi.health_check``).

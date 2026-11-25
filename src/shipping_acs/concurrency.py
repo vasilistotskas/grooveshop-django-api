@@ -41,7 +41,7 @@ A caller that finds every slot taken waits a bounded time, then raises
 ``AcsRetryableError`` so Celery retries with backoff instead of a worker
 sitting on it. With Redis unreachable the cap is skipped and logged: it
 only prevents 406s (a rejected call was never processed), and
-``core.caches`` states that "an unreachable Redis must cost speed, not
+``core.cache_backend`` states that "an unreachable Redis must cost speed, not
 requests", so a cache outage must not fail checkout quotes or voucher
 mints.
 """
@@ -59,7 +59,7 @@ from django.core.cache import cache
 from redis.exceptions import LockError
 from redis.lock import Lock
 
-from core.caches import REDIS_UNAVAILABLE, BurstLogger
+from core.cache_backend import REDIS_UNAVAILABLE, BurstLogger
 from shipping_acs.exceptions import AcsRetryableError
 
 logger = logging.getLogger("shipping_acs.concurrency")

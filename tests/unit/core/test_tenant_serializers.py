@@ -55,6 +55,11 @@ class TestTenantConfigSerializer:
         serializer = TenantConfigSerializer()
         assert "stripe_connect_account_id" not in serializer.fields
 
+    def test_box_now_partner_id_not_in_public_fields(self):
+        """The storefront's own locker picker does not need it."""
+        serializer = TenantConfigSerializer()
+        assert "box_now_partner_id" not in serializer.fields
+
 
 class TestTenantAdminSerializer:
     """Platform-admin serializer DOES include plan (full info)."""

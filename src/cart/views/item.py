@@ -21,19 +21,15 @@ from cart.serializers.item import (
     CartItemUpdateSerializer,
 )
 from cart.services import CartService
-from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    CartMutationAnonThrottle,
-    CartMutationThrottle,
-    UserBudgetThrottle,
-)
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from cart.throttles import CartMutationAnonThrottle, CartMutationThrottle
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
+from core.api.views import BaseModelViewSet
 from tenant.membership import is_store_staff
 from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 

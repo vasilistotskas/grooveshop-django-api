@@ -85,8 +85,7 @@ or expired token is `404 preview_link_expired`. Both are `private, no-store`.
 
 ### Images documents still name by URL
 
-Before the media picker a block held an image as a string (`/img/x.jpg`,
-`/uploads/y.jpg`). `manage.py import_builder_media --tenant <schema>`
+A document can name an image by a string (`/img/x.jpg`, `/uploads/y.jpg`) instead of a library reference. `manage.py import_builder_media --tenant <schema>`
 (`src/builder/media_migration.py`) brings those into the library:
 
 - It reads every string of the drafts and of the published versions
@@ -102,8 +101,7 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
   paths above is the store's; and the hosts of `MEDIA_STREAM_BASE_URL` and
   `STATIC_BASE_URL`, which every store shares and where only
   `/media/<store>/uploads/...` is this store's. The file is then read by its
-  path from where the store keeps it; the address itself is never fetched. A
-  domain the store no longer has is not its host any more.
+  path from where the store keeps it; the address itself is never fetched. A domain the store does not have is not its host.
 - Each distinct path goes through the same import as `media/import`
   (`media_services.store_import`: the upload checks, the shrinking of an
   oversize photo, de-duplication by content), so running it again finds the
@@ -118,7 +116,7 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
 
 `manage.py migrate_builder_media --tenant <schema>` does, once the storefront
 serves the blocks' new settings and the images are imported. The storefront
-declares each block's old image settings (`legacyImages`, vendored as
+declares each block's URL image settings (`legacyImages`, vendored as
 `src/builder/legacy_image_fields.json`). Every draft and stored version gets the
 asset in place of the URL and loses the URL and its alt, in the settings and in
 the overlay, through `src/builder/document_rewrite.py`: each document is validated
@@ -165,7 +163,7 @@ release: that is what brings the rewrite to visitors.
   (`builder.media_migration.read_decisions`):
 
   ```json
-  {"webside": {
+  {"demostore": {
     "images": {"https://example.org/a.png": 12, "/img/old-logo.svg": "empty"},
     "alt": {"12": {"el": "Ο πάγκος", "en": ""}},
     "slots": {
@@ -186,7 +184,7 @@ release: that is what brings the rewrite to visitors.
   still stops the store. Each decision used is printed, and what was decided
   for a store is kept with its run (`BuilderRewriteRun.decisions`), which
   `builder_rewrite_backups` lists.
-- **The file is held to its word.** A name in it that is no store (`websid`)
+- **The file is held to its word.** A name in it that is no store (`demostor`)
   stops the command before anything is read. A decision nothing used stops its
   store like any other problem: a value no document holds, an alt for an image
   that has its own or whose uses agree, a slot that is no empty entry beside
@@ -209,8 +207,7 @@ release: that is what brings the rewrite to visitors.
   that is where a rewritten document's references and hash come from. A
   version was valid when it was made and nothing validates it again
   (`publish_version` and `rollback` say so), so an old one can fail today for
-  a reason that has nothing to do with images: a block the storefront has
-  since dropped or changed. Nobody can edit a version and no decision makes
+  a reason that has nothing to do with images: a block the storefront dropped or changed. Nobody can edit a version and no decision makes
   one valid, so what happens depends on who reads it.
   - A version **a release holds, or a publish is waiting to release**, is what
     visitors read. It has to be moved, and it stops the store. The line names
@@ -237,8 +234,7 @@ release: that is what brings the rewrite to visitors.
   cannot be fixed by hand. Its lines are marked `(deleted page)`, and a value
   or an empty list entry there is settled in the decisions file like any
   other. Its draft is never read again, so where no decision can settle why
-  it cannot be rewritten (it no longer validates, a value has a shape the
-  walk refuses), the draft is left as it is and said, and the store goes on;
+  it cannot be rewritten (it does not validate, a value has a shape the walk refuses), the draft is left as it is and said, and the store goes on;
   its versions are moved as usual. What a deleted page's draft says about an
   image's alt decides nothing.
 - **A decision reaches every version.** A version is immutable to the editor,
@@ -263,8 +259,7 @@ release: that is what brings the rewrite to visitors.
   separately, because each may hold something else at that position.
 - **The rule does not look at the store's design.** Which component draws a
   block is the storefront's choice by store (`componentRegistry`,
-  `<block>@<schema>`), and Django does not know it: webside's carousel does
-  not pair the two lists at all, the default one does. A stored document is
+  `<block>@<schema>`), and Django does not know it: one design's carousel does not pair the two lists at all, the default design's does. A stored document is
   also not tied to the design that draws it today. So an empty entry beside an
   image stops every store and asks, whatever would draw it.
 - A new setting already chosen stays and the URL beside it goes.
@@ -317,8 +312,7 @@ no store the command reaches holds, given to `--restore` or `--delete`, exits
 - `--restore <run>` (with `--dry-run` to try it) puts a run back in that
   store, **whole or not at all**. Each draft and version gets its columns
   exactly as they were, with no validation, and its backup is deleted; a
-  restored draft moves to a new revision again. A row that no longer holds
-  what the run stored cannot be put back: a draft saved since is someone's
+  restored draft moves to a new revision again. A row that does not hold what the run stored cannot be put back: a draft saved since is someone's
   work, a version rewritten since belongs to a later run (restore that one
   first). One such row and nothing of the store is restored, the rows are
   named, and the command exits 1.
@@ -339,9 +333,7 @@ no store the command reaches holds, given to `--restore` or `--delete`, exits
   as those (`src/devtools/anonymise/rules.py`), and Django deletes it with its
   document or its version.
 
-**Rolling back to a release from before this table.** That release deletes
-versions (checkpoint pruning in `src/builder/services.py`) and pages without
-knowing the backups exist. Django's cascade is Django's: the database would
+**Why a backup has no database constraint.** A release that predates a backup deletes versions (checkpoint pruning in `src/builder/services.py`) and pages without knowing the backups exist. Django's cascade is Django's: the database would
 not delete a backup, it would refuse the delete of the version. A
 database-level cascade is not available here (`DB_CASCADE` is refused by the
 system check `fields.E323`, because `BuilderVersion` reaches its document

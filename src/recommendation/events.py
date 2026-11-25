@@ -54,7 +54,9 @@ def record_events(
     user_id: int | None = None,
     cart_uuid: str | None = None,
 ) -> int:
-    """Insert one row per item; return how many were asked for.
+    """Insert one row per valid item; return how many rows it asked to
+    insert (the items with a known strategy and a product, before the
+    unique key leaves out the rows that already exist).
 
     Validates the enums again here rather than trusting the caller:
     the task payload crosses a broker, and a row with an unknown kind

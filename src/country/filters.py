@@ -135,6 +135,16 @@ class CountryFilter(
         ),
     )
 
+    home_delivery = filters.BooleanFilter(
+        method="filter_home_delivery",
+        help_text=_(
+            "true: only the countries the current store delivers to at "
+            "home (its shipping zones), the countries a saved address may "
+            "be in; false: only the others. shippable also counts pickup "
+            "points. On the platform host true returns none."
+        ),
+    )
+
     class Meta:
         model = Country
         fields = {
@@ -276,6 +286,25 @@ class CountryFilter(
         if value:
             return queryset.filter(alpha_2__in=shippable_codes)
         return queryset.exclude(alpha_2__in=shippable_codes)
+
+    def filter_home_delivery(self, queryset, name, value):
+        """``true`` keeps the countries a home delivery of the store
+        reaches (``shipping.zones.HomeCoverage``): the ones a saved
+        address may be in, which ``/user/address`` refuses with
+        ``country_not_served`` otherwise. ``false`` is the complement."""
+        from django.db import connection
+
+        if value is None:
+            return queryset
+        if connection.schema_name == "public":
+            return queryset.none() if value else queryset
+
+        from shipping.zones import HomeCoverage
+
+        reached = HomeCoverage.load().reached
+        if value:
+            return queryset.filter(alpha_2__in=reached)
+        return queryset.exclude(alpha_2__in=reached)
 
     def filter_has_all_data(self, queryset, name, value):
         """Filter countries that have complete data (ISO, phone, flag, name)."""

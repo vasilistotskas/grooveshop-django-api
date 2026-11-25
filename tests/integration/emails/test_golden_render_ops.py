@@ -19,6 +19,7 @@ from uuid import UUID
 
 import pytest
 from django.core import mail
+from django.core.cache import cache
 from django.utils import translation
 from django.utils.translation import gettext
 from djmoney.money import Money
@@ -31,7 +32,7 @@ from giftcard.services import GiftCardService
 from order.emails import Overcharged, RefundFailed
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.services import OrderService
+from order.services import PAYMENT_WITHOUT_ORDER_CLAIM_KEY, OrderService
 from product.enum.review import ReviewStatus
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
@@ -231,6 +232,19 @@ class TestPaymentAlerts:
 
         assert_sent("ops_payment_after_cancel", language)
 
+    def test_payment_without_order(self, language):
+        # The alert goes once per payment, and the cache outlives a test:
+        # the recorded payment id is the same on every run.
+        cache.delete(
+            PAYMENT_WITHOUT_ORDER_CLAIM_KEY.format(payment_id="pi_3QxExample")
+        )
+
+        OrderService.alert_payment_without_order(
+            "pi_3QxExample", captured=Money(Decimal("45.50"), "EUR")
+        )
+
+        assert_sent("ops_payment_without_order", language)
+
     def test_payment_mismatch(self, language):
         order = OrderFactory(
             id=1234,
@@ -351,7 +365,7 @@ class TestBuilderAlerts:
         from builder import scheduling, services
         from builder.models import BuilderScheduledPublish
         from builder.storefront import clear_catalogue_cache
-        from tenant.models import TenantMembershipRole
+        from tenant.enum import TenantMembershipRole
         from tests.utils.builder import FakeCatalogue, document, hero
         from tests.utils.staff import store_staff
 

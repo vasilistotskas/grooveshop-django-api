@@ -16,7 +16,9 @@ skip. `was_sent(deliveries)` says whether any recipient was sent. In order:
    `SKIPPED_SWITCHED_OFF`. A required type never reads the switch.
 5. **Recipients**: `recipient`, else `email_type.recipients(obj)`. None
    gives `SKIPPED_NO_RECIPIENT`.
-6. Per recipient: **opt-out** (marketing only, `SKIPPED_OPTED_OUT`), then
+6. Per recipient: **opt-out** (marketing only, `SKIPPED_OPTED_OUT`), the
+   **suppression list** (`SKIPPED_SUPPRESSED`; a required mail that is blocked
+   is logged as a warning), then
    `render` in `recipient.language`, the `EmailLog` row (`QUEUED`),
    `build_headers`, and `transport.deliver`; the row becomes `SENT` (with
    the transport's `Receipt`) or `FAILED`.
@@ -48,17 +50,15 @@ else the store's), `store_operators` (the store's), `platform_operators`
 (`settings.LANGUAGE_CODE`). `store_operators` is the bound tenant's
 `contact_email` then `owner_email` and nothing else: a store with neither
 has nobody to write to, and `settings.ADMINS` is never used for it. When
-both exist and differ, each gets its own mail. `team.new_order` and the
-dispute mails and the ops alerts changed to this from
-`tenant_admin_recipients()` (contact address only, in practice, for the
-dispute mails), which is deleted.
+both exist and differ, each gets its own mail.
 
 ### Sender
 
 `From` is `emails.sender.from_address()` read in the schema the
 send runs under, so a platform type is sent as `"{SITE_NAME}"
 <DEFAULT_FROM_EMAIL>` and a store type as the store (its own verified domain,
-else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type, obj)`) is the store's contact
+else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type, obj)`) is what the type names
+(`EmailType.reply_to`), else the store's contact
 address for a store type sent to customers, and empty for a platform type
 and for mail to the store's own staff.
 
@@ -78,8 +78,7 @@ and the status colours are stored as the colour a store paints, and what an
 unchanged store paints depends on its storefront design, which the API does
 not know.
 
-The platform palette (the one the base template carried before it was
-themable, in `_DEFAULT_EMAIL_THEME`) is used when
+The platform palette (`_DEFAULT_EMAIL_THEME`) is used when
 
 - the mail renders outside a store's schema (every `platform.*` type renders
   under `public`; a task with no tenant has none);
@@ -300,27 +299,23 @@ named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
   all through `opt_out_of_marketing`, the one writer (it takes the address
   HASH, which is all a token holds). A guest's token (no `a`) records the
   `EmailOptOut` row only.
-- The old `/api/v1/user/unsubscribe/<token>[/<topic>]` routes, which opted out
-  on GET, are gone with their token (`user.unsubscribe` salt).
 
 ### `EMAIL_HASH_KEY`
 
 A required environment variable in production **and staging** (any
-non-dev, non-CI deployment: the process refuses to start without it), so it
-must exist in the environment BEFORE the release containing `src/emails/`
-deploys. Development and CI get a fixed insecure key. Generate one
+non-dev, non-CI deployment: the process refuses to start without it).
+Development and CI get a fixed insecure key. Generate one
 with `secrets.token_urlsafe(48)` and keep it with the other platform
 secrets. It is separate from `SECRET_KEY` on purpose: rotating `SECRET_KEY`
 must not orphan the opt-outs. Changing `EMAIL_HASH_KEY` forgets every
-opt-out (the hashes no longer match, and outstanding unsubscribe links
+opt-out (the stored hashes stop matching, and outstanding unsubscribe links
 stop working), so it is never rotated casually.
 
 ## Headers (`headers.py`)
 
 `build_headers(email_type, recipient)` decides by audience, then by kind.
 Only `customer` mail is list mail; `store_staff` and `platform_operator`
-mail gets no list headers (`{}`), as staff mail has none today. For
-customers:
+mail gets no list headers (`{}`). For customers:
 
 - **Transactional**: `List-ID: <{list_id}.{store domain}>` and, when the
   store has a contact address, `List-Unsubscribe: <mailto:{contact}?subject=unsubscribe>`.
@@ -358,8 +353,8 @@ does not know raises `KeyError`, so a mail a later allauth adds never goes
 out unbranded) and queues `user.tasks.send_allauth_email_task`; the task calls
 `send_email`, so the mail is rendered, headed and sent like every other. The
 sending is in a task because allauth's own `send_mail` talks SMTP inside the
-view: a 421 from the mail server then failed the sign-up request (production,
-2026-09-15), where in the task it is a retry.
+view, where a 421 from the mail server would fail the sign-up request; in the
+task it is a retry.
 
 The 19 types are `account.*` (twelve), `mfa.*` (five) and `social.*` (two),
 declared in `src/user/emails.py` through `_allauth_email`, which also fills the
@@ -381,8 +376,5 @@ resolved from `HEADLESS_FRONTEND_URLS` that language
 reset link or a code never reaches the failure log. An account deleted before
 the task runs gets no mail.
 
-The subject is the type's msgid, as everywhere on the pipeline. allauth's old
-`[<store name>]` subject prefix is gone (the `From` carries the store's
-name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
-`get_from_email` are deleted, and so is `user.tasks.send_rendered_email_task`
-(nothing has queued it since `send_allauth_email_task` replaced it).
+The subject is the type's msgid, as everywhere on the pipeline, with no
+store-name prefix (the `From` carries the store's name).

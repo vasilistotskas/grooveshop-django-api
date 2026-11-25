@@ -3,12 +3,12 @@
 {% blocktrans %}The changes scheduled for {{ scheduled_for }} did not go live. Nothing was published and your live pages are unchanged.{% endblocktrans %}
 
 {% trans "Pages" %}:
-{% for document in documents %}- {{ document|safe }}
+{% for document in documents %}- {{ document }}
 {% endfor %}{% if note %}
-{% trans "Note" %}: {{ note|safe }}
+{% trans "Note" %}: {{ note }}
 {% endif %}
 {% trans "Why" %}:
-{% for problem in problems %}- {{ problem|safe }}
+{% for problem in problems %}- {{ problem }}
 {% endfor %}
 {% trans "Fix the cause in the storefront editor and schedule the publish again, or publish it now." %}
 

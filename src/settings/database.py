@@ -17,9 +17,30 @@ DB_POOL_MIN_SIZE = int(getenv("DB_POOL_MIN_SIZE", "2"))
 DB_POOL_MAX_SIZE = int(getenv("DB_POOL_MAX_SIZE", "8"))
 DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 
+# How fast the SERVER finds out that a client is gone without having closed
+# its socket (a worker's node lost, a network partition): TCP keepalives on
+# each session, sent after DB_TCP_KEEPALIVES_IDLE idle seconds, every
+# DB_TCP_KEEPALIVES_INTERVAL, given up after DB_TCP_KEEPALIVES_COUNT unanswered
+# probes. Without them a session gets the server's own (on the cluster, a
+# first probe after 900 s, then 9 more 100 s apart: about half an hour), and
+# a session that holds a lock across a call to another service holds it
+# that long: every lock ``core.db.locks.held_across_calls`` takes, and the
+# store lock a running task takes (``tenant.celery.holding_store``). Django
+# connects to PostgreSQL directly (no pooler), so the server's probes reach
+# the worker's own socket. These GUCs are set per session, so they need no
+# change to the server.
+DB_TCP_KEEPALIVES_IDLE = int(getenv("DB_TCP_KEEPALIVES_IDLE", "30"))
+DB_TCP_KEEPALIVES_INTERVAL = int(getenv("DB_TCP_KEEPALIVES_INTERVAL", "10"))
+DB_TCP_KEEPALIVES_COUNT = int(getenv("DB_TCP_KEEPALIVES_COUNT", "3"))
+
 _db_options: dict = {
     "connect_timeout": 5,
-    "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
+    "options": (
+        "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000"
+        f" -c tcp_keepalives_idle={DB_TCP_KEEPALIVES_IDLE}"
+        f" -c tcp_keepalives_interval={DB_TCP_KEEPALIVES_INTERVAL}"
+        f" -c tcp_keepalives_count={DB_TCP_KEEPALIVES_COUNT}"
+    ),
     # Enforce TLS to Postgres in production ('require' rejects an
     # unencrypted connection); dev/ci default to 'prefer' since local
     # Postgres usually has no server cert (G0362).

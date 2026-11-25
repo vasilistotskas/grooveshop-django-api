@@ -21,12 +21,8 @@ from django.core.management.base import CommandError
 from django.db import connection
 from django.db.utils import IntegrityError
 
-from tenant.models import (
-    Tenant,
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -61,6 +57,20 @@ def test_reserved_schema_name_check_runs_before_db_writes():
     assert not TenantDomain.objects.filter(
         domain="blocked-store.example.com"
     ).exists()
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_blank_name_raises_command_error_before_db_writes(name):
+    with pytest.raises(CommandError, match="--name is blank"):
+        call_command(
+            "tenant_create",
+            name=name,
+            slug="blank-name-store",
+            schema_name="blank_name_store",
+            domain="blank-name-store.example.com",
+            owner_email="owner@blank-name-store.example.com",
+        )
+    assert not Tenant.objects.filter(schema_name="blank_name_store").exists()
 
 
 def test_unknown_plan_is_rejected_via_cli_args():

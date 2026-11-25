@@ -423,10 +423,10 @@ class TestRetention:
         assert AcsApiCall.objects.filter(pk=call.pk).exists() is kept
 
     def test_fanout_reaches_suspended_stores_and_is_scheduled(self, settings):
-        from tenant import tasks as tenant_tasks
+        from shipping_acs import tasks as acs_tasks
 
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            tenant_tasks.fanout_purge_expired_acs_api_calls()
+        with patch("shipping_acs.tasks.run_for_all_tenants") as run:
+            acs_tasks.fanout_purge_expired_acs_api_calls()
 
         run.assert_called_once_with(
             "shipping_acs.tasks.purge_expired_acs_api_calls",

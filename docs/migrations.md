@@ -21,6 +21,14 @@ add form), so no migration commits: an atomic one runs in a savepoint, an
   `shipping.0017` next to `shipping.0011` and broke every new store.
   `tests_mt/test_provisioning_in_one_transaction.py` provisions a store
   that way.
+- The command settles between migrations, not inside one. Give a data
+  migration a migration of its own: Django builds an added column's index
+  and foreign key when the migration's schema editor closes, after a
+  `RunPython` in the same migration has written rows, and rows a store's
+  provisioning wrote earlier in its transaction then still have queued
+  checks (`shipping` `0023`, `0024`). The migration tests drive the
+  executor the same way (`tests/utils/migrations.py` settles after each
+  migration through `core.db.migrate_command.settle_deferred_constraints`).
 - A concurrent index build is not possible there; see below.
 
 ## Index additions on large tables

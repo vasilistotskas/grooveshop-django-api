@@ -387,7 +387,7 @@ class TestWhileHeldNothingIsSent:
         _lose_one_answer(acs)
         waiting = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )
@@ -398,7 +398,7 @@ class TestWhileHeldNothingIsSent:
         ):
             response = admin.issue_voucher_now(request, waiting.pk)
 
-        assert response.status_code == 302
+        assert response["HX-Redirect"].endswith("/shipping_acs/acsshipment/")
         assert "held" in str(warned.call_args.args[1])
         informed.assert_not_called()
         waiting.refresh_from_db()
@@ -430,7 +430,7 @@ class TestWhileHeldNothingIsSent:
             voucher_hold.admit(lease_seconds=78, request_id=OTHER)
         shipment = _shipment()
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
-        request = RequestFactory().get("/")
+        request = RequestFactory().post("/", {"_form_submitted": "on"})
         request.user = get_user_model()(
             id=1, username="staff", is_superuser=True
         )
@@ -1422,8 +1422,8 @@ class TestHeldPastTheRetryBudget:
         entry = settings.CELERY_BEAT_SCHEDULE["issue-held-acs-vouchers"]
 
         assert entry["task"] == "tenant.tasks.fanout_issue_held_acs_vouchers"
-        with patch("tenant.tasks.run_for_all_tenants") as fan_out:
-            from tenant.tasks import fanout_issue_held_acs_vouchers
+        with patch("shipping_acs.tasks.run_for_all_tenants") as fan_out:
+            from shipping_acs.tasks import fanout_issue_held_acs_vouchers
 
             fanout_issue_held_acs_vouchers.run()
         fan_out.assert_called_once_with(issue_held_acs_vouchers.name)

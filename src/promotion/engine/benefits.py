@@ -110,8 +110,8 @@ def gift_pairs(result: CartDiscountResult) -> list[tuple[Product, int]]:
     so everything that sizes the parcel counts them with the cart:
     the weight bracket ACS quotes, the weight cap, and the carrier's
     parcel size. Add these to the cart's own pairs on every surface
-    that prices or sizes shipping (payment-intent, verification,
-    creation, the shipment row, the options). The engine already
+    that prices or sizes shipping (the quote, order creation, the
+    shipment row, the options). The engine already
     leaves out a gift that is out of stock; one that loses a later
     stock race only makes the parcel look bigger, which is safe.
     """

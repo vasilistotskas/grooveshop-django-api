@@ -22,6 +22,10 @@
 | `status.py` | `Status`: what became of one recipient's send, shared by `Delivery` and `EmailLog`. |
 | `log.py`, `tasks.py` | The `EmailLog` writes of `send_email`, and the retention sweep. |
 | `models.py`, `services.py` | `EmailSwitch`, `EmailOptOut`, `EmailLog`, `EmailEvent`, `EmailSuppression`; `set_switch`, the only writer of switches. |
+| `admin.py`, `switches.py`, `throttles.py` | The store's and the platform's email pages, the grouping of types on them, and the throttles of the emails endpoints. |
+| `preferences.py` | `offered_types`: the marketing types a customer can choose to receive. |
+| `events.py`, `webhooks.py`, `suppression.py` | The Resend webhook, the application of a provider event to its log row, and the suppression list (see [`delivery.md`](delivery.md)). |
+| `checks.py`, `setup.py` | The deploy guard and the check that a store's email setup is complete for the transport in use. |
 
 `emails` is in both `SHARED_APPS` and `TENANT_APPS`: a store's switches and
 opt-outs live in its schema, the platform's own in `public`. It imports no
@@ -76,17 +80,25 @@ Declared in `src/order/emails.py`, next to the builders that read the order:
 | Key | About | Requirement / gates |
 |---|---|---|
 | `order.received`, `order.payment_confirmed` | the `Order` | required; `FeatureGate("cart")` |
-| `order.payment_failed`, `order.shipped` | the `Order` | required |
+| `order.shipped` | the `Order` | required |
 | `order.delivered`, `order.completed` | the `Order` | switchable |
 | `order.review_request` | the `Order`, `REVIEW_REQUEST_DELAY_DAYS` days after its delivery | **marketing**; `FeatureGate("product_reviews")` |
 | `order.canceled`, `order.returned` | the `Order` | required |
 | `order.status_refunded` | the `Order`, closed as REFUNDED | required |
 | `order.refunded` | one refund `PaymentTransaction` | required |
 | `order.receipt_issued`, `order.credit_issued` | the `Invoice` / `RetailCredit` (PDF attached) | required; `StoreSwitchGate("MYDATA_ENABLED")` |
-| `shipping.acs_out_for_delivery` | the `AcsShipment` | switchable; `CarrierGate("acs")` |
-| `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
 | `team.new_order` | the `Order` | switchable, store staff |
 | `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
+
+Declared by the carrier apps through `order.emails.shipment_email`
+(`src/shipping_acs/emails.py`, `src/shipping_boxnow/emails.py`): order
+emails about the order's shipment, previewed from an order through the
+carrier's `shipment_for_order`, with their templates in `emails/order/`:
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `shipping.acs_out_for_delivery` | the `AcsShipment` | switchable; `CarrierGate("acs")` |
+| `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
 
 Declared in `src/product/emails.py` (templates in `emails/product_alerts/`; the
 ops alert `ops.review_pending` is under Operational alerts below):
@@ -124,12 +136,12 @@ Declared in `src/user/emails.py` and `src/cart/emails.py`:
 
 | Key | About | Requirement / gates |
 |---|---|---|
-| `user.data_export_ready` | the `UserDataExport` | required (GDPR) |
+| `user.data_export_ready` | the `UserDataExport` | required (GDPR); `FeatureGate("customer_accounts")` |
 | `newsletter.confirmation` | the `UserSubscription` (a guest row too) | required (double opt-in); `FeatureGate("newsletter")` |
 | `newsletter.already_subscribed` | the `UserSubscription` (a guest row too) | required (the answer to the visitor's own form submission); `FeatureGate("newsletter")` |
-| `user.reengagement` | the `UserAccount` | **marketing**; `ScheduleGate("send-inactive-user-notifications")` |
-| `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")` |
-| `account.*` (12), `mfa.*` (5), `social.*` (2) | an `AllauthMail` | required; see allauth mail in [`sending.md`](sending.md) |
+| `user.reengagement` | the `UserAccount` | **marketing**; `FeatureGate("customer_accounts")`, `ScheduleGate("send-inactive-user-notifications")` |
+| `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")`, `FeatureGate("customer_accounts")` |
+| `account.*` (12), `mfa.*` (5), `social.*` (2) | an `AllauthMail` | required; `FeatureGate("customer_accounts")`; see allauth mail in [`sending.md`](sending.md) |
 
 ### The newsletter form's answer
 
@@ -164,13 +176,11 @@ check.
 
 ### Operational alerts (`ops.*`)
 
-Fourteen mails to the store's own staff, for work that needs a person. They were
-`OpsAlertKind` and `send_ops_alert` (`src/shipping/alerts.py`); each is now an
+Mails to the store's own staff, for work that needs a person. Each is an
 email type declared with `staff_email(..., area="ops")`, so the store's
 `EmailSwitch`, the gates and `store_operators()` apply. All are switchable,
 store staff, with no list headers. A store with no contact or owner address
-gets `SKIPPED_NO_RECIPIENT` (the old `ADMINS` fallback is gone with
-`tenant_admin_recipients`, deleted); the work still shows on the dashboard counter or
+gets `SKIPPED_NO_RECIPIENT`; the work still shows on the dashboard counter or
 the order note, whatever the switch says.
 
 | Key | About | Declared in | Gate |
@@ -183,6 +193,7 @@ the order note, whatever the switch says.
 | `ops.acs_voucher_request_unknown` | a `VoucherRequestUnknown` (order id, how the request ended) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.acs_unrecognised_vouchers` | an `UnrecognisedVouchers` (the voucher numbers ACS named for the first time, the pickup date) | `src/shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.payment_after_cancel` | a `PaymentAfterCancel` | `src/order/emails.py` | |
+| `ops.payment_without_order` | a `PaymentWithoutOrder` (the intent id and what Stripe collected) | `src/order/emails.py` | |
 | `ops.payment_mismatch` | a `PaymentMismatch` | `src/order/emails.py` | |
 | `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `src/order/emails.py` | |
 | `ops.refund_failed` | a `RefundFailed` | `src/order/emails.py` | |
@@ -208,22 +219,12 @@ voucher is first recorded (`AcsUnrecognisedVoucher`), and stay counted on
 the dashboard until staff resolve them. Every sender is best-effort: a mail failure never fails the task or
 masks the error it reports.
 
-Each store's old `OPS_ALERT_<KIND>_ENABLED` setting that was OFF became its
-`EmailSwitch` row in `emails/0003_import_ops_alert_switches` (a setting still
-on needs none: no row is on). The import moves the store's cache generation
-(a bulk insert fires no signal). The setting rows themselves are left in
-place for one release, because the previous image still reads them while a
-release rolls out; `emails/0004_drop_ops_alert_settings` (`contract_of`
-0003) then deleted them in every schema. The declarations and the
-"Operational Alerts" settings group are gone.
-
 A marketing type is switchable, honours `EmailOptOut` and carries the
 RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
-no task filters on `UserAccount.marketing_opted_out_at` any more. That
-field stays as account state (the admin and the storefront page's "stop all"
-button set it; the type-scoped unsubscribe writes `EmailOptOut` alone), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
-for every account that opted out before the link also wrote `EmailOptOut`
-(#368). In the customer admin staff may RECORD an objection a customer made
+no task filters on `UserAccount.marketing_opted_out_at`. That
+field is account state (the admin and the storefront page's "stop all"
+button set it; the type-scoped unsubscribe writes `EmailOptOut` alone). In the
+customer admin staff may RECORD an objection a customer made
 by phone or email (setting the field writes `EmailOptOut("*")`,
 `UserAdmin.save_model`); once set the field is read-only, because only the
 customer can lift an opt-out, through their own preferences (below).
@@ -246,24 +247,21 @@ an alert to the operators must not be mutable. None carries list headers
 | `platform.billing_expiring`, `platform.billing_expired`, `platform.billing_suspended` | `src/tenant/emails.py` | a `BillingNotice` (the `Tenant` row and the grace days), sent by `tenant.billing._send_stage_email` | the owner (`Tenant.owner_email`), in the store's `default_locale` |
 | `platform.billing_stage_copy` | `src/tenant/emails.py` | a `BillingStageCopy` (store, stage), the operators' trail of stages 2 and 3 | `settings.ADMINS` (`platform_operators()`), `settings.LANGUAGE_CODE` |
 | `platform.staff_password_reset` | `src/tenant/emails.py` | a `StaffPasswordReset` (the link, built by `tenant.tasks.send_staff_password_reset_email`) | the staff member's address, in the asked store's language |
-| `platform.health_alert` | `src/core/emails.py` | a `HealthAlert` (the failed components and their errors), from `core.tasks.monitor_system_health` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
-| `platform.backup_failed` | `src/core/emails.py` | a `BackupFailed` (the error), from `core.tasks.scheduled_database_backup` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.health_alert` | `src/tenant/emails.py` | a `HealthAlert` (the failed components and their errors), from `monitor_system_health` (`src/tenant/tasks.py`) | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.backup_failed` | `src/tenant/emails.py` | a `BackupFailed` (the error), from `scheduled_database_backup` (`src/tenant/tasks.py`) | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
 
 The staff reset is built under `public`, which knows only the platform, so
 the task reads the store's name in the store's schema first and carries it
 in the object (`store_name`): the subject and heading name the store, the
-rest of the brand is the platform's (owner decision D2: the platform
-sender). Its link still points at the host that asked, in the store's
+rest of the brand is the platform's, sender included. Its link still points at the host that asked, in the store's
 language.
 
-Both operator alerts keep their old guarantees: a failed health alert send
-is logged and does not mask the failure the task raises, and the backup
-task still re-raises its own error after a failed alert. The billing
-copy never fails the owner's notice it follows. `mail_admins` is no longer
-called anywhere in the project: an operator alert goes to the same
-`ADMINS`, now with a template pair, a translated subject and the platform's
-sender (the subject starts `[{site}]`, as the ops alerts do; `SERVER_EMAIL`
-and `EMAIL_SUBJECT_PREFIX`, which only `mail_admins` read, are gone).
+A failed health alert send is logged and does not mask the failure the task
+raises, and the backup task re-raises its own error after a failed alert. The
+billing copy never fails the owner's notice it follows. An operator alert goes
+to `ADMINS` with a template pair, a translated subject and the platform's
+sender (the subject starts `[{site}]`, as the ops alerts do); no code calls
+`mail_admins`.
 
 ### Email preferences (`GET` and `PATCH /api/v1/user/email-preferences`)
 
@@ -318,22 +316,10 @@ out, and an abandoned-checkout reservation (also settled when the store
 switched the reminder off, so turning it on later never sends a
 months-old reminder).
 
-Customer types are transactional with the `List-ID` the old send sites
-used (`order_confirmation`, `order_status`, `order_invoice`, ...), set as
-`list_id` so the recorded headers stay equal. The two carrier
-arrival mails (`shipping.acs_out_for_delivery`, `shipping.boxnow_at_locker`)
-sent no list headers before they moved; like every customer transactional
-mail they now carry them (re-recorded in the goldens):
-
-```
--  "headers": {},
-+  "headers": {
-+    "List-ID": "<acs_out_for_delivery.shop.example>",
-+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
-+  },
-```
-
-Their Reply-To was `[contact or From]` and is now `[contact]`, or none for a
-store without a contact address (replies then go to From). The status template that
-`order_returned` and `order_refunded` build on is `emails/base/order_status`,
-not an email.
+Customer types are transactional with a `list_id` of their own
+(`order_confirmation`, `order_status`, `order_invoice`, ...), so every customer
+transactional mail, the two carrier arrival mails (`shipping.acs_out_for_delivery`,
+`shipping.boxnow_at_locker`) included, carries a `List-ID` and, when the store has a contact address, a `mailto:`
+`List-Unsubscribe`.
+The status template that `order_returned` and `order_refunded` build on is
+`emails/base/order_status`, not an email.

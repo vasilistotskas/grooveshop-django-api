@@ -3,9 +3,9 @@
 The value every "free above X" rule is judged on (``threshold_value``),
 the shopper's distance to free shipping, the shipping price, the
 pay-way fee, and the total they add up to (``quote``). Order creation,
-the payment-intent endpoint, ``POST /cart/quote`` and the cart
-serializer all take these from ``OrderQuoteService``, so the cart
-preview, the quote, the intent amount and the order cannot disagree.
+``POST /cart/quote`` and the cart serializer all take these from
+``OrderQuoteService``, so the cart preview, the quote and the order
+cannot disagree.
 """
 
 from __future__ import annotations
@@ -13,10 +13,11 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.utils.crypto import salted_hmac
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -25,6 +26,7 @@ from order.exceptions import (
     InvalidCouponError,
     InvalidGiftCardError,
     LoyaltyRedemptionError,
+    PickupPointUnfitError,
     ShippingPriceUnresolvedError,
     ShippingRefusedError,
 )
@@ -35,10 +37,11 @@ from promotion.enum import BenefitType
 from shipping.enum import FreeShippingSource, ShippingRefusal
 
 if TYPE_CHECKING:
-    from cart.models import Cart
+    from cart.models import Cart, CartItem
     from giftcard.services import RedemptionPlan
     from pay_way.models import PayWay
-    from promotion.engine.results import CartDiscountResult
+    from product.models.product import Product
+    from promotion.engine.results import CartDiscountResult, CouponVerdict
     from shipping.services import ShippingCharge
 
 logger = logging.getLogger(__name__)
@@ -95,10 +98,15 @@ class ShippingChoice:
         The quote and order creation build it here from the same field
         names, so they read one delivery. The pickup point is the
         carrier's own ``location_keys``: a key of another carrier names
-        nothing this order is sent to.
+        nothing this order is sent to. A pickup-point delivery has no
+        region: it goes to the point, and the order keeps none of the
+        buyer's address (``_deliver_to_pickup_point``), so the quote, the
+        digest and the order read the same delivery.
         """
+        from shipping.enum import ShippingKind
         from shipping.interfaces import get_provider, is_registered
 
+        kind = data.get("shipping_kind") or None
         provider_code = data.get("shipping_provider_code") or None
         keys = (
             get_provider(provider_code).location_keys
@@ -106,10 +114,14 @@ class ShippingChoice:
             else ()
         )
         return cls(
-            kind=data.get("shipping_kind") or None,
+            kind=kind,
             provider_code=provider_code,
             country_id=data.get("country_id") or None,
-            region_id=data.get("region_id") or None,
+            region_id=(
+                None
+                if kind == ShippingKind.PICKUP_POINT
+                else data.get("region_id") or None
+            ),
             location=tuple(
                 (key, str(data[key])) for key in keys if data.get(key)
             ),
@@ -154,6 +166,30 @@ class BlockedCoupon:
 
 
 @dataclass(frozen=True, slots=True)
+class QuoteLine:
+    """One cart line as the quote priced it.
+
+    ``product``, ``quantity``, ``unit_price`` (the price the shopper
+    pays per unit, wholesale prices bound) and ``promotion_discount``
+    (the promotion money the line carries) are what ``cart_digest``
+    covers of it; ``total_price`` is ``quantity`` units at
+    ``unit_price``, before promotions.
+    """
+
+    item_id: int
+    product: Product
+    quantity: int
+    unit_price: Money
+    promotion_discount: Decimal
+
+    @property
+    def total_price(self) -> Money:
+        return Money(
+            self.quantity * self.unit_price.amount, self.unit_price.currency
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OrderCharges:
     """The rows an order is created from: those of a quote whose
     delivery and pay way are both chosen."""
@@ -174,6 +210,11 @@ class CheckoutQuote:
     ``gift_cards`` (planned against what is left to pay) and
     ``amount_due``. A row is never guessed.
 
+    ``lines`` are the cart's lines the quote priced: ``items_subtotal``
+    is their sum, the parcel is weighed from them and ``cart_digest``
+    covers them, all from one read of the cart. ``coupons`` is the
+    promotions' verdict on each code attached to the cart.
+
     ``grand_total`` is the products after promotions, plus shipping and
     the pay-way fee. ``amount_due`` is what is left of it after the
     loyalty redemption and the gift cards: the amount the order stores
@@ -181,8 +222,10 @@ class CheckoutQuote:
     ``loyalty_discount`` was priced for, 0 when none are redeemed.
     """
 
+    lines: tuple[QuoteLine, ...]
     items_subtotal: Money
     promotion: CartDiscountResult
+    coupons: tuple[CouponVerdict, ...]
     parcel_items: tuple[tuple[Any, int], ...]
     weight_grams: int
     shipping: ShippingCharge | None
@@ -193,6 +236,10 @@ class CheckoutQuote:
     grand_total: Money | None
     amount_due: Money | None
     cart_digest: str | None
+    #: The delivery as it was priced: its kind normalised and, for a home
+    #: delivery that named none, the carrier checkout resolved. Order
+    #: creation assigns this carrier, never a second resolution.
+    shipping_choice: ShippingChoice | None
 
     @property
     def currency(self) -> str:
@@ -264,9 +311,8 @@ class OrderQuoteService:
     ) -> CheckoutQuote:
         """What checkout charges for ``cart`` with these choices.
 
-        The one computation of the total: ``POST /cart/quote``, the
-        payment-intent amount and both order-creation paths call it, so
-        a rule added here reaches all of them. ``cart`` carries its
+        The one computation of the total: ``POST /cart/quote`` and
+        order creation call it, so a rule added here reaches both. ``cart`` carries its
         wholesale prices already (``B2BPricingService.bind_cart``).
 
         ``shipping`` and ``pay_way`` are ``None`` while the shopper
@@ -288,8 +334,11 @@ class OrderQuoteService:
         """
         from b2b.services import B2BService
 
+        # One read of the lines: the promotions are evaluated over the
+        # lines the quote prices, digests and returns.
+        items = tuple(cart.get_items())
         promotion = PromotionEngine.evaluate(
-            cart, user=user, email=email, lock=lock
+            cart, user=user, email=email, lock=lock, items=items
         )
         if lock:
             blocking = promotion.blocking_rejections
@@ -297,15 +346,31 @@ class OrderQuoteService:
                 code, reason = blocking[0]
                 raise InvalidCouponError(code=code, reason=reason)
 
-        items_subtotal = cart.total_price
+        lines = cls.priced_lines(items, promotion)
+        items_subtotal = Money(
+            sum((line.total_price.amount for line in lines), Decimal(0)),
+            settings.DEFAULT_CURRENCY,
+        )
         currency = items_subtotal.currency
-        parcel_items, weight_grams = cls._parcel(cart, promotion)
+        parcel_items, weight_grams = cls._parcel(lines, promotion)
         threshold_value = cls.threshold_value(
             items_subtotal, promotion.discount_total
         )
 
         shipping_charge = None
         if shipping is not None:
+            # One carrier for the whole quote, resolved once: priced,
+            # digested and assigned to the order (``shipping_choice``), so
+            # a zone or rate edit committing during the request cannot
+            # price one carrier and assign another.
+            kind, carrier = cls._carrier(
+                shipping.kind,
+                shipping.provider_code,
+                shipping.country_id,
+                weight_grams,
+                shipping.region_id,
+            )
+            shipping = replace(shipping, kind=kind, provider_code=carrier)
             shipping_charge = cls.shipping_cost(
                 order_value=threshold_value,
                 country_id=shipping.country_id,
@@ -319,6 +384,7 @@ class OrderQuoteService:
                 # price was resolved before (``resolve_live_shipping``).
                 cached_only=lock,
             )
+            cls._assert_pickup_point_fits(shipping, parcel_items)
         payment_fee = None
         if pay_way is not None:
             payment_fee = PaymentFee(
@@ -330,7 +396,7 @@ class OrderQuoteService:
 
         # Wholesale carts sit outside the loyalty program unless the
         # merchant opts in. Dropped here, before any total, so the
-        # quote, the intent amount, the order and ``redeem_points`` agree.
+        # quote, the order and ``redeem_points`` agree.
         if B2BService.suppresses_loyalty(cart):
             loyalty_points = 0
         loyalty_points = cls._redeemable_points(user, loyalty_points)
@@ -353,7 +419,7 @@ class OrderQuoteService:
         # way is not part of it; its fee is in ``expected_total``.
         cart_digest = (
             cls.cart_digest(
-                cart,
+                lines,
                 promotion,
                 shipping=shipping,
                 weight_grams=weight_grams,
@@ -379,8 +445,13 @@ class OrderQuoteService:
             amount_due = Money(due.amount - gift_cards.amount.amount, currency)
 
         return CheckoutQuote(
+            lines=lines,
             items_subtotal=items_subtotal,
             promotion=promotion,
+            # The codes the promotions were evaluated with, never a
+            # second read: a coupon swapped meanwhile would be reported
+            # with the other's discount.
+            coupons=promotion.coupon_verdicts(promotion.codes),
             parcel_items=parcel_items,
             weight_grams=weight_grams,
             shipping=shipping_charge,
@@ -391,17 +462,37 @@ class OrderQuoteService:
             grand_total=grand_total,
             amount_due=amount_due,
             cart_digest=cart_digest,
+            shipping_choice=shipping,
+        )
+
+    @staticmethod
+    def priced_lines(
+        items: Iterable[CartItem], promotion: CartDiscountResult
+    ) -> tuple[QuoteLine, ...]:
+        """The cart's lines (``items``, one read of the cart) at the
+        prices checkout charges, each with the promotion money
+        ``promotion``, evaluated over those same lines, puts on it."""
+        line_discounts = promotion.line_discounts
+        return tuple(
+            QuoteLine(
+                item_id=item.pk,
+                product=item.product,
+                quantity=item.quantity,
+                unit_price=item.final_price,
+                promotion_discount=line_discounts.get(item.pk, Decimal(0)),
+            )
+            for item in items
         )
 
     @staticmethod
     def cart_digest(
-        cart: Cart,
+        lines: Iterable[QuoteLine],
         promotion: CartDiscountResult,
         *,
         shipping: ShippingChoice,
         weight_grams: int,
     ) -> str:
-        """What an order of ``cart`` is made of, as one opaque value.
+        """What an order of these ``lines`` is made of, as one opaque value.
 
         Each line (product, quantity, unit price as priced, the promotion
         money it carries), the promotions that apply with their codes,
@@ -418,15 +509,14 @@ class OrderQuoteService:
         An HMAC over a canonical form, keyed by the ``SECRET_KEY``: it
         reveals nothing of the cart, and no client can compute it.
         """
-        line_discounts = promotion.line_discounts
-        lines = sorted(
+        canonical_lines = sorted(
             [
-                item.product_id,
-                item.quantity,
-                str(item.final_price.amount),
-                str(line_discounts.get(item.pk, Decimal(0))),
+                line.product.pk,
+                line.quantity,
+                str(line.unit_price.amount),
+                str(line.promotion_discount),
             ]
-            for item in cart.items.all()
+            for line in lines
         )
         promotions = sorted(
             [
@@ -448,6 +538,7 @@ class OrderQuoteService:
             shipping.provider_code,
             shipping.country_id,
             weight_grams,
+            shipping.region_id,
         )
         delivery = [
             kind,
@@ -458,7 +549,7 @@ class OrderQuoteService:
         ]
         canonical = json.dumps(
             {
-                "lines": lines,
+                "lines": canonical_lines,
                 "promotions": promotions,
                 "gifts": gifts,
                 "delivery": delivery,
@@ -471,7 +562,7 @@ class OrderQuoteService:
         ).hexdigest()
 
     @staticmethod
-    def _parcel(cart: Cart, promotion: CartDiscountResult):
+    def _parcel(lines: Iterable[QuoteLine], promotion: CartDiscountResult):
         """What ships and what it weighs: the cart's lines and the gifts
         the promotions add. Gifts ride in the parcel, so they count for
         the weight bracket, the weight cap and the carrier's parcel size.
@@ -479,7 +570,7 @@ class OrderQuoteService:
         from shipping.utils import compute_total_weight_grams
 
         parcel_items = (
-            *((item.product, item.quantity) for item in cart.items.all()),
+            *((line.product, line.quantity) for line in lines),
             *gift_pairs(promotion),
         )
         return parcel_items, compute_total_weight_grams(parcel_items)
@@ -492,7 +583,7 @@ class OrderQuoteService:
         ``Order.shipping_kind``'s own default. Everything that depends
         on the kind reads it here — the price (:meth:`_carrier`), the
         carrier the order is assigned
-        (``OrderService._resolve_shipping_provider``) and the pay ways it
+        (:attr:`CheckoutQuote.shipping_choice`) and the pay ways it
         may use (:meth:`offered_pay_ways`) — so none of them can take a
         kind-less order for something else. Judged by no kind at all,
         such an order was priced as a home delivery and took a pay way
@@ -508,13 +599,15 @@ class OrderQuoteService:
         shipping_provider_code: str | None,
         country_id: str | None,
         weight_grams: int | None,
+        region_id: str | None,
     ) -> tuple[str, str | None]:
         """The (kind, carrier code) a delivery is priced as.
 
         A home delivery (:meth:`delivery_kind`) that names no carrier
-        takes the active home-delivery carrier for the country, by the
-        helper that assigns the order's carrier, so the price charged
-        and the carrier assigned always agree.
+        takes the active home-delivery carrier for the destination (the
+        country and the region's zone). :meth:`quote` resolves it once and
+        hands it to the order (:attr:`CheckoutQuote.shipping_choice`), so
+        the price charged and the carrier assigned always agree.
         """
         from shipping.enum import ShippingKind
         from shipping.services import ShippingService
@@ -526,7 +619,7 @@ class OrderQuoteService:
         ):
             shipping_provider_code = (
                 ShippingService.resolve_home_delivery_provider(
-                    country_id, weight_grams
+                    country_id, weight_grams, region_id
                 )
             )
         return shipping_kind, shipping_provider_code
@@ -551,14 +644,19 @@ class OrderQuoteService:
         """
         from shipping.services import ShippingService
 
+        items = tuple(cart.get_items())
+        promotion = PromotionEngine.evaluate(
+            cart, user=user, email=email, items=items
+        )
         _parcel_items, weight_grams = cls._parcel(
-            cart, PromotionEngine.evaluate(cart, user=user, email=email)
+            cls.priced_lines(items, promotion), promotion
         )
         kind, provider_code = cls._carrier(
             shipping.kind,
             shipping.provider_code,
             shipping.country_id,
             weight_grams,
+            shipping.region_id,
         )
         ShippingService.resolve_live_price(
             provider_code=provider_code,
@@ -781,6 +879,35 @@ class OrderQuoteService:
             return None
         return min(routes, key=lambda route: (route[0], route[1]))[2]
 
+    @staticmethod
+    def _assert_pickup_point_fits(
+        shipping: ShippingChoice, parcel_items: Iterable[tuple[Any, int]]
+    ) -> None:
+        """Refuse a chosen pickup point that cannot take the cart's parcel
+        (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import PickupPointUnfit, get_provider
+        from shipping.services import ShippingService
+
+        if (
+            shipping.kind != ShippingKind.PICKUP_POINT
+            or not shipping.provider_code
+            or not shipping.location
+        ):
+            return
+        try:
+            ShippingService.assert_pickup_point_fits(
+                shipping.provider_code,
+                dict(shipping.location),
+                items=parcel_items,
+            )
+        except PickupPointUnfit as exc:
+            raise PickupPointUnfitError(
+                get_provider(shipping.provider_code).location_keys[0],
+                str(exc.message),
+                exc.code,
+            ) from exc
+
     @classmethod
     def shipping_cost(
         cls,
@@ -824,21 +951,25 @@ class OrderQuoteService:
 
         Raises :class:`~order.exceptions.ShippingRefusedError`, an
         ``InvalidOrderDataError`` that names which refusal it is (never
-        the raw ``shipping.exceptions`` types), so every caller of
-        :meth:`quote` — order creation, the create-payment-intent and
-        quote endpoints — gets the same field-scoped 400 shape it
-        already handles for every other checkout-time rejection.
+        the raw ``shipping.exceptions`` types): order creation answers it
+        with the field-scoped 400 it gives every other checkout-time
+        rejection, and the quote endpoint with the refusal's own code.
         """
         from shipping.exceptions import (
             ShippingLivePriceUnresolvedError,
             ShippingParcelTooLargeError,
+            ShippingRegionUnavailableError,
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
         from shipping.services import ShippingService
 
         shipping_kind, shipping_provider_code = cls._carrier(
-            shipping_kind, shipping_provider_code, country_id, weight_grams
+            shipping_kind,
+            shipping_provider_code,
+            country_id,
+            weight_grams,
+            region_id,
         )
 
         try:
@@ -855,6 +986,17 @@ class OrderQuoteService:
             )
         except ShippingLivePriceUnresolvedError as exc:
             raise ShippingPriceUnresolvedError from exc
+        except ShippingRegionUnavailableError as exc:
+            # Before ShippingUnavailableError, which it subclasses.
+            raise ShippingRefusedError(
+                ShippingRefusal.REGION_UNAVAILABLE,
+                str(
+                    _(
+                        "The selected shipping method does not deliver "
+                        "to the selected region."
+                    )
+                ),
+            ) from exc
         except ShippingUnavailableError as exc:
             raise ShippingRefusedError(
                 ShippingRefusal.UNAVAILABLE,
@@ -995,7 +1137,7 @@ class OrderQuoteService:
         through a provider the store can charge with, and not excluded
         for the chosen delivery (all of the first two while none is
         chosen). The one rule behind the list a quote returns and the
-        pay way a quote, a payment intent or order creation accepts, so
+        pay way a quote or order creation accepts, so
         a selection is accepted exactly when it is listed.
 
         A delivery without a kind is judged as what it is priced as, a

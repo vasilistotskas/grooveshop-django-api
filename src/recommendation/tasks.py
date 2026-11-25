@@ -21,9 +21,9 @@ from django.conf import settings
 from django.utils import timezone
 
 from core.celery import celery_app
+from core.monitored_task import MonitoredTask
 from core.retention import delete_in_batches
 from core.retry import TRANSIENT_DB_ERRORS, TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ def recompute_all_candidates() -> dict[str, int]:
 
     # One purge for the whole pass. The cache surface deliberately does
     # NOT list RecommendationCandidate in ``invalidated_by`` — see
-    # src/core/cache/surfaces.py — because per-row signals from the
+    # src/recommendation/cache_surfaces.py — because per-row signals from the
     # delete + bulk_create above would purge once per product.
     from core.cache.service import CacheService
 
@@ -173,9 +173,9 @@ def record_recommendation_event(
     retry_backoff=True,
 )
 def record_recommendation_attach(order_id: int) -> dict[str, int]:
-    """Write ``attach`` rows for a newly created order.
+    """Write ``attach`` rows for a newly confirmed order.
 
-    Dispatched from ``recommendation.signals.on_order_created`` through
+    Dispatched from ``recommendation.signals.on_order_confirmed`` through
     ``dispatch_on_commit`` so the schema travels with the message. Safe
     to retry: the attach rows are unique per (order, product,
     impression).

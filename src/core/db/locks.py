@@ -7,7 +7,9 @@ need a transaction open across the call, and
 ``idle_in_transaction_session_timeout`` ends a transaction left idle that
 long. So the lock is the session's: taken outside any transaction, released
 when the block ends, and gone with the session if the process dies, which
-lets the copy that waits take over at once.
+lets the copy that waits take over: at once when the process ends, and
+within about a minute when its node is lost without closing the socket
+(the TCP keepalives every session sets, ``settings.database``).
 """
 
 from __future__ import annotations
@@ -16,9 +18,30 @@ import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from django.db import Error, connection
+from django.db import Error, OperationalError, connection
+from psycopg.errors import LockNotAvailable, QueryCanceled
 
 logger = logging.getLogger(__name__)
+
+
+class LockWaitRanOut(OperationalError):
+    """Another session held the lock for longer than this one may wait.
+
+    Its own ``lock_timeout`` or ``statement_timeout`` ended the wait. The
+    holder is still at work, so the caller's next attempt can find the work
+    done: a task retries it. Raised only while taking the lock, never by the
+    block it guards, so a timeout inside the block is not mistaken for one.
+    """
+
+
+def _take(sql: str, key: str) -> None:
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [key])
+    except OperationalError as error:
+        if isinstance(error.__cause__, QueryCanceled | LockNotAvailable):
+            raise LockWaitRanOut(key) from error
+        raise
 
 
 @contextmanager
@@ -27,7 +50,7 @@ def held_across_calls(key: str) -> Generator[None]:
 
     Another holder makes this wait, for at most the connection's
     ``lock_timeout`` or ``statement_timeout``: a longer wait raises
-    ``OperationalError``. Advisory locks are per database, which every
+    ``LockWaitRanOut``. Advisory locks are per database, which every
     schema shares, so *key* names what it guards in a way no other store's
     key can repeat.
 
@@ -37,16 +60,10 @@ def held_across_calls(key: str) -> Generator[None]:
     the lock went with it.
     """
     if connection.in_atomic_block:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [key]
-            )
+        _take("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", key)
         yield
         return
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT pg_advisory_lock(hashtextextended(%s, 0))", [key]
-        )
+    _take("SELECT pg_advisory_lock(hashtextextended(%s, 0))", key)
     try:
         yield
     finally:

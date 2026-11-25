@@ -3,12 +3,12 @@
 Verifies that:
 1. Fields forbidden by the schema (e.g. unknown keys) are rejected.
 2. Cross-field validation (email disposable, B2B invoice, BoxNow) runs.
-3. Both payment flows (online + offline) go through the serializer.
+3. Online and offline pay ways both go through the serializer.
 4. The floor/place/location_type optional fields added to
    OrderCreateFromCartSerializer are accepted without error.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -34,7 +34,6 @@ User = get_user_model()
 
 
 pytestmark = [
-    pytest.mark.usefixtures("trust_intent_binding"),
     pytest.mark.usefixtures("checkout_legal_documents"),
 ]
 
@@ -64,7 +63,6 @@ class TestOrderCreateSerializerValidation(APITestCase):
         data = {
             "pay_way_id": self.pay_way.id,
             "terms_accepted": True,
-            "payment_intent_id": "pi_test_abc123",
             "first_name": "John",
             "last_name": "Doe",
             "email": "john@example.com",
@@ -292,24 +290,17 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             "shipping_kind": "home_delivery",
         }
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_online_flow_accepted_with_valid_data(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_provider,
     ):
-        """Stripe (online) flow creates an order when all fields are valid."""
+        """Stripe (online) flow creates the order, unpaid, when all fields
+        are valid: it is paid afterwards on the hosted page."""
         mock_validate_cart.return_value = {"valid": True, "errors": []}
         mock_validate_address.return_value = None
-        mock_provider = MagicMock()
-        mock_provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_provider.return_value = mock_provider
 
         pay_way = PayWayFactory(
             provider_code="stripe", settlement=PaySettlement.ONLINE, active=True
@@ -318,7 +309,6 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             **self._base_address(),
             "pay_way_id": pay_way.id,
             "terms_accepted": True,
-            "payment_intent_id": "pi_stripe_test_xyz",
         }
 
         self.client.force_authenticate(user=self.user)
@@ -326,15 +316,18 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
+        self.assertEqual(
+            response.data["payment_status"], PaymentStatus.PENDING.value
+        )
 
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
-    def test_offline_flow_accepted_without_payment_intent(
+    def test_offline_flow_accepted(
         self,
         mock_validate_address,
         mock_validate_cart,
     ):
-        """COD (offline) flow creates an order without payment_intent_id."""
+        """COD (offline) flow creates an order."""
         mock_validate_cart.return_value = {"valid": True, "errors": []}
         mock_validate_address.return_value = None
 
@@ -433,7 +426,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
     ):
         """An active Viva Wallet pay-way is still rejected at order
         creation when the tenant holds no Viva credentials — tenant-only,
-        no settings fallback (see tenant/credentials.py). The GET
+        no settings fallback (see src/tenant/credentials.py). The GET
         pay-way list already hides it via ``is_provider_configured``;
         this pins the same gate at the create boundary for a direct
         API call / stale client."""
@@ -466,6 +459,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         go')."""
         from pay_way.factories import PayWayShippingExclusionFactory
         from shipping.models import ShippingProvider
+        from shipping_boxnow.factories import BoxNowLockerFactory
 
         boxnow = ShippingProvider.objects.get(code="boxnow")
         boxnow.is_active = True
@@ -480,6 +474,10 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             pay_way=pay_way,
             shipping_provider=boxnow,
             shipping_kind="pickup_point",
+        )
+        BoxNowLockerFactory(
+            external_id="123",
+            country_code=self._base_address()["country_id"],
         )
 
         data = {
@@ -496,11 +494,10 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
 
-    def test_online_flow_rejects_missing_pay_way_id(self):
+    def test_missing_pay_way_id_is_rejected(self):
         """Serializer catches missing pay_way_id before any DB lookup."""
         data = {
             **self._base_address(),
-            "payment_intent_id": "pi_stripe_test_xyz",
             # deliberately no pay_way_id
         }
 

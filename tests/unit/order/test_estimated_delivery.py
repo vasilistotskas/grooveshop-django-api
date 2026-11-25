@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from extra_settings.models import Setting
 
 from country.factories import CountryFactory
+from order.checkout.quote import ShippingChoice
 from order.factories.order import OrderFactory
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
@@ -17,22 +19,22 @@ from tests.utils.checkout import priced
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 MONDAY_10_ATHENS = datetime(2026, 10, 5, 7, 0, tzinfo=UTC)
 MONDAY_1530_ATHENS = datetime(2026, 10, 5, 12, 30, tzinfo=UTC)
 
 
 def _order_data(country, *, kind="home_delivery", code="flat_rate"):
-    data = {
-        "country_id": country.alpha_2,
-        "shipping_provider_code": code,
-        "shipping_kind": kind,
-    }
-    OrderService._resolve_shipping_provider(data, weight_grams=0)
+    data = {"country_id": country.alpha_2}
+    OrderService._assign_shipping_provider(
+        data,
+        SimpleNamespace(
+            shipping_choice=ShippingChoice(
+                kind=kind, provider_code=code, country_id=country.alpha_2
+            )
+        ),
+    )
     return data
 
 
@@ -81,7 +83,9 @@ def test_inactive_rate_is_not_used():
     from shipping.models import ShippingRate
 
     data = _order_data(country)
-    ShippingRate.objects.filter(country_id=country_rate).update(is_active=False)
+    ShippingRate.objects.filter(zone__country_id=country_rate).update(
+        is_active=False
+    )
     assert _seed(data, MONDAY_10_ATHENS) is None
 
 
@@ -151,7 +155,7 @@ class TestSetAtCreation:
         with patch(
             "order.services.timezone.now", return_value=MONDAY_10_ATHENS
         ):
-            return OrderService.create_order_from_cart_offline(
+            return OrderService.create_order_from_cart(
                 **priced(
                     legal_acceptance=checkout_acceptance(),
                     cart=cart,
@@ -179,7 +183,7 @@ def _create_online():
     from djmoney.money import Money
 
     from cart.factories import CartFactory, CartItemFactory
-    from order.enum.status import PaymentStatus
+    from pay_way.enum.settlement import PaySettlement
     from pay_way.factories import PayWayFactory
     from product.factories import ProductFactory
     from user.factories import UserAccountFactory
@@ -199,14 +203,7 @@ def _create_online():
     )
     country = _country_with_rate(delivery_days_min=1, delivery_days_max=3)
 
-    with (
-        patch("order.payments.payment.get_payment_provider") as provider,
-        patch("order.services.timezone.now", return_value=MONDAY_10_ATHENS),
-    ):
-        provider.return_value.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {"payment_id": "pi_test_123", "status": "succeeded"},
-        )
+    with patch("order.services.timezone.now", return_value=MONDAY_10_ATHENS):
         order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
@@ -223,8 +220,11 @@ def _create_online():
                     "phone": "+306900000000",
                     "shipping_kind": "home_delivery",
                 },
-                payment_intent_id="pi_test_123",
-                pay_way=PayWayFactory(provider_code="stripe"),
+                pay_way=PayWayFactory(
+                    provider_code="stripe",
+                    settlement=PaySettlement.ONLINE,
+                    active=True,
+                ),
                 user=user,
             )
         )
@@ -233,9 +233,9 @@ def _create_online():
     return order
 
 
-def test_payment_first_creation_stores_the_estimate():
-    """``create_order_from_cart`` (online) seeds it too, not only the
-    offline path."""
+def test_online_creation_stores_the_estimate():
+    """An order an online pay way will pay afterwards seeds it too, not
+    only an offline one."""
     assert _create_online().estimated_delivery == date(2026, 10, 8)
 
 
@@ -269,7 +269,7 @@ class TestUnreadableCutoff:
         assert order.estimated_delivery is None
         assert "DISPATCH_CUTOFF" in caplog.text
 
-    def test_payment_first_order_is_still_created(self, caplog):
+    def test_online_order_is_still_created(self, caplog):
         _store_unvalidated_cutoff("25:99")
         order = _create_online()
         assert order.pk

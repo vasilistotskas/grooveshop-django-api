@@ -57,19 +57,24 @@ def test_order_created_schedules_purchase_per_settlement(
         purchase.assert_not_called()
 
 
-def test_order_refunded_schedules_refund_with_amount():
+def test_order_refunded_schedules_refund_with_its_ledger_row_and_amount():
     with mock.patch("meta_capi.signals.schedule_refund") as refund:
         _on_order_refunded(
             sender=None,
             order=SimpleNamespace(id=43),
             amount=Money(Decimal("9.99"), "EUR"),
+            refund=SimpleNamespace(pk=430),
         )
 
-    refund.assert_called_once_with(43, Decimal("9.99"))
+    refund.assert_called_once_with(43, 430, Decimal("9.99"))
 
 
 def test_order_refunded_without_an_amount_is_an_error():
     """``amount`` is part of the signal's contract: a sender that leaves it
     out fails loudly, it is not read as a refund of "everything"."""
     with pytest.raises(TypeError, match="amount"):
-        _on_order_refunded(sender=None, order=SimpleNamespace(id=43))
+        _on_order_refunded(
+            sender=None,
+            order=SimpleNamespace(id=43),
+            refund=SimpleNamespace(pk=430),
+        )

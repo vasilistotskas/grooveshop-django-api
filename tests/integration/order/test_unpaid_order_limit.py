@@ -84,7 +84,7 @@ def _place(*, email="maria@example.com", user=None, pay_way=None):
     )
     country = CountryFactory()
     enable_rate(country)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,

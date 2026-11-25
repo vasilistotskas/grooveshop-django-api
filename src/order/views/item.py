@@ -12,14 +12,14 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-from core.utils.serializers import (
+from core.api.action_config import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
 from order.filters import OrderItemFilter
 from order.models.item import OrderItem
 from order.serializers.item import (
@@ -65,7 +65,7 @@ class OrderItemViewSet(BaseModelViewSet):
     serializers_config = serializers_config
     # Reads: the queryset is user-scoped and schema-isolated, so an
     # authenticated caller is by construction a customer of THIS store.
-    # Tenancy is not an extra permission here (see tenant/membership.py).
+    # Tenancy is not an extra permission here (see src/tenant/membership.py).
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [
@@ -124,7 +124,7 @@ class OrderItemViewSet(BaseModelViewSet):
     def restock(self, request, pk=None):
         # Restocking puts returned units back on the shelf and records them
         # on the line; it moves NO money. What the customer is paid back is
-        # the order's refund (``OrderService.refund_order``, the staff
+        # the order's refund (``RefundService.refund_order``, the staff
         # "Refund" admin action), decided at order level because a line's
         # snapshot price is not what the customer paid for it (tax, shared
         # discounts, shipping). It is a staff/merchant operation, never

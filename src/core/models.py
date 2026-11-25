@@ -15,6 +15,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.cache.models import CachePurgeLog  # noqa: F401
 from core.fields.plain_text import PlainTextField
+from core.mixins import SoftDeleteManagerMixin, SoftDeleteQuerySetMixin
 
 
 class JSONBConcat(Func):
@@ -416,7 +417,7 @@ class SweepCursor(models.Model):
     A sweep acts on the rows whose date fell in ``(position, now]``
     (``core.sweeps``) and moves the position only after the work ran, so
     a run that fails repeats its window. Kept in Postgres, not the cache:
-    the cache fails open (``core.caches.CustomCache``: an unreachable
+    the cache fails open (``core.cache_backend.CustomCache``: an unreachable
     Redis reads as a miss and drops the write), so a cursor there was lost
     with every outage, and the sweep fell back to a fixed window: missing
     what went live before it, repeating what came after.
@@ -500,7 +501,7 @@ class MetaDataModel(models.Model):
             )
         )
         # Keep the in-memory copy usable — callers go on to set more
-        # keys on it (see ``order/services.py`` right after
+        # keys on it (see ``src/order/services.py`` right after
         # ``redeem_points``). It reflects this write, not any concurrent
         # one; ``refresh_from_db`` if you need the row's full state.
         self.metadata.update(items)
@@ -555,80 +556,17 @@ class SoftDeleteMixin(models.Model):
         self.save(update_fields=["deleted_at", "is_deleted"])
 
 
-class SoftDeleteQuerySet(models.QuerySet):
-    """
-    QuerySet that overrides delete() to perform soft delete.
-
-    Provides methods for soft delete, restore, and hard delete operations.
-    """
-
-    def delete(self) -> tuple[int, dict[str, int]]:
-        """
-        Soft delete all instances in the queryset.
-
-        Returns:
-            Tuple of (number updated, dict of updates per model)
-        """
-        count = super().update(deleted_at=timezone.now(), is_deleted=True)
-        return (count, {self.model._meta.label: count})
-
-    def restore(self) -> int:
-        """
-        Restore all soft-deleted instances in the queryset.
-
-        Returns:
-            Number of instances restored
-        """
-        return super().update(deleted_at=None, is_deleted=False)
-
-    def hard_delete(self) -> tuple[int, dict[str, int]]:
-        """
-        Permanently delete all instances in the queryset.
-
-        Returns:
-            Tuple of (number deleted, dict of deletions per model)
-        """
-        return super().delete()
+class SoftDeleteQuerySet(SoftDeleteQuerySetMixin, models.QuerySet):
+    """The soft-delete queryset of a model with no queryset of its own."""
 
 
-class SoftDeleteManager(models.Manager):
-    """
-    Manager that filters out soft-deleted items by default.
+class SoftDeleteManager(SoftDeleteManagerMixin, models.Manager):
+    """Hides soft-deleted rows; ``all_with_deleted()`` and
+    ``deleted_only()`` reach them (``core.mixins.soft_delete``)."""
 
-    Provides methods to access all records including deleted ones,
-    or only deleted records.
-    """
-
-    def get_queryset(self) -> SoftDeleteQuerySet:
-        """
-        Get the default queryset excluding soft-deleted items.
-
-        Returns:
-            QuerySet with is_deleted=False filter applied
-        """
-        return SoftDeleteQuerySet(self.model, using=self._db).exclude(
-            is_deleted=True
-        )
-
-    def all_with_deleted(self) -> SoftDeleteQuerySet:
-        """
-        Get all records including soft-deleted ones.
-
-        Returns:
-            Unfiltered QuerySet
-        """
-        return SoftDeleteQuerySet(self.model, using=self._db)
-
-    def deleted_only(self) -> SoftDeleteQuerySet:
-        """
-        Get only soft-deleted records.
-
-        Returns:
-            QuerySet with is_deleted=True filter applied
-        """
-        return SoftDeleteQuerySet(self.model, using=self._db).filter(
-            is_deleted=True
-        )
+    # The queryset ``models.Manager.get_queryset`` builds, as
+    # ``Manager.from_queryset`` would set it.
+    _queryset_class = SoftDeleteQuerySet
 
 
 class SoftDeleteModel(SoftDeleteMixin, models.Model):

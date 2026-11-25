@@ -1,4 +1,4 @@
-"""An order records where its shopper came from, on both creation paths.
+"""An order records where its shopper came from, whatever its pay way.
 
 ``POST /order`` takes an optional ``attribution`` object (the
 storefront's first-touch capture, or the agent gateway's protocol) and
@@ -9,7 +9,7 @@ row when nothing was sent. The order responses read it back.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.test import override_settings
@@ -22,7 +22,6 @@ from cart.factories.item import CartItemFactory
 from cart.models import CartAttribution
 from country.factories import CountryFactory
 from order.enum.attribution import OrderSourceType
-from order.enum.status import PaymentStatus
 from order.factories import OrderFactory
 from order.models.attribution import OrderAttribution
 from pay_way.enum.settlement import PaySettlement
@@ -41,7 +40,6 @@ INSTAGRAM_UA = (
 
 
 pytestmark = [
-    pytest.mark.usefixtures("trust_intent_binding"),
     pytest.mark.usefixtures("checkout_legal_documents"),
 ]
 
@@ -177,16 +175,7 @@ class TestOrderAttributionOnCreate(APITestCase):
             "instagram",
         )
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_the_payment_first_path_keeps_the_carts_source_too(
-        self, mock_get_provider, *_mocks
-    ):
-        provider = MagicMock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_provider.return_value = provider
+    def test_a_card_order_keeps_the_carts_source_too(self, *_mocks):
         CartAttribution.objects.create(
             cart=self.cart,
             source_type=OrderSourceType.SEARCH,
@@ -198,7 +187,7 @@ class TestOrderAttributionOnCreate(APITestCase):
             active=True,
         )
 
-        response = self._post(pay_way, paymentIntentId="pi_test_cart_source")
+        response = self._post(pay_way)
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         row = OrderAttribution.objects.get(order_id=response.json()["id"])
@@ -268,7 +257,7 @@ class TestOrderAttributionOnCreate(APITestCase):
 
     def test_a_referrer_on_the_store_own_domain_is_ignored(self, *_mocks):
         with patch(
-            "order.services.tenant_domain_set",
+            "order.checkout.attribution_service.tenant_domain_set",
             return_value={"webside.gr"},
         ):
             response = self._post(
@@ -298,16 +287,7 @@ class TestOrderAttributionOnCreate(APITestCase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert not OrderAttribution.objects.exists()
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_the_payment_first_path_records_it_too(
-        self, mock_get_provider, *_mocks
-    ):
-        provider = MagicMock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_provider.return_value = provider
+    def test_a_card_order_records_it_too(self, *_mocks):
         pay_way = PayWayFactory(
             provider_code="stripe",
             settlement=PaySettlement.ONLINE,
@@ -316,7 +296,6 @@ class TestOrderAttributionOnCreate(APITestCase):
 
         response = self._post(
             pay_way,
-            paymentIntentId="pi_test_attribution",
             attribution={"utmSource": "google", "clickIds": ["gclid"]},
         )
 

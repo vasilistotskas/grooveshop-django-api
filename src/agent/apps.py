@@ -15,4 +15,7 @@ class AgentConfig(AppConfig):
     verbose_name = _("Agent API")
 
     def ready(self) -> None:
-        from . import signals  # noqa: F401  — register receivers
+        from . import (
+            checks,  # noqa: F401  — registers the CIMD guard
+            signals,  # noqa: F401  — register receivers
+        )

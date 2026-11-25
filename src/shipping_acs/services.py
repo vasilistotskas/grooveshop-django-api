@@ -23,16 +23,21 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
 
+from core.cache.invalidation import mark_model_stale
+from core.enum import FloorChoicesEnum
 from emails.send import send_email
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
-from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping.exceptions import (
+    ShipmentAwaitingPaymentError,
+    ShipmentNotNeededError,
+)
 from shipping.locks import lock_with_order
-from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
+from shipping.services import DELIVERY_NOTES_MAX_LEN, CourierNotes
 from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
 from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
@@ -80,7 +85,7 @@ _COD_PAYMENT_METHOD = "acs_cod"
 
 # State-transition tables (string literals to avoid importing
 # order.enum.status at module import time and risking a circular
-# import chain since order/services.py imports shipping providers).
+# import chain since src/order/services.py imports shipping providers).
 
 _SHIPPED_STATES: frozenset[AcsShipmentState] = frozenset(
     {
@@ -125,7 +130,7 @@ _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
 # DB without re-running the payload builder. Strictly operational —
 # recipient PII (name/address/phone/email) is intentionally excluded
 # because shipment.metadata is not cleared by GDPR anonymisation
-# (see user/services/gdpr.py) and we don't want a shadow PII copy.
+# (see src/user/services/gdpr.py) and we don't want a shadow PII copy.
 _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Pickup_Date",
     "Sender",
@@ -146,6 +151,30 @@ _AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
     "Language",
     "Delivery_Notes",
 )
+
+
+def _floor_label(order: Order) -> str:
+    """The order's floor as the courier reads it: the choice's Greek label
+    ("2ος όροφος"), the text the checkout shows, or "" without one.
+
+    It rides in ``Delivery_Notes`` (free text by ACS's manual, p. 7). The
+    manual's ``Recipient_Floor`` gives no format or allowed values (p. 6),
+    so the field is not sent until an ACS stage voucher shows how a value
+    lands; the floor then moves there and out of the notes.
+    """
+    if not order.floor:
+        return ""
+    if order.floor not in FloorChoicesEnum.values:
+        # The column's choices are not a database constraint: a value
+        # outside them must not keep the voucher from being issued.
+        logger.warning(
+            "Order %s has a floor outside the choices: %r",
+            order.id,
+            order.floor,
+        )
+        return ""
+    with translation.override("el"):
+        return str(FloorChoicesEnum(order.floor).label)
 
 
 def _recipient_name(order: Order) -> str:
@@ -191,9 +220,30 @@ def _stale_claim_message(age: float) -> str:
     )
 
 
-def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
-    """Return a PII-scrubbed copy of the create-voucher params."""
-    return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+def _audit_envelope(params: dict[str, Any], order: Order) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the create-voucher params, built
+    with them (``create_voucher_for_order``) from the same order.
+
+    ``Delivery_Notes`` is recorded as the customer's note the voucher
+    carried (:attr:`CourierNotes.customer_part`), without the floor and
+    the address line 2 that ride ahead of it: those are the recipient's
+    address, which this copy does not hold.
+    """
+    envelope = {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
+    if "Delivery_Notes" in envelope:
+        envelope["Delivery_Notes"] = _delivery_notes(order).customer_part
+    return envelope
+
+
+def _delivery_notes(order: Order) -> CourierNotes:
+    """The voucher's ``Delivery_Notes``: the floor, the address line 2
+    and the customer's note. The floor and the address line come first:
+    ACS's ``Recipient_Address`` is the street alone, so they ride here."""
+    return CourierNotes(
+        floor=_floor_label(order),
+        address_line_2=order.address_line_2,
+        customer_notes=order.customer_notes,
+    )
 
 
 def _kg_from_grams(weight_grams: int | None) -> str:
@@ -467,7 +517,6 @@ class AcsService:
         outcome does to the hold is the table in
         ``shipping_acs.voucher_hold``.
         """
-        client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
         with transaction.atomic():
             try:
@@ -489,6 +538,16 @@ class AcsService:
                 )
                 return shipment
 
+            # Never mint for an order that ships nothing: canceled, refunded,
+            # or its payment all went back (a full refund leaves the order
+            # PROCESSING), or a shipment ACS retired. The voucher would
+            # hand over goods nobody pays for, and only this lock sees a
+            # cancel that landed during a retry's backoff. Like an unpaid
+            # order below, it no longer waits for ACS either.
+            from shipping_acs.attention import needs_no_voucher
+
+            ships_nothing = needs_no_voucher(shipment)
+
             # Never mint for an order the shopper still owes online: the
             # voucher would carry Cod_Ammount 0 and hand the parcel over
             # for free. ``shipment.order`` was loaded under this lock, so
@@ -500,12 +559,21 @@ class AcsService:
             # like any other while a hold is in force. Left stamped, the
             # sweep would send it tick after tick to be refused here.
             awaits_payment = shipment.order.awaits_online_payment
-            if awaits_payment:
+            if ships_nothing or awaits_payment:
                 stale_claim, hold = "", None
                 cls._voucher_request_no_longer_held(
-                    shipment, "Held voucher request: order awaits payment"
+                    shipment,
+                    "Held voucher request: order ships nothing"
+                    if ships_nothing
+                    else "Held voucher request: order awaits payment",
                 )
             else:
+                # Only an order that is sent needs the store's ACS
+                # credentials (``AcsConfigError``): one that ships nothing
+                # or awaits payment is refused above whatever they are.
+                # Nothing is written before this, so a failure leaves no
+                # claim.
+                client = AcsClient()
                 # A voucher request whose answer was lost: ACS may hold a
                 # voucher for this order, and ``ACS_Create_Voucher`` has no
                 # idempotency key, so nothing sends another one until staff
@@ -556,6 +624,8 @@ class AcsService:
                     else:
                         cls._mark_voucher_request_held(shipment)
 
+        if ships_nothing:
+            raise ShipmentNotNeededError(order.id)
         if awaits_payment:
             raise ShipmentAwaitingPaymentError(order.id)
         if stale_claim:
@@ -585,6 +655,7 @@ class AcsService:
         # ----- Phase 2: API call (no DB lock held) -----
         try:
             params = cls._build_create_voucher_params(order, shipment, client)
+            audit_request = _audit_envelope(params, order)
         except Exception as exc:
             # Nothing was sent. Refused locally (an invalid postcode) or
             # failed building the request: record it where the admin
@@ -775,10 +846,10 @@ class AcsService:
                 # attempt so ops looking at the row don't mistake an old
                 # error for the current state. Mirrors BoxNow's success
                 # path which already nulls ``last_error`` (see
-                # shipping_boxnow/services.py).
+                # src/shipping_boxnow/services.py).
                 metadata.pop("last_error", None)
                 metadata["create_response"] = result
-                metadata["create_request"] = _audit_envelope(params)
+                metadata["create_request"] = audit_request
                 metadata["multipart_vouchers"] = children
 
                 # The answer came after another worker found this claim
@@ -797,6 +868,8 @@ class AcsService:
                 shipment.voucher_request_unknown_at = None
                 shipment.voucher_request_held_at = None
                 shipment.metadata = metadata
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
                 shipment.save(
                     update_fields=[
                         "voucher_no",
@@ -804,6 +877,7 @@ class AcsService:
                         "voucher_request_unknown_at",
                         "voucher_request_held_at",
                         "metadata",
+                        "updated_at",
                     ]
                 )
                 cls._settle_unrecognised_vouchers(
@@ -832,7 +906,7 @@ class AcsService:
         sent_notes = params.get("Delivery_Notes", "") or ""
         raw_notes_len = len(order.customer_notes or "")
         # ``notes_truncated`` derives from the post-sanitize length —
-        # ``sanitize_delivery_notes`` collapses whitespace runs before
+        # ``CourierNotes`` collapses whitespace runs before
         # truncating, so a raw note of 600 spaces sanitises to "" and
         # was NOT truncated even though raw_len > MAX. The sanitiser
         # caps at exactly MAX, so sent_len == MAX is the truncation
@@ -983,7 +1057,9 @@ class AcsService:
                     "response": getattr(exc, "raw", None),
                 }
                 fresh.metadata = metadata
-                fresh.save(update_fields=["metadata"])
+                # ``updated_at`` too: the erasure sweep reads a write to the
+                # row by it (``AcsCarrier.orders_written_since``).
+                fresh.save(update_fields=["metadata", "updated_at"])
         except Exception:
             logger.warning(
                 "Failed to persist last_error for shipment=%s",
@@ -1453,7 +1529,7 @@ class AcsService:
             # dropped on the floor between Django and the carrier
             # (reported by the site owner 2026-05-16). Empty string
             # is fine — ACS renders nothing.
-            "Delivery_Notes": sanitize_delivery_notes(order.customer_notes),
+            "Delivery_Notes": _delivery_notes(order).sent,
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:
@@ -1531,7 +1607,7 @@ class AcsService:
         cancelled the voucher, leaving local state inconsistent. That
         only holds with no transaction open around this call: an order
         cancel asks after its own has committed
-        (``OrderService.cancel_attached_shipment``).
+        (``OrderLifecycleService.cancel_attached_shipment``).
 
         It locks the shipment alone and never writes the order
         (``shipping.locks``).
@@ -1638,11 +1714,14 @@ class AcsService:
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment.cancel_requested_at = timezone.now()
             shipment.metadata = metadata
+            # ``updated_at`` too: the erasure sweep reads a write to the
+            # row by it (``AcsCarrier.orders_written_since``).
             shipment.save(
                 update_fields=[
                     "shipment_state",
                     "cancel_requested_at",
                     "metadata",
+                    "updated_at",
                 ]
             )
 
@@ -3344,6 +3423,11 @@ class AcsService:
                 .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
+            if deactivated:
+                # ``update`` sends no ``post_save``: the cached station
+                # list would keep serving the withdrawn stations, and the
+                # shippable countries a locker-only country lost.
+                mark_model_stale(AcsStation)
 
         return {"upserted": upserted, "deactivated": deactivated}
 
@@ -3980,13 +4064,14 @@ class AcsService:
         Fires ``order_paid`` so the standard signal chain (Meta CAPI
         Purchase dispatch) runs — ``mark_as_paid`` only persists
         ``payment_status``; the post_save handler in
-        ``order/signals/handlers.py`` only emits ``order_paid`` on a
+        ``src/order/signals/handlers.py`` only emits ``order_paid`` on a
         PENDING → PROCESSING status transition with ``is_paid=True``,
         and COD orders are already at PROCESSING by the time we reach
         here (status was advanced at voucher-mint time). After the
         flip, attempts the DELIVERED → COMPLETED auto-advance so
         accounting matches the lifecycle.
         """
+        from order.lifecycle.service import OrderLifecycleService
         from order.services import OrderService
         from order.signals import order_paid
 
@@ -4016,7 +4101,7 @@ class AcsService:
         # double-fire (e.g. a payout being upserted twice) results in
         # one Meta event, not two.
         order_paid.send(sender=type(order), order=order)
-        OrderService.maybe_advance_to_completed(
+        OrderLifecycleService.maybe_advance_to_completed(
             order, silent_for_customer=silent_for_customer
         )
 
@@ -4110,7 +4195,7 @@ class AcsService:
         ``False`` and behaves exactly as before.
         """
         from order.exceptions import InvalidStatusTransitionError
-        from order.services import OrderService
+        from order.lifecycle.service import OrderLifecycleService
 
         current_status: str = order.status
         new_status = cls.order_status_for_shipment_state(
@@ -4123,7 +4208,7 @@ class AcsService:
             # Never produced by ACS tracking: the admin retire action or
             # a voucher cancel, i.e. a parcel that never left (the
             # mapping returns it only for an order not yet shipped).
-            OrderService.cancel_for_dead_shipment(
+            OrderLifecycleService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=silent_for_customer
             )
             return
@@ -4155,7 +4240,7 @@ class AcsService:
             and current_status in _PRE_SHIPPED_ORDER_STATUSES
         ):
             try:
-                OrderService.update_order_status(
+                OrderLifecycleService.update_order_status(
                     order,
                     "SHIPPED",
                     silent_for_customer=(
@@ -4183,7 +4268,7 @@ class AcsService:
             )
 
         try:
-            OrderService.update_order_status(
+            OrderLifecycleService.update_order_status(
                 order, new_status, silent_for_customer=silent_for_customer
             )
         except InvalidStatusTransitionError as exc:
@@ -4210,7 +4295,7 @@ class AcsService:
         # advance — only the user-visible email/WS dispatches are
         # skipped.
         if new_status == "DELIVERED":
-            OrderService.maybe_advance_to_completed(
+            OrderLifecycleService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
 
@@ -4219,7 +4304,7 @@ class AcsService:
         """Bump a PENDING order to PROCESSING after voucher mint.
 
         For COD / offline-paid orders the order sits at PENDING through
-        the entire create_order_from_cart_offline flow because nothing
+        the entire create_order_from_cart flow because nothing
         else advances payment_status either; without this nudge the
         shopper sees "Εκκρεμεί" forever even after the voucher is live
         at ACS and the courier has been engaged. Online-paid orders
@@ -4234,8 +4319,8 @@ class AcsService:
         recurses through the manager.
         """
         from order.exceptions import InvalidStatusTransitionError
+        from order.lifecycle.service import OrderLifecycleService
         from order.models.order import Order as _Order
-        from order.services import OrderService
 
         current_status = (
             _Order.objects.filter(pk=order.pk)
@@ -4246,7 +4331,7 @@ class AcsService:
             return
         order.status = current_status
         try:
-            OrderService.update_order_status(order, "PROCESSING")
+            OrderLifecycleService.update_order_status(order, "PROCESSING")
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "ACS voucher mint: could not advance order=%s PENDING -> "

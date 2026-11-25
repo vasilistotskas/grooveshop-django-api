@@ -52,6 +52,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
 from order.models.order import Order
@@ -380,7 +381,9 @@ class TestTheReceiptCarriesTheMovement:
         with mydata_enabled(), FakeAade() as aade:
             _issue(order, django_capture_on_commit_callbacks)
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         assert len(aade.receipts) == 1
 
@@ -397,7 +400,9 @@ def test_without_a_dispatch_point_the_receipt_waits_for_shipment_and_is_plain(
             generate_order_invoice(order.id)
         assert not Invoice.objects.filter(order=order).exists()
         with django_capture_on_commit_callbacks(execute=True):
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
     [sent] = aade.receipts
     assert not sent.is_delivery_note
@@ -693,7 +698,9 @@ class TestWhenMyDataDoesNotAnswer:
             FakeAade() as aade,
             django_capture_on_commit_callbacks(execute=True),
         ):
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         invoice.refresh_from_db()
         assert invoice.transmission_failed_at is not None
@@ -717,7 +724,7 @@ class TestWhenMyDataDoesNotAnswer:
                 patch("order.signals.handlers.generate_order_invoice"),
                 django_capture_on_commit_callbacks(execute=True),
             ):
-                OrderService.update_order_status(
+                OrderLifecycleService.update_order_status(
                     type(order).objects.get(pk=order.pk), OrderStatus.SHIPPED
                 )
             raise MyDataTransportError("connection refused")
@@ -819,7 +826,9 @@ class TestTheReceiptReachesTheCustomerWithTheParcel:
         with mydata_enabled(), FakeAade():
             invoice = _issue(order, django_capture_on_commit_callbacks)
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         invoice.refresh_from_db()
         assert invoice.is_deliverable()
@@ -885,7 +894,7 @@ def _staff_cancel(
         else patch("order.signals.handlers.settle_canceled_receipt"),
         django_capture_on_commit_callbacks(execute=True),
     ):
-        OrderService.cancel_order(
+        OrderLifecycleService.cancel_order(
             order, "changed my mind", customer_initiated=False
         )
 
@@ -926,7 +935,7 @@ class TestCanceledBeforeThePickup:
                 ),
                 django_capture_on_commit_callbacks(execute=True),
             ):
-                OrderService.cancel_order(order, "no longer needed")
+                OrderLifecycleService.cancel_order(order, "no longer needed")
 
         invoice.refresh_from_db()
         assert invoice.mydata_status == MyDataStatus.CANCELED
@@ -1203,7 +1212,7 @@ class TestWhatHappensBetweenTwoSteps:
                     return_value=True,
                 ),
             ):
-                OrderService.cancel_order(
+                OrderLifecycleService.cancel_order(
                     order, "changed my mind", customer_initiated=False
                 )
                 invoice.refresh_from_db()
@@ -1248,7 +1257,7 @@ class TestWhatHappensBetweenTwoSteps:
                     patch("order.signals.handlers.generate_order_invoice"),
                     django_capture_on_commit_callbacks(execute=True),
                 ):
-                    OrderService.update_order_status(
+                    OrderLifecycleService.update_order_status(
                         type(order).objects.get(pk=order.pk),
                         OrderStatus.SHIPPED,
                     )
@@ -1273,7 +1282,9 @@ class TestWhatHappensBetweenTwoSteps:
                 mydata_status=MyDataStatus.CANCELED
             )
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         assert not _emailed(mailoutbox, invoice)
 
@@ -1460,7 +1471,9 @@ class TestAMovementTheReceiptDoesNotCover:
             )
             order.refresh_from_db()
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         [note] = [n for n in _notes(order) if "movement indication" in n]
         assert invoice.invoice_number in note
@@ -1478,7 +1491,9 @@ class TestAMovementTheReceiptDoesNotCover:
                 issue_date=timezone.localdate() - timedelta(days=6)
             )
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         assert any("6 days after" in note for note in _notes(order))
 
@@ -1489,7 +1504,9 @@ class TestAMovementTheReceiptDoesNotCover:
         with mydata_enabled(), FakeAade():
             _issue(order, django_capture_on_commit_callbacks)
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         assert not any("movement indication" in n for n in _notes(order))
 
@@ -1599,7 +1616,9 @@ class TestASendWithNoAnswerOnRecord:
             FakeAade() as aade,
             django_capture_on_commit_callbacks(execute=True),
         ):
-            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            OrderLifecycleService.update_order_status(
+                order, OrderStatus.SHIPPED
+            )
 
         [sent] = aade.receipts
         assert sent.transmission_failure == "3"
@@ -1987,7 +2006,9 @@ class TestCodeRabbitReview:
             type(order).objects.filter(pk=order.pk).update(street="Πατησίων")
             order.refresh_from_db()
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         [line] = [r for r in caplog.records if "does not cover" in r.message]
         assert "delivery place" in line.message
@@ -2002,7 +2023,9 @@ class TestCodeRabbitReview:
             item = order.items.get()
             type(item).objects.filter(pk=item.pk).update(refunded_quantity=1)
             with django_capture_on_commit_callbacks(execute=True):
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                OrderLifecycleService.update_order_status(
+                    order, OrderStatus.SHIPPED
+                )
 
         assert any("goods it declares differ" in n for n in _notes(order))
 
@@ -3299,8 +3322,10 @@ def _out_of_sight(order) -> list[str]:
     return [note for note in _notes(order) if "cannot see receipt" in note]
 
 
-def _admin_request():
-    request = RequestFactory().post("/admin/order/order/")
+def _admin_request(data=None):
+    request = RequestFactory().post(
+        "/admin/order/order/", data or {"_form_submitted": "on"}
+    )
     request.user = UserAccountFactory(is_staff=True, is_superuser=True)
     request.session = {}
     request._messages = FallbackStorage(request)
@@ -3414,7 +3439,9 @@ class TestAReceiptMyDataCannotSee:
             order, invoice = self._held(django_capture_on_commit_callbacks)
             with django_capture_on_commit_callbacks(execute=True):
                 OrderAdmin(Order, AdminSite()).cancel_mydata_invoice_now(
-                    _admin_request(), object_id=order.pk
+                    # The confirmation dialog's POST.
+                    _admin_request({"_form_submitted": "on"}),
+                    object_id=order.pk,
                 )
 
         invoice.refresh_from_db()

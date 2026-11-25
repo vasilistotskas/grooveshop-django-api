@@ -18,21 +18,21 @@ from functools import lru_cache
 from core.cache.registry import get_surface
 from core.cache.surfaces import (
     _escaped_pathname,
-    _nuxt,
-    _nuxt_functions,
-    _nuxt_matching,
-    _nuxt_routes,
+    nuxt_functions,
+    nuxt_handlers,
+    nuxt_handlers_matching,
+    nuxt_routes,
 )
 
 
 class TestPatternBuilders:
     def test_handler_patterns_target_the_handlers_prefix(self):
-        assert _nuxt("BlogPostViewSet") == (
+        assert nuxt_handlers("BlogPostViewSet") == (
             "cache:nitro:handlers:BlogPostViewSet*",
         )
 
     def test_function_patterns_target_the_functions_prefix(self):
-        assert _nuxt_functions("sitemap", "rss") == (
+        assert nuxt_functions("sitemap", "rss") == (
             "cache:nitro:functions:sitemap*",
             "cache:nitro:functions:rss*",
         )
@@ -45,18 +45,20 @@ class TestPatternBuilders:
         one whole segment (``BlogCategoryDetail``). Only a LEADING star
         reaches the purge endpoint's regex post-filter.
         """
-        assert _nuxt_matching("Blog") == ("cache:nitro:handlers:*Blog*",)
+        assert nuxt_handlers_matching("Blog") == (
+            "cache:nitro:handlers:*Blog*",
+        )
 
     def test_route_patterns_flatten_the_path_like_nitro_does(self):
         """Nitro strips non-word chars and truncates the path to 16."""
-        assert _nuxt_routes("/blog") == ("cache:nitro:routes:_:*blog*",)
-        assert _nuxt_routes("/products") == ("cache:nitro:routes:_:*products*",)
+        assert nuxt_routes("/blog") == ("cache:nitro:routes:_:*blog*",)
+        assert nuxt_routes("/products") == ("cache:nitro:routes:_:*products*",)
 
     def test_route_pattern_matches_every_page_in_the_family(self):
         """One pattern clears a whole family; the endpoint globs it."""
         import re
 
-        (pattern,) = _nuxt_routes("/blog")
+        (pattern,) = nuxt_routes("/blog")
         # Mirror the purge endpoint's mid-glob handling.
         regex = re.compile(
             "^"
@@ -130,7 +132,7 @@ class TestSiteRootPathname:
     Verified in the live staging keyspace:
     ``cache:nitro:routes:_:index.il7asoJjJE:host.<hash>:xdeviceclass.<hash>.json``
 
-    Before this was handled, ``_nuxt_routes("/")`` stripped every
+    Before this was handled, ``nuxt_routes("/")`` stripped every
     non-word character to an empty string and produced
     ``cache:nitro:routes:_:**`` — matching EVERY cached page render, so
     a caller wanting to drop just the homepage dropped the whole site's
@@ -143,7 +145,7 @@ class TestSiteRootPathname:
         assert _escaped_pathname("") == "index"
 
     def test_root_pattern_is_not_a_catch_all(self):
-        (pattern,) = _nuxt_routes("/")
+        (pattern,) = nuxt_routes("/")
 
         assert pattern == "cache:nitro:routes:_:*index*"
         assert pattern != "cache:nitro:routes:_:**"

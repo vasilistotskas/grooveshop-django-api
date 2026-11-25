@@ -4,7 +4,6 @@ from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
@@ -25,6 +24,7 @@ from admin.bulk import update_each
 from admin.displays import money
 from admin.export import ExportActionMixin
 from admin.filters import RelatedDropdownFilter
+from admin.responses import hx_redirect
 from core.cache.invalidation import mark_surface_stale
 from promotion.enum import BenefitType, TargetScope
 from promotion.models import (
@@ -374,9 +374,16 @@ class PromotionAdmin(BaseTranslatableAdmin):
         description=_("Duplicate"),
         icon="content_copy",
         permissions=["duplicate"],
+        dialog=ActionDialog(
+            title=_("Duplicate the promotion"),
+            description=_(
+                "Creates an inactive copy of this promotion, with its translations, "
+                "products and categories, and opens it."
+            ),
+        ),
     )
     def duplicate_promotion(
-        self, request: HttpRequest, object_id: int
+        self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
         source = Promotion.objects.prefetch_related(
             "translations", "products", "categories"
@@ -421,7 +428,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
             _("Promotion duplicated as an inactive draft."),
             messages.SUCCESS,
         )
-        return redirect(
+        return hx_redirect(
             reverse("admin:promotion_promotion_change", args=[clone.pk])
         )
 

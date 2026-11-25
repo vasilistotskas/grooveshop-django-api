@@ -23,7 +23,11 @@ def collect_candidates(
 ) -> tuple[
     list[tuple[Promotion, PromotionCode | None]],
     list[tuple[str, str]],
+    list[str],
 ]:
+    """The promotions that may apply to ``cart``, the attached codes
+    refused before any is judged, and every attached code as read here:
+    the codes this evaluation decided on."""
     rejected: list[tuple[str, str]] = []
     cart_codes = list(
         CartPromotionCode.objects.filter(cart=cart).select_related(
@@ -41,8 +45,8 @@ def collect_candidates(
     # `_matching_items` and `_gift_entitlement` walk five relations
     # for EVERY candidate, so without the prefetch the engine's
     # cost grows with the number of live promotions — and
-    # `evaluate()` runs on every cart read, on the payment-intent
-    # path, and twice more during order creation.
+    # `evaluate()` runs on every cart read, on every quote, and
+    # twice more during order creation.
     promotions_qs = (
         Promotion.objects.filter(pk__in={*automatic_ids, *code_promotion_ids})
         .with_scope_relations()
@@ -71,7 +75,21 @@ def collect_candidates(
 
     attach_category_scopes([promotion for promotion, _code in candidates])
 
-    return candidates, rejected
+    return candidates, rejected, [cc.code.code for cc in cart_codes]
+
+
+def automatic_candidates() -> list[tuple[Promotion, PromotionCode | None]]:
+    """The live automatic promotions, as candidates for a cart no code
+    is applied to: what ``collect_candidates`` gives such a cart,
+    without a lock."""
+    promotions = list(
+        Promotion.objects.live()
+        .automatic()
+        .with_scope_relations()
+        .order_by("pk")
+    )
+    attach_category_scopes(promotions)
+    return [(promotion, None) for promotion in promotions]
 
 
 def dead_window_reason(promotion: Promotion) -> CouponRejectionReason:

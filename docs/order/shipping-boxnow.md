@@ -6,6 +6,14 @@ and says which file holds each § number used here.
 ## 5.2 BoxNow (`src/shipping_boxnow/`)
 
 - **REST + webhook** for tracking events.
+- **The locker list** (`GET /shipping/boxnow/lockers`,
+  `src/shipping_boxnow/views/locker.py`, `BoxNowLockerFilter`) serves
+  active rows only and takes the exact filters `externalId` (the locker's
+  BOX NOW id) and `countryCode`, with which the agent gateway resolves a
+  UCP pickup destination. The list is cached (`cache_methods`) under the
+  `shipping` cache surface, which every locker write purges: a saved row
+  through `invalidated_by`, a sync's deactivating `update` through
+  `mark_model_stale`, the order-time resync included.
 - Voucher mint: same 3-phase design as ACS.
 - **The HTTP layer never sends a POST or PUT a second time once it may
   have reached BoxNow** (`CARRIER_RETRY` in `src/shipping/carrier_http.py`,
@@ -20,7 +28,7 @@ and says which file holds each § number used here.
   claim, and the same `orderNumber` is sent again. A GET also gets no retry
   after an error of unknown timing (`other=0`).
 - **A `P410` on creation takes over the parcel BoxNow already holds**
-  (`BoxNowService._take_over_existing_parcel`, #606). The first request of
+  (`BoxNowService._take_over_existing_parcel`). The first request of
   a creation whose answer was lost (a read timeout, a 5xx, a worker that
   died before phase 3) did create the parcel, so the retry's `P410` is
   answered by looking the order up: `GET /api/v1/parcels?orderNumber=`
@@ -110,8 +118,8 @@ and says which file holds each § number used here.
   p. 15); the webhook guide says partners "receive notifications for all
   parcel status changes and events" (p. 1), so a cancel made through the
   API is expected to arrive as one too (not yet verified on stage).
-- **A shipment with no `parcel_id` is asked about before it cancels**
-  (#606). A creation never sent (no `metadata["mint_started_at"]` and no
+- **A shipment with no `parcel_id` is asked about before it cancels.**
+  A creation never sent (no `metadata["mint_started_at"]` and no
   `metadata["last_error"]`: an unpaid order, a store without credentials)
   cancels locally with no API call. One that was sent may have created a
   parcel whose answer was lost, so `cancel_shipment` first looks the
@@ -134,7 +142,7 @@ and says which file holds each § number used here.
   lookup: a creation that saved a parcel meanwhile sends the cancel down
   the usual path, and a claim taken meanwhile refuses.
 - **An empty lookup is trusted only once an uncertain creation has
-  settled** (#690). A creation that fails after its request may have
+  settled.** A creation that fails after its request may have
   reached BoxNow (a `BoxNowRetryableError`: a read timeout, a dropped
   connection, a 5xx; or an error the client does not classify) stamps
   `metadata["creation_uncertain_at"]` when it releases its claim, so the
@@ -162,7 +170,7 @@ and says which file holds each § number used here.
   settled, [§7.1.2](cancel.md)) instead of a local cancel;
   after it, the lookup is authoritative. The creation task's own retries
   refresh the stamp, and their `P410` take-over usually saves the parcel
-  first. **Measured on BoxNow's stage environment (2026-11-15):** a parcel
+  first. **Measured on BoxNow's stage environment:** a parcel
   is listed by `GET /api/v1/parcels?orderNumber=` in the first lookup,
   under 0.1 s after `POST /api/v1/delivery-requests` answers (4 of 4;
   the POST itself took 0.2 to 0.5 s). So the listing adds no delay of its
@@ -173,7 +181,7 @@ and says which file holds each § number used here.
   rest.
 - **A canceled order never gets a live parcel.** A staff or system order
   cancel goes on when the courier step is refused
-  (`OrderService.cancel_attached_shipment` never raises): while a creation
+  (`OrderLifecycleService.cancel_attached_shipment` never raises): while a creation
   of uncertain outcome settles, or one is in flight, and while BoxNow gives
   no answer (the cancel stays pending and is asked again,
   [cancel §7.1.2](cancel.md)). The order's status is
@@ -183,13 +191,14 @@ and says which file holds each § number used here.
   (`_cancel_for_a_canceled_order`), which cancels a parcel BoxNow lists,
   refuses with a `BoxNowBusyError` while the creation settles (the task
   retries) and cancels locally once the lookup is authoritative or when no
-  creation was sent. In phase 3, `_persist_parcel` treats an order canceled
-  meanwhile like a shipment canceled meanwhile: the row is recorded
+  creation was sent. In phase 3, `_persist_parcel` treats an order that
+  stopped shipping meanwhile (`Order.ships_nothing`: canceled, or its
+  payment refunded in full) like a shipment canceled meanwhile: the row is recorded
   CANCELED, the parcel goes to `metadata["minted_after_cancel"]` and is
   cancelled at BoxNow. It locks the order row first
   (`shipping.locks.lock_with_order`), so an order cancel still in its
   transaction is waited for and then seen.
-- **A sweep settles creations that stayed uncertain** (#712). The
+- **A sweep settles creations that stayed uncertain.** The
   creation task's retries back off for about 30 seconds, far inside
   `BOXNOW_CREATION_SETTLE_SECONDS`, and the tracking poll only reads
   shipments with a `parcel_id`, so nothing else asks BoxNow again.
@@ -199,12 +208,18 @@ and says which file holds each § number used here.
   `BoxNowService.settle_uncertain_creation` for each shipment with no
   parcel whose `creation_uncertain_at` is older than the settle time and
   whose creation is not in flight:
-  - a canceled order: its cancel is finished as the creation would
-    (`_cancel_for_a_canceled_order`): a parcel BoxNow lists is cancelled
-    there and recorded, none is a local cancel. A refusal is reported
+  - an order that ships nothing (`Order.ships_nothing`: canceled, or its
+    payment refunded in full, which leaves it PROCESSING): its shipment is
+    cancelled as a canceled order's creation would
+    (`_cancel_unsent_shipment`): a parcel BoxNow lists is cancelled there
+    and recorded, none is a local cancel. A refund's cancel leaves a staff
+    note on the order: a refund that fails or is reversed makes it payable
+    again, and only "Create BoxNow parcel now" creates its parcel then. An
+    order whose refund was reversed before the cancel is left for the next
+    run, which settles it as a live order's creation. A refusal is reported
     (`report_cancel_refused`: an ERROR line and a staff note on the order)
     and ends the uncertainty wherever it is met, by the sweep or by the
-    creation task (`_cancel_for_a_canceled_order` ends it), so it is
+    creation task (`_cancel_unsent_shipment` ends it), so it is
     reported once;
   - a live order: under the creation's own claim, the order is looked up by
     `orderNumber`. One live `new` parcel created for this shipment's terms
@@ -260,7 +275,7 @@ and says which file holds each § number used here.
   the shipment alone, and an order cancel calls it after its own
   transaction has committed ([§7.1.2](cancel.md)), so it never runs under
   the order's lock.
-- **The tracking poll asks in the shipment's payment mode** (#691).
+- **The tracking poll asks in the shipment's payment mode.**
   `sync_shipment_state` calls `GET /api/v1/parcels?parcelId=` with
   `paymentMode` set to the shipment's `payment_mode`. Both BoxNow sources
   give the parameter a default of `prepaid` (the OpenAPI file's
@@ -268,20 +283,19 @@ and says which file holds each § number used here.
   v7.2, §6.5.3) and neither exempts a `parcelId` query, so a call naming
   no mode would, as documented, not list a cash-on-delivery parcel: its
   states would never reach the shop. Naming the mode the parcel was
-  created with is right either way. **Tried on stage (2026-11-15):** for
+  created with is right either way. **Tried on stage:** for
   a COD parcel, `parcelId` and `orderNumber` lookups naming no mode both
   listed it, `paymentMode=cod` listed it, and `paymentMode=prepaid` did
-  not. So stage does not apply the documented default, the filter itself
-  works, and the poll before this change was not shown to miss COD
-  parcels; the documents still say otherwise, and production was not
-  tried.
+  not. So stage does not apply the documented default and the filter
+  itself works; the documents say otherwise, and production was not
+  tried, so the poll names the mode.
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   with no `parcel_id` can cancel (the paragraph above says how); a parcel
   cancels only while it is `new` (BoxNow answers P420
   otherwise); an already `canceled` one, sent to BoxNow or not, is a no-op
   that changes nothing, `cancel_requested_at` and the
   `metadata["cancellations"]` log included (BoxNow: "Canceling a canceled
-  parcel has no effect", §3.7, p. 15; #599). `cancel_shipment`,
+  parcel has no effect", §3.7, p. 15). `cancel_shipment`,
   the order's `canBeCanceled` and the shipment admin's two cancel
   actions ("Cancel parcels via BoxNow API" on the list, "Cancel parcel
   via BoxNow API" on the detail page) all read it, so the admin skips or
@@ -311,25 +325,82 @@ and says which file holds each § number used here.
   (metres are floats). `create_shipment_row` stores the result on
   `BoxNowShipment.compartment_size`, which goes out as
   `items[].compartmentSize`.
-  **The checkout no longer supplies a size** (the server owns it; an old
-  client still sending `boxnowCompartmentSize` is ignored, not rejected).
+  **The checkout supplies no size** (the server owns it; a client that
+  sends `boxnowCompartmentSize` is ignored, not rejected).
   **Products without dimensions** get the store's
   `BOXNOW_DEFAULT_COMPARTMENT_SIZE` setting (1 = Small by default, 2 and 3
   allowed, validated). A cart with some measured and some unmeasured items
   takes the larger of the derived size and that setting; with every item
   measured the derived size wins. The free gifts a cart is entitled to
   (`promotion.engine.benefits.gift_pairs`) are added to the cart's lines everywhere the
-  parcel is weighed or sized (payment intent, order verification and creation,
+  parcel is weighed or sized (the quote, order verification and creation,
   the shipment row, the options flag, the locker search), because they become
   physical order lines. A gift the engine leaves out (sold out) adds nothing;
   one lost to a later stock race only makes the booked size larger.
+- **Each locker's compartment sizes and availability come from BOX NOW's
+  public locker catalogue**, not the partner API: its destinations carry
+  neither, and its `requiredSize` filter returns the same lockers for every
+  size (checked on production). The catalogue is the file BOX NOW's own map
+  widget reads, `BOXNOW_LOCKER_CATALOGUE_URL` per country
+  (`BOXNOW_LOCKER_CATALOGUE_COUNTRIES`): a JSON object of locker id to
+  `address, id, lat, lng, postalCode, probability, sizes, title`. **BOX NOW
+  documents neither the file nor its shape**; they are the widget's
+  internals, the same data its official picker filters on, and the question
+  to BOX NOW is open. `shipping_boxnow.catalogue` therefore validates it
+  strictly (`CATALOGUE_SCHEMA`); on any fetch or shape failure it logs an
+  ERROR naming the country and keeps the stored sizes. The hourly
+  `sync-boxnow-locker-catalogue` task (`sync_boxnow_locker_catalogue`) sets
+  `BoxNowLocker.compartment_sizes` and `availability_probability` of the
+  active lockers: **a locker lists a size by exact membership**, as the
+  widget's `acceptLocker.js` does (a bigger compartment is not assumed to
+  take a smaller parcel), and one the catalogue lacks is **unknown**: empty
+  sizes, its ids logged at WARNING. `limitedAvailability` is
+  `probability < BOXNOW_LIMITED_AVAILABILITY_BELOW` (0.87, the widget's
+  threshold), false when unknown.
+  **Sizes exist only for BOX NOW's live network.** The catalogue describes
+  production lockers; a store on BOX NOW's stage environment
+  (`Tenant.box_now_live_mode` off, read through `box_now_credentials()`)
+  holds stage ids, a different id space whose numbers collide with
+  production's (stage 5 and production 5 are different lockers, found on
+  the demo store). So `shipping_boxnow.catalogue.sizes_exist()`
+  gates everything below: the sync resets a stage store's lockers to
+  unknown instead of applying the file, and the `compartmentSize` filter,
+  the quote's size and the order refusal do not apply to it (its lockers
+  list no sizes and no locker is refused for one). A live store still
+  refuses a locker whose sizes are unknown.
+  `GET /shipping/boxnow/lockers` takes `compartmentSize` (1 to 3) and
+  returns `compartmentSizes` and `limitedAvailability` per locker;
+  `POST /cart/quote` names the cart's `compartmentSize` on a BOX NOW pickup
+  option (null elsewhere, and on a store that is not live). **Order
+  creation on a live store refuses a locker that does not list the cart's
+  size** with 400 `pickup_point_too_small` on `boxnowLockerId`, and one
+  whose sizes are not known with `pickup_point_size_unknown`
+  (`ShippingCarrierInterface.assert_pickup_point_fits` raising a
+  `shipping.interfaces.PickupPointUnfit`, run in the locked quote; the
+  quote answers the same codes).
+  A locker is unknown only until the catalogue names it: each store keeps
+  the last catalogue it applied for `BOXNOW_LOCKER_CATALOGUE_KEEP_SECONDS`
+  (3 hours, `remember_catalogues`), and a partner sync that creates lockers
+  (the daily one, the admin button, the resync an order for a locker the
+  table lacks runs) applies it again at once
+  (`apply_remembered_catalogues`), so a locker BOX NOW added is sized
+  before the next hourly run when the catalogue already lists it.
+- **A locker is withdrawn after N daily syncs without it**, not at the
+  first absence: the partner list churns by a few percent a day.
+  `BoxNowLocker.consecutive_absent_syncs` counts the absences, a locker the
+  partner returns is reactivated and reset, and
+  `BOXNOW_LOCKER_ABSENT_SYNCS_BEFORE_DEACTIVATION` (3: about 48 hours at the
+  daily 02:00 sync; derive it again when that cadence changes) deactivates
+  it. A partner list that is empty or smaller than
+  `BOXNOW_LOCKER_SYNC_MIN_FRACTION` of the active lockers is an error
+  response: ERROR logged, no counter moved, nothing deactivated.
 - **A cart that fits no compartment is refused at checkout**, next to the
   weight cap: `ShippingService.assert_available(items=...)` asks the
   adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by
   default) and a `ShippingParcelTooLargeError` becomes the 400
   `invalid_order_data` ("The cart is too large for the selected shipping
-  method.") on `shippingProviderCode`, from order creation and from the
-  create-payment-intent endpoint. `/shipping/options` finds the cart the
+  method.") on `shippingProviderCode` from order creation, and the quote
+  answers it as `shipping_parcel_too_large`. `/shipping/options` finds the cart the
   way every cart endpoint does (`X-Cart-Id`, or the signed-in user's
   cart; `CartService`) and flags each option the cart does not fit with
   `exceeds_parcel_size`, by the same `assert_parcel_fits` rule. The option
@@ -339,16 +410,17 @@ and says which file holds each § number used here.
   `POST /shipping/boxnow/lockers/nearest` (the closest-locker lookup)
   derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
   (the store default when there is none) and refuses a cart that fits no
-  compartment with 400 `parcel_too_large`; the old `compartment_size` body
-  field is gone. BoxNow's own refusal (P422 address not found, P423 no
+  compartment with 400 `parcel_too_large`; the body names no size. BoxNow's own refusal (P422 address not found, P423 no
   locker near it) is a 400 with BoxNow's `code`. BoxNow giving no answer
   (a `CarrierUnavailableError`: a 5xx, a timeout, a connection or auth
   failure, no credentials) is a 503 `carrier_unavailable`
   (`shipping.api_errors.CarrierUnavailable`) whose `detail` is written for
-  a client; the error text goes to the log (#650). The agent gateway reads
-  only the status, so an outage is no longer "no locker nearby". The
-  storefront's locker picker is BoxNow's own iframe widget, which this API
-  does not drive. The same 503 answers an outage on ACS address
+  a client; the error text goes to the log. The agent gateway reads
+  only the status, so an outage never reads as "no locker nearby". The
+  storefront's locker picker is its own, filtered by the quote's
+  `compartmentSize`; it needs no partner id, which the store
+  config (`tenant/resolve`) therefore does not carry. The partner id stays
+  on the tenant for this API's own BoxNow calls. The same 503 answers an outage on ACS address
   validation and on every staff cancel endpoint: the carriers' own
   (`cancelBoxNowShipment`, `cancelAcsShipment`) and the order's
   provider-agnostic `shipment_cancel` (`src/order/views/order.py`), all
@@ -379,5 +451,5 @@ and says which file holds each § number used here.
   not UTF-8 (decoded strictly first, RFC 8259 §8.1 — `json.loads` on bytes
   would sniff UTF-16/32, while the signed-data extractor walks the raw bytes),
   invalid JSON, JSON nested past the decoder's stack, or valid JSON that is not
-  an object (`[]`, `"x"`, `null`). Those used to raise inside the
-  unauthenticated view and return 500, which BoxNow retries.
+  an object (`[]`, `"x"`, `null`), rather than raising inside the
+  unauthenticated view and answering 500, which BoxNow retries.

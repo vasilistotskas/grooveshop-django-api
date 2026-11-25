@@ -145,7 +145,7 @@ Nightly fanout (04:00)    │                 └─ candidates: live strategies
   └─ full pass ───────────┤                    (no seed — empty cart: the seedless strategies' store_wide)
                           ▼                 └─ guard · weight · diversify · cut N
               RecommendationCandidate        └─ hydrate via ProductSerializer(for_full_list())
-              (per schema, top-K:            └─ items + reason per item, impressionId
+              (per schema, top-K:            └─ items + reason per item
                attributes, co_purchase)               │
                                                       ▼
                                             RecommendationEvent (impression · click · attach)

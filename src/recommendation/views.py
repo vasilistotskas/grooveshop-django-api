@@ -16,8 +16,8 @@ the response returns, and the showing's clicks and the add to cart that
 follows one carry it. Nothing upstream of that request can mint it per
 viewer: the storefront caches the suggestions body per (surface, seed)
 and the edge caches the page the strip is drawn into, so one body
-reaches every viewer while it is cached, and so does the
-``impression_id`` in it. The beacon is the first request that is one
+reaches every viewer while it is cached (the id it once carried was
+every viewer's). The beacon is the first request that is one
 viewer's and passes no cache, and its own session, cart and customer are
 what the impression is recorded with, so an ``attach`` matched through
 the id is the viewer's own. The id is a random UUID Django minted, so an id a

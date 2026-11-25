@@ -83,6 +83,29 @@ class TestRedisDown:
 
 
 class TestRedisUp:
+    @pytest.mark.parametrize(
+        ("path", "per_minute"),
+        [
+            ("/_allauth/app/v1/auth/reauthenticate/code/request", 5),
+            ("/_allauth/app/v1/auth/reauthenticate/code/resend", 3),
+            ("/_allauth/app/v1/auth/reauthenticate/code/confirm", 10),
+        ],
+    )
+    def test_the_reauthentication_code_routes_are_limited_per_address(
+        self, path, per_minute
+    ):
+        middleware = _middleware()
+        address = str(ipaddress.IPv6Address(uuid.uuid4().int))
+        allowed = [
+            middleware(_post(path, address)).status_code
+            for _ in range(per_minute)
+        ]
+
+        response = middleware(_post(path, address))
+
+        assert allowed == [200] * per_minute
+        assert response.status_code == 429
+
     def test_the_counters_are_strict_keys(self, monkeypatch):
         counted: list[str] = []
 

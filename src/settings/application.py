@@ -238,7 +238,7 @@ MIDDLEWARE = [
     "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # A view that cannot reach a strict cache key (a rate limit, a TOTP
-    # replay check, an IdP code, a ticket) answers the coded 503 here, in
+    # replay check, a ticket) answers the coded 503 here, in
     # the shape of its route, on every route (``core.cache_backend``' rule).
     "core.middleware.strict_cache.StrictCacheUnavailableMiddleware",
     # The IdP's token endpoints let a refused ``resource`` escape as a 500;

@@ -71,6 +71,31 @@ class TenantAccountAdapter(UserAccountAdapter):
     table. See ``pre_login``.
     """
 
+    def is_reauthentication_required(self, *, app: str, **kwargs) -> bool:
+        """Not asked of a customer who has no way to reauthenticate, while
+        the code method is off.
+
+        Transitional, deleted with ``ACCOUNT_REAUTHENTICATION_METHODS`` by
+        the release that turns the code method on
+        (``docs/allauth-schema.md``, "Reauthentication"). allauth up to
+        65.21 skipped the check for a customer with neither a password nor
+        an authenticator (a social sign-up); 65.22 refuses them. With the
+        code off they would lose account deletion and second-factor setup
+        for the length of that rollout.
+        """
+        from allauth.account.internal.flows.reauthentication import (
+            get_reauthentication_flows,
+        )
+
+        user = getattr(self.request, "user", None)
+        if (
+            user is not None
+            and user.is_authenticated
+            and not get_reauthentication_flows(user)
+        ):
+            return False
+        return super().is_reauthentication_required(app=app, **kwargs)
+
     def clean_password(self, password: str, user=None) -> str:
         """Refuse a new password for a shared demo login.
 

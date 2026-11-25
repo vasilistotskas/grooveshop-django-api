@@ -143,7 +143,7 @@ adds `code` and `fields`.
 ## A security store that is down
 
 A view that cannot reach a strict cache key (a rate limit that cannot count,
-a TOTP replay check, an IdP code, a single-use ticket) refuses the request,
+a TOTP replay check, a single-use ticket) refuses the request,
 on every route, with **503** and the code `temporarily_unavailable`
 (`src/core/middleware/strict_cache.py`; the rule beside
 `STRICT_KEY_PREFIXES` in `src/core/cache_backend.py`). The body is the route's own

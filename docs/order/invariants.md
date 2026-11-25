@@ -97,7 +97,7 @@ These invariants need more than a table row. Each ends with its anchor.
 - The default cache fails open on a Redis outage (reads miss, writes no-op —
   `src/core/cache_backend.py`), but never for keys under `STRICT_KEY_PREFIXES`: the
   `strict:` throttle namespace, allauth's rate limits, TOTP replay protection,
-  the IdP's single-use codes and WebSocket tickets. The checkout, payment,
+  the IdP's device-flow codes (not served) and the single-use tickets. The checkout, payment,
   coupon and gift-card throttles (`src/order/throttles.py`,
   `src/cart/throttles.py`, `src/giftcard/throttles.py`,
   `fail_closed = True`) therefore REFUSE with 503 `temporarily_unavailable`

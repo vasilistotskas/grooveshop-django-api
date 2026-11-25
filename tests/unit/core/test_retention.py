@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from allauth.idp.oidc.models import Token
 from allauth.usersessions.models import UserSession
 from django.contrib.admin.models import ADDITION, LogEntry
 from django.contrib.contenttypes.models import ContentType
@@ -212,3 +213,26 @@ class TestSessionsAndTokensByState:
         assert result["expired_tokens"] == 1
         remaining = set(AuthToken.objects.values_list("pk", flat=True))
         assert remaining == {valid.pk, forever.pk}
+
+    def test_expired_oauth_tokens_and_codes_are_deleted(self):
+        # allauth's IdP deletes none of its own; an authorization code is
+        # a row since 65.22.
+        now = timezone.now()
+        rows = {
+            (type_, age): Token.objects.create(
+                type=type_,
+                hash=f"{type_}-{age}",
+                expires_at=None if age is None else now + age,
+            ).pk
+            for type_ in Token.Type.values
+            for age in (timedelta(minutes=-1), timedelta(minutes=1), None)
+        }
+
+        result = clear_expired_sessions_task()
+
+        assert result["expired_tokens"] == len(Token.Type.values)
+        assert set(Token.objects.values_list("pk", flat=True)) == {
+            pk
+            for (_type, age), pk in rows.items()
+            if age != timedelta(minutes=-1)
+        }

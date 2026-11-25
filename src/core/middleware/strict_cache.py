@@ -3,7 +3,7 @@
 A key under ``core.cache_backend.STRICT_KEY_PREFIXES`` (or a ``count_in_window`` /
 ``add`` / ``incr``) raises ``REDIS_UNAVAILABLE`` instead of lying when Redis
 cannot be reached: a rate limit that cannot count, a TOTP code whose replay
-cannot be checked, an IdP code or a ticket that cannot be stored or spent.
+cannot be checked, a ticket that cannot be stored or spent.
 The request is refused. This module is the one place that says how, so every
 route refuses the same way, in the shape its client reads:
 

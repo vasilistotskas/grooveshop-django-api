@@ -23,12 +23,17 @@ SURFACES = (
         # a rate, a zone or a zone's region set changes this surface's own
         # responses, not just ``shipping``. A zone's region set changes
         # through its M2M, which sends no ``post_save``:
-        # ``shipping.signals.zone_regions_changed`` marks it.
+        # ``shipping.signals.zone_regions_changed`` marks it. A carrier's
+        # gate counts too (``shipping.zones.carrier_offers``): ACS offers
+        # lockers in a country only while it has synced stations there,
+        # and a carrier's credentials on ``Tenant`` decide whether it
+        # delivers at all (``shipping.tasks.purge_carrier_gate_surfaces``).
         invalidated_by=(
             "shipping.ShippingProvider",
             "shipping.ShippingRate",
             "shipping.ShippingZone",
             "shipping.ShippingZoneRegion",
+            "shipping_acs.AcsStation",
         ),
         icon="public",
         group="commerce",

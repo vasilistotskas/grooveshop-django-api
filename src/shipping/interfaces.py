@@ -511,7 +511,7 @@ class ShippingCarrierInterface(ABC):
         when it holds no answer.
 
         ``rate`` is the resolved ``ShippingRate`` for this
-        (provider, country, kind) — the price, free-shipping threshold
+        (provider, zone, kind) — the price, free-shipping threshold
         and weight cap all live there now; this hook exists only for a
         carrier whose tariff varies by destination or weight bracket
         beyond what a single stored price can express (ACS's weight-

@@ -134,14 +134,34 @@ longer has one. The form refuses (`zone_errors`, `rate_kind_errors`):
 
 ### Caches
 
-`/shipping/*` and the region and country pickers read zones, so the
-`shipping` and `regions_countries` surfaces declare `ShippingZone` and
-`ShippingZoneRegion` in `invalidated_by`, and `regions_countries` also
-`ShippingProvider` (a carrier switched on or off changes what is shippable). A region set changes through
-`bulk_create`, which sends no `post_save`, so
-`shipping.signals.zone_regions_changed` marks both surfaces on
-`m2m_changed`. Django's response cache keys on the full URL, so
-`?shippable=` and `regionId` are in its key.
+`/shipping/*` and the region and country pickers read zones and the
+carrier gate (`carrier_offers`), so the `shipping` and `regions_countries`
+surfaces both declare, in `invalidated_by`:
+
+- `ShippingZone` and `ShippingZoneRegion`;
+- `ShippingProvider`: a carrier switched on or off changes what is
+  shippable;
+- `shipping_acs.AcsStation`: ACS offers lockers in a country only while it
+  has synced stations there, so a locker-only country's `shippable`
+  follows them.
+
+A write no signal reports marks what a save would, through
+`core.cache.invalidation.mark_model_stale(model)` (every surface that
+declares the model):
+
+- a region set changes through `bulk_create`, so
+  `shipping.signals.zone_regions_changed` marks it on `m2m_changed`;
+- a station or locker sync deactivates with an `update`.
+
+A carrier's credentials on `Tenant` decide whether it delivers at all, as
+its provider row's switch does. A change to one of
+`tenant.credentials.CARRIER_CREDENTIAL_FIELDS` queues
+`shipping.tasks.purge_carrier_gate_surfaces` in the store's schema
+(`tenant.signals`, through `on_switch_change`), which marks the surfaces
+that declare `ShippingProvider`.
+
+Django's response cache keys on the full URL, so `?shippable=` and
+`regionId` are in its key.
 
 ### Release history
 

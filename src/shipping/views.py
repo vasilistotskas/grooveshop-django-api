@@ -120,8 +120,8 @@ class ShippingOptionsView(APIView):
     def get(self, request: Request) -> Response:
         query = ShippingOptionsQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        # Required on the serializer now — a ``ShippingRate`` is
-        # per-country, so there is no destination-agnostic matrix.
+        # Required on the serializer — a ``ShippingRate`` belongs to a
+        # zone of one country, so there is no destination-agnostic matrix.
         country_code = query.validated_data["country_code"]
         amount = float(query.validated_data.get("order_value_amount") or 0)
         currency = query.validated_data.get("currency") or "EUR"

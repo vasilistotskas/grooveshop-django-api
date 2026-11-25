@@ -20,7 +20,7 @@ from shipping.factories import (
     ShippingRateFactory,
     ShippingZoneFactory,
 )
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingRate
 from tests.integration.order.test_checkout_quote import (
     _checkout,
     _choices,
@@ -28,7 +28,7 @@ from tests.integration.order.test_checkout_quote import (
     _post_quote,
 )
 from tests.utils.checkout import UNQUOTED
-from tests.utils.shipping import registered_carrier
+from tests.utils.shipping import enable_rate, registered_carrier
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 
@@ -38,6 +38,7 @@ pytestmark = [
 ]
 
 ISLANDS = Decimal("7.50")
+ACS_PRICE = Decimal("9.90")
 
 
 def _zone_regions(country):
@@ -269,6 +270,46 @@ class TestCheckout:
         assert response.status_code == 201, response.content
         order = Order.objects.get()
         assert order.shipping_price.amount == ISLANDS
+
+
+class TestTheStoresHomeCarrier:
+    """No carrier named: the store picks the home-delivery carrier among
+    those checkout would take, so a carrier ahead in priority that the
+    quote's gate refuses (ACS without the store's credentials) never
+    makes a served country fail."""
+
+    @pytest.fixture
+    def acs_first(self, store):
+        acs = enable_rate(
+            store.country, provider_code="acs", price=ACS_PRICE
+        ).provider
+        flat_rate = ShippingProvider.objects.get(code="flat_rate")
+        acs.priority = flat_rate.priority - 1
+        acs.supports_home_delivery = True
+        acs.save(update_fields=["priority", "supports_home_delivery"])
+        return store
+
+    def test_the_quote_takes_the_carrier_checkout_offers(self, acs_first):
+        response = _post_quote(
+            acs_first, **_choices(acs_first), region_id=acs_first.mainland.alpha
+        )
+
+        assert response.status_code == 200, response.content
+        flat_rate = ShippingRate.objects.get(
+            provider__code="flat_rate",
+            zone__country=acs_first.country,
+            zone__regions__isnull=True,
+        )
+        assert (
+            Decimal(str(response.json()["shipping"]["price"]))
+            == flat_rate.price.amount
+        )
+
+    def test_the_order_is_assigned_that_carrier(self, acs_first):
+        response = _post_order(acs_first, region_id=acs_first.mainland.alpha)
+
+        assert response.status_code == 201, response.content
+        assert Order.objects.get().shipping_provider.code == "flat_rate"
 
 
 class TestSavedAddresses:

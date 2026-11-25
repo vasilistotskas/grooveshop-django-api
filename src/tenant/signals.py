@@ -10,6 +10,7 @@ from django.dispatch import receiver
 from country.models import Country
 from region.models import Region
 from tenant.cache import bump_cache_generation
+from tenant.credentials import CARRIER_CREDENTIAL_FIELDS
 from tenant.features import (
     feature_plan_flags,
     feature_setting_keys,
@@ -41,6 +42,15 @@ on_switch_change(
     plan_flags=("available_locales",),
     task="core.tasks.purge_store_locales_task",
     plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
+)
+
+# A carrier's credentials decide whether it delivers at all, as its
+# ``ShippingProvider`` row's switch does: the store's shipping options and
+# the countries and regions it ships to follow them.
+on_switch_change(
+    setting_keys=(),
+    plan_flags=CARRIER_CREDENTIAL_FIELDS,
+    task="shipping.tasks.purge_carrier_gate_surfaces",
 )
 
 

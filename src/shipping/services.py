@@ -602,9 +602,9 @@ class ShippingService:
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
-        ``country_code`` is required — a per-country ``ShippingRate``
-        is what makes a (provider, kind) offerable at all now, so there
-        is no destination-agnostic matrix left to return.
+        ``country_code`` is required — a ``ShippingRate`` of a zone of
+        the country is what makes a (provider, kind) offerable at all,
+        so there is no destination-agnostic matrix to return.
 
         Filters by:
         * ``ShippingProvider.is_active = True``.
@@ -1114,7 +1114,9 @@ class ShippingService:
     ) -> str | None:
         """Return the active home-delivery carrier's code for ``country_code``.
 
-        Lower ``ShippingProvider.priority`` wins the tie. Without a
+        Only a carrier the quote's gate takes there is a candidate
+        (:func:`~shipping.zones.carrier_offers`). Lower
+        ``ShippingProvider.priority`` wins the tie. Without a
         country, falls back to the lowest-priority active home-delivery
         provider regardless of rate coverage (there is nothing more
         specific to prefer yet). Moved from ``OrderService.
@@ -1142,15 +1144,27 @@ class ShippingService:
         if not country_code:
             picked = carriers.order_by("priority", "code").first()
             return picked.code if picked is not None else None
+        country_code = country_code.upper()
+        # Only a carrier the quote's gate takes in the country
+        # (``carrier_offers``, as in :meth:`active_rate`): one ahead in
+        # priority that checkout refuses (ACS without the store's
+        # credentials) would otherwise be named, and the quote fail.
+        carriers = carriers.filter(
+            pk__in=[
+                carrier.pk
+                for carrier in carriers
+                if carrier_offers(
+                    carrier, ShippingKind.HOME_DELIVERY, country_code
+                )
+            ]
+        )
         code = cls._home_delivery_carrier(
             carriers, destination_rates(country_code, region_id), weight_grams
         )
         if code is None and region_id:
             code = cls._home_delivery_carrier(
                 carriers,
-                ShippingRate.objects.filter(
-                    zone__country_id=country_code.upper()
-                ),
+                ShippingRate.objects.filter(zone__country_id=country_code),
                 weight_grams,
             )
         return code

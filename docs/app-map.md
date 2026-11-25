@@ -293,8 +293,9 @@ the cross-service view is
   availability and weight cap), `ShippingService`
   (`src/shipping/services.py`), the one lock order for an order and its
   shipment (`src/shipping/locks.py`), the HTTP session and retry rule
-  both carrier clients send through (`src/shipping/carrier_http.py`) and
-  the operational alerts (`src/shipping/alerts.py`). Read
+  both carrier clients send through (`src/shipping/carrier_http.py`),
+  the purge a carrier credential change queues (`src/shipping/tasks.py`)
+  and the operational alerts (`src/shipping/alerts.py`). Read
   `docs/order/shipping.md` and `docs/order/shipping-zones.md`.
 - `shipping_acs/`: `AcsShipment`, `AcsPickupList`, `AcsPickupListRun`,
   `AcsCodPayout`, `AcsStation`, `AcsTrackingEvent`, `AcsApiCall`,

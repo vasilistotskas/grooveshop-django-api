@@ -14,8 +14,8 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
         max_length=2,
         help_text=_(
             "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — "
-            "a ``ShippingRate`` is per-country, so there is no "
-            "destination-agnostic matrix of options to return."
+            "a ``ShippingRate`` belongs to a zone of one country, so "
+            "there is no destination-agnostic matrix of options to return."
         ),
     )
     region_id = serializers.CharField(

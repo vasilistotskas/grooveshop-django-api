@@ -233,7 +233,7 @@ def test_an_unchanged_catalogue_writes_nothing_and_purges_nothing():
 
     with (
         _serve(_body([_row("1")])),
-        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+        patch("core.cache.invalidation.mark_surface_stale") as purge,
     ):
         sync_catalogue_facts()
 
@@ -255,7 +255,7 @@ def test_a_stage_store_takes_no_size_from_a_colliding_id(
 
     with (
         _serve(_body([_row("5", ("3",), 0.4), _row("6")])),
-        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+        patch("core.cache.invalidation.mark_surface_stale") as purge,
     ):
         result = sync_catalogue_facts()
 
@@ -275,7 +275,7 @@ def test_a_stage_store_with_nothing_sized_writes_nothing(
 
     with (
         _serve(_body([_row("5")])),
-        patch("shipping_boxnow.catalogue.mark_surface_stale") as purge,
+        patch("core.cache.invalidation.mark_surface_stale") as purge,
     ):
         sync_catalogue_facts()
 

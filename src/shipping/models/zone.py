@@ -50,8 +50,7 @@ class ShippingZone(TimeStampMixinModel):
     zone with regions covers only those, and overrides the base zone for
     them, so "the islands cost more" is a region zone with its own rates
     and "we do not deliver to Crete" a region zone with no home-delivery
-    rate. ``shipping.services.ShippingService.zone_for`` is the one
-    resolution: the region zone holding a region, else the base zone.
+    rate. ``shipping.zones.zone_for`` is the one resolution: the region zone holding a region, else the base zone.
 
     The admin form keeps one base zone per country and a zone's regions
     in its country (``shipping.zones.zone_errors``); the database keeps a

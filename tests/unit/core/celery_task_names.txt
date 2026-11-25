@@ -118,6 +118,7 @@ search.tasks.anonymize_old_search_queries
 search.tasks.save_search_click
 search.tasks.save_search_query
 search.tasks.update_click_scores
+shipping.tasks.purge_carrier_gate_surfaces
 shipping_acs.tasks.acs_send_arrival_notification
 shipping_acs.tasks.alert_unremitted_cod_payouts
 shipping_acs.tasks.check_stale_acs_shipments

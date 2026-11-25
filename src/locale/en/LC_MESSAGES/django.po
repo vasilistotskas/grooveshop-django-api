@@ -7523,8 +7523,8 @@ msgstr "IP address from which the change was made."
 msgid "ISO 3166-1 alpha-2 country code"
 msgstr "ISO 3166-1 alpha-2 country code"
 
-msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` is per-country, so there is no destination-agnostic matrix of options to return."
-msgstr "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` is per-country, so there is no destination-agnostic matrix of options to return."
+msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` belongs to a zone of one country, so there is no destination-agnostic matrix of options to return."
+msgstr "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` belongs to a zone of one country, so there is no destination-agnostic matrix of options to return."
 
 msgid "ISO 3166-1 alpha-2 country code for the buyer's tax identity. Defaults to the order country when blank."
 msgstr "ISO 3166-1 alpha-2 country code for the buyer's tax identity. Defaults to the order country when blank."
@@ -15247,8 +15247,8 @@ msgstr "The public offers listing and the per-product offer panel. An offer is a
 msgid "The quantity exceeds the available stock."
 msgstr "The quantity exceeds the available stock."
 
-msgid "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
-msgstr "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
+msgid "The rate's own price for this (provider, zone, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
+msgstr "The rate's own price for this (provider, zone, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
 
 msgid "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."
 msgstr "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."

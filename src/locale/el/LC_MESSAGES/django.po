@@ -7530,8 +7530,8 @@ msgstr "Διεύθυνση IP από την οποία έγινε η αλλαγ�
 msgid "ISO 3166-1 alpha-2 country code"
 msgstr "ISO 3166-1 alpha-2 κωδικός χώρας"
 
-msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` is per-country, so there is no destination-agnostic matrix of options to return."
-msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 (π.χ. «GR»). Υποχρεωτικός — η τιμή αποστολής (``ShippingRate``) ορίζεται ανά χώρα, οπότε δεν υπάρχει λίστα επιλογών ανεξάρτητη από τον προορισμό."
+msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` belongs to a zone of one country, so there is no destination-agnostic matrix of options to return."
+msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 (π.χ. «GR»). Υποχρεωτικός — η τιμή αποστολής (``ShippingRate``) ανήκει σε μια ζώνη αποστολής μιας χώρας, οπότε δεν υπάρχει λίστα επιλογών ανεξάρτητη από τον προορισμό."
 
 msgid "ISO 3166-1 alpha-2 country code for the buyer's tax identity. Defaults to the order country when blank."
 msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 για τη φορολογική ταυτότητα του αγοραστή. Προεπιλογή η χώρα της παραγγελίας όταν είναι κενό."
@@ -15249,8 +15249,8 @@ msgstr "Η δημόσια λίστα προσφορών και το πλαίσι
 msgid "The quantity exceeds the available stock."
 msgstr "Η ποσότητα υπερβαίνει το διαθέσιμο απόθεμα."
 
-msgid "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
-msgstr "Η ίδια η τιμή αποστολής για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν το όριο δωρεάν αποστολής ή μια ζωντανή τιμή του courier αλλάξει όσα πληρώνει ένα συγκεκριμένο καλάθι."
+msgid "The rate's own price for this (provider, zone, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
+msgstr "Η ίδια η τιμή αποστολής για αυτόν τον συνδυασμό (πάροχος, ζώνη, τρόπος αποστολής), πριν το όριο δωρεάν αποστολής ή μια ζωντανή τιμή του courier αλλάξει όσα πληρώνει ένα συγκεκριμένο καλάθι."
 
 msgid "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."
 msgstr "Το όριο βάρους της τιμής αποστολής, ή null όταν δεν έχει. Συγκρίνετέ το με το βάρος του καλαθιού που ήδη γνωρίζετε — αυτή η εγγραφή δεν το επαναλαμβάνει."

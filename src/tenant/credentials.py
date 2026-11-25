@@ -543,6 +543,29 @@ def box_now_credentials() -> BoxNowCredentials:
     }
 
 
+#: The ``Tenant`` fields the carrier credentials above are read from. A
+#: carrier's checkout gate reads them (``is_kind_enabled``: an
+#: unconfigured carrier delivers nowhere), so ``tenant.signals`` purges
+#: what that gate renders when one of them changes. A field added to
+#: ``acs_credentials`` or ``box_now_credentials`` is added here.
+CARRIER_CREDENTIAL_FIELDS = (
+    "acs_api_key",
+    "acs_company_id",
+    "acs_company_password",
+    "acs_user_id",
+    "acs_user_password",
+    "acs_billing_code",
+    "acs_station_origin",
+    "box_now_client_id",
+    "box_now_client_secret",
+    "box_now_partner_id",
+    "box_now_warehouse_id",
+    "box_now_notify_phone",
+    "box_now_webhook_secret",
+    "box_now_live_mode",
+)
+
+
 def tenant_resend_webhook_secret() -> str:
     """The bound store's own Resend webhook signing secret, ``""`` when it
     has none. Tenant-only, with no platform fallback: a delivery to a store's

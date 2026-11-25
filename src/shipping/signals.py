@@ -5,7 +5,7 @@ from __future__ import annotations
 from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
 
-from core.cache.invalidation import mark_surface_stale, surfaces_invalidated_by
+from core.cache.invalidation import mark_model_stale
 from shipping.models import ShippingZone, ShippingZoneRegion
 
 _CHANGES = frozenset({"post_add", "post_remove", "post_clear"})
@@ -26,5 +26,4 @@ def zone_regions_changed(sender, action, **kwargs) -> None:
     """
     if action not in _CHANGES:
         return
-    for code in surfaces_invalidated_by(ShippingZoneRegion):
-        mark_surface_stale(code)
+    mark_model_stale(ShippingZoneRegion)

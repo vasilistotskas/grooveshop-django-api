@@ -29,7 +29,7 @@ class ShippingPolicyEntrySerializer(serializers.Serializer):
         max_digits=11,
         decimal_places=2,
         help_text=_(
-            "The rate's own price for this (provider, country, kind), "
+            "The rate's own price for this (provider, zone, kind), "
             "before a free-shipping threshold or a live carrier quote "
             "changes what a particular cart pays."
         ),

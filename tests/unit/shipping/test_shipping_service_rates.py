@@ -422,10 +422,31 @@ class TestResolveHomeDeliveryProvider:
         ShippingRateFactory(provider=low_priority, country=country)
         ShippingRateFactory(provider=high_priority, country=country)
 
-        assert (
-            ShippingService.resolve_home_delivery_provider(country.alpha_2)
-            == high_priority.code
-        )
+        with (
+            registered_carrier(low_priority.code),
+            registered_carrier(high_priority.code),
+        ):
+            picked = ShippingService.resolve_home_delivery_provider(
+                country.alpha_2
+            )
+
+        assert picked == high_priority.code
+
+    def test_a_carrier_checkout_refuses_is_passed_over(self):
+        # Ahead in priority, but the quote's gate would refuse it (no
+        # adapter here; ACS without the store's credentials in a store).
+        country = CountryFactory()
+        refused = ShippingProviderFactory(code="rate_home_refused", priority=1)
+        offered = ShippingProviderFactory(code="rate_home_offered", priority=5)
+        ShippingRateFactory(provider=refused, country=country)
+        ShippingRateFactory(provider=offered, country=country)
+
+        with registered_carrier(offered.code):
+            picked = ShippingService.resolve_home_delivery_provider(
+                country.alpha_2
+            )
+
+        assert picked == offered.code
 
     def test_a_capped_carrier_listed_first_does_not_hide_one_that_fits(
         self,
@@ -440,18 +461,16 @@ class TestResolveHomeDeliveryProvider:
             provider=roomy, country=country, max_weight_grams=None
         )
 
-        assert (
-            ShippingService.resolve_home_delivery_provider(
+        with registered_carrier(capped.code), registered_carrier(roomy.code):
+            heavy = ShippingService.resolve_home_delivery_provider(
                 country.alpha_2, weight_grams=5000
             )
-            == roomy.code
-        )
-        assert (
-            ShippingService.resolve_home_delivery_provider(
+            light = ShippingService.resolve_home_delivery_provider(
                 country.alpha_2, weight_grams=1500
             )
-            == capped.code
-        )
+
+        assert heavy == roomy.code
+        assert light == capped.code
 
     def test_when_no_carrier_fits_it_still_names_the_first(self):
         """Over every cap, the first carrier is still returned, so the
@@ -468,12 +487,12 @@ class TestResolveHomeDeliveryProvider:
             provider=second, country=country, max_weight_grams=2000
         )
 
-        assert (
-            ShippingService.resolve_home_delivery_provider(
+        with registered_carrier(first.code), registered_carrier(second.code):
+            picked = ShippingService.resolve_home_delivery_provider(
                 country.alpha_2, weight_grams=9000
             )
-            == first.code
-        )
+
+        assert picked == first.code
 
     def test_ignores_a_provider_with_no_rate_for_the_country(self):
         rated_country = CountryFactory()

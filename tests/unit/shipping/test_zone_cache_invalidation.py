@@ -1,6 +1,7 @@
-"""A zone's region set changes through its M2M, which writes its rows with
-``bulk_create`` and sends no ``post_save``: ``shipping.signals`` marks the
-surfaces that render where the store delivers."""
+"""What renders where the store delivers is purged when it changes: a
+zone's region set (an M2M that sends no ``post_save``, marked by
+``shipping.signals``), a carrier's switch, its synced stations and its
+credentials on ``Tenant``."""
 
 from __future__ import annotations
 
@@ -13,6 +14,9 @@ from country.factories import CountryFactory
 from region.factories import RegionFactory
 from shipping.factories import ShippingZoneFactory
 from shipping.models import ShippingProvider
+from shipping.tasks import purge_carrier_gate_surfaces
+from shipping_acs.models import AcsStation
+from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
 
@@ -23,7 +27,7 @@ def test_a_region_set_change_marks_the_shipping_surfaces(change):
     region = RegionFactory(country=country)
     zone = ShippingZoneFactory(country=country, regions=[region])
 
-    with mock.patch("shipping.signals.mark_surface_stale") as mark:
+    with mock.patch("core.cache.invalidation.mark_surface_stale") as mark:
         if change == "add":
             zone.regions.add(RegionFactory(country=country))
         elif change == "remove":
@@ -43,3 +47,41 @@ def test_a_carrier_switched_on_or_off_marks_the_region_and_country_pickers():
     assert {"shipping", "regions_countries"} <= set(
         surfaces_invalidated_by(ShippingProvider)
     )
+
+
+def test_a_station_sync_marks_the_region_and_country_pickers():
+    # ACS offers lockers in a country only while it has synced stations
+    # there, so a locker-only country's ``shippable`` follows them.
+    assert {"shipping", "regions_countries"} <= set(
+        surfaces_invalidated_by(AcsStation)
+    )
+
+
+class TestCarrierCredentials:
+    @pytest.fixture
+    def tenant(self):
+        return store_tenant("carrier_shop")
+
+    def test_a_credential_change_queues_the_purge_in_the_store(self, tenant):
+        with mock.patch("tenant.switches.dispatch_on_commit") as dispatch:
+            tenant.acs_api_key = "a-new-key"
+            tenant.save()
+
+        assert dispatch.call_args_list == [
+            mock.call(purge_carrier_gate_surfaces, schema_name="carrier_shop")
+        ]
+
+    def test_a_save_that_keeps_them_queues_nothing(self, tenant):
+        with mock.patch("tenant.switches.dispatch_on_commit") as dispatch:
+            tenant.store_name = "Renamed"
+            tenant.save()
+
+        assert dispatch.call_args_list == []
+
+    def test_the_task_marks_what_a_carrier_switch_does(self):
+        with mock.patch("core.cache.invalidation.mark_surface_stale") as mark:
+            purge_carrier_gate_surfaces.run()
+
+        assert {call.args[0] for call in mark.call_args_list} == set(
+            surfaces_invalidated_by(ShippingProvider)
+        )

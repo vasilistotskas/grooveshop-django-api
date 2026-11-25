@@ -263,3 +263,8 @@ clients read the new name, removes it together with the old columns (the
 
 After a contract migration runs, the image can roll back to N, not to
 N-1: N-1 still reads the dropped columns.
+
+The preflight takes the applied migrations for the release that serves. A
+rollback breaks that: after N+1 -> N, N+1's migrations stay applied while N's
+pods serve. Deploy N+1 again before N+2, or a contract N+2 carries passes the
+preflight while N still names its column.

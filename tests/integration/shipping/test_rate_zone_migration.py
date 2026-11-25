@@ -352,6 +352,75 @@ class TestTheZoneBecomesRequired(TestCase):
                     cursor, "shipping_shippingrate"
                 )
             }
+            constraints = set(
+                connection.introspection.get_constraints(
+                    cursor, "shipping_shippingrate"
+                )
+            )
+            cursor.execute(
+                "SELECT count(*) FROM shipping_shippingrate "
+                "WHERE country_id IS NOT NULL"
+            )
+            (carrying_a_country,) = cursor.fetchone()
         self.assertFalse(columns["zone_id"])
-        # Kept for the release still serving, and free to be NULL.
+        # Kept for the release still serving, NULL, and held by nothing.
         self.assertTrue(columns["country_id"])
+        self.assertEqual(carrying_a_country, 0)
+        self.assertFalse(
+            {
+                "shipping_rate_provider_country_kind_unique",
+                "shipping_rate_country_active_ix",
+            }
+            & constraints
+        )
+
+    def test_the_reverse_gives_the_country_its_unique_and_its_index_back(self):
+        apps = migrate_to(
+            ("shipping", "0027_shipping_rate_country_out_of_state")
+        )
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Zone = apps.get_model("shipping", "ShippingZone")
+        Region = apps.get_model("region", "Region")
+        Rate.objects.all().delete()
+        Zone.objects.all().delete()
+        base = Zone.objects.create(name="Greece", country_id="GR")
+        crete = Zone.objects.create(name="Crete", country_id="GR")
+        region, _ = Region.objects.get_or_create(
+            alpha="GR-QZ", defaults={"country_id": "GR", "sort_order": 0}
+        )
+        apps.get_model("shipping", "ShippingZoneRegion").objects.create(
+            zone=crete, region=region
+        )
+        provider = apps.get_model("shipping", "ShippingProvider").objects.get(
+            code="flat_rate"
+        )
+        for zone in (base, crete):
+            Rate.objects.create(
+                provider=provider,
+                zone=zone,
+                kind="home_delivery",
+                price=Decimal("3.00"),
+            )
+        _settle_deferred_constraints()
+
+        migrate_to(("shipping", "0025_shipping_rate_zone_required"))
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT zone_id, country_id FROM shipping_shippingrate"
+            )
+            self.assertEqual(
+                set(cursor.fetchall()), {(base.pk, "GR"), (crete.pk, None)}
+            )
+            constraints = set(
+                connection.introspection.get_constraints(
+                    cursor, "shipping_shippingrate"
+                )
+            )
+        self.assertTrue(
+            {
+                "shipping_rate_provider_country_kind_unique",
+                "shipping_rate_country_active_ix",
+            }
+            <= constraints
+        )

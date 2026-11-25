@@ -1825,8 +1825,8 @@ msgstr "Παρουσιάστηκε μη αναμενόμενο σφάλμα κα
 msgid "Analytics"
 msgstr "Αναλυτικά"
 
-msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
-msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ο καλών πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του χρονικού παραθύρου που ορίζεται από το ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. The caller must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``."
+msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ο καλών πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, στη συνεδρία allauth που ορίζει με το ``X-Session-Token``."
 
 msgid "Anonymous"
 msgstr "Ανώνυμος"
@@ -9539,6 +9539,9 @@ msgstr "Δεν έχει οριστεί"
 msgid "Not shipped yet"
 msgstr "Δεν έχει αποσταλεί"
 
+msgid "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+msgstr "Δεν είναι ο λογαριασμός του καλούντος, ή ο καλών δεν επιβεβαίωσε πρόσφατα ότι είναι ο ίδιος (``reauthentication_required``, με τους τρόπους που μπορεί)"
+
 msgid "Not the order's owner, and no matching order UUID was given."
 msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας και δεν δόθηκε το UUID της."
 
@@ -14759,6 +14762,9 @@ msgstr "Η διεύθυνση που δόθηκε στη φόρμα ενημερ
 msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 msgstr "Η ολοκλήρωση αγοράς του agent gateway που δημιούργησε αυτή την παραγγελία. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη της δημιουργίας της απαντάται με αυτή την παραγγελία."
 
+msgid "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+msgstr "Η ροή του allauth: ``reauthenticate`` (ο κωδικός πρόσβασης), ``mfa_reauthenticate`` (δεύτερος παράγοντας), ``reauthenticate_by_code`` (κωδικός που του στέλνεται με email)."
+
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά): 1999 για 19,99."
 
@@ -15361,6 +15367,9 @@ msgstr "Η ίδια τιμή με το ``reason``."
 
 msgid "The scheduled database backup failed with this error:"
 msgstr "Το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε με αυτό το σφάλμα:"
+
+msgid "The second factors the customer has."
+msgstr "Οι δεύτεροι παράγοντες που έχει ο πελάτης."
 
 msgid "The selected payment method is not available for this order."
 msgstr "Η επιλεγμένη μέθοδος πληρωμής δεν είναι διαθέσιμη για αυτή την παραγγελία."
@@ -17464,6 +17473,9 @@ msgstr "Παράθυρο"
 
 msgid "Wishlist"
 msgstr "Λίστα επιθυμιών"
+
+msgid "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
+msgstr "Με το ``reauthentication_required``: οι τρόποι με τους οποίους αυτός ο πελάτης μπορεί να επιβεβαιώσει ότι είναι ο ίδιος, στη συνεδρία allauth που ορίζει το αίτημα (``X-Session-Token``)."
 
 msgid "Without a category"
 msgstr "Χωρίς κατηγορία"

@@ -4,8 +4,8 @@ One ``impression`` row per item shown, one ``click`` per click — both
 reported by the storefront — and one ``attach`` per order line whose
 product had been shown under an impression to the same cart or the same
 signed-in customer inside the attribution windows. All three share
-``impression_id``, minted by the API per response and echoed by the
-client.
+``impression_id``, minted by the impression beacon for each showing and
+carried by the client.
 
 Called from Celery tasks so no write sits on a page's or a checkout's
 critical path; primitives in, count out.

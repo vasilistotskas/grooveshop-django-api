@@ -62,20 +62,25 @@ def purge_orphaned_user_sessions() -> int:
 
 
 def purge_expired_auth_tokens() -> int:
-    """Delete knox tokens past their expiry, in the active schema.
+    """Delete knox and OAuth tokens past their expiry, in the active schema.
 
     knox deletes a user's expired tokens only when that user authenticates
-    again, and ships no sweep. The token's own ``expiry`` is the rule, so
+    again, and ships no sweep. allauth's IdP never deletes its own: an
+    access or refresh token, and since 65.22 an authorization code, stays
+    a row of ``allauth_idp_oidc.Token`` (its ``oidc_cleartokens`` command
+    is this rule in one statement). A token's own expiry is the rule, so
     there is no setting. Knox lives in the store schemas only: a schema
     without its table (public) has none to purge.
     """
+    from allauth.idp.oidc.models import Token
     from django.db import connection
     from django.utils import timezone
     from knox.models import get_token_model
 
+    deleted = delete_in_batches(Token.objects.expired())
     token_model = get_token_model()
-    if token_model._meta.db_table not in connection.introspection.table_names():
-        return 0
-    return delete_in_batches(
-        token_model.objects.filter(expiry__lt=timezone.now())
-    )
+    if token_model._meta.db_table in connection.introspection.table_names():
+        deleted += delete_in_batches(
+            token_model.objects.filter(expiry__lt=timezone.now())
+        )
+    return deleted

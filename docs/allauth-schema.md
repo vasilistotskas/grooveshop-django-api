@@ -51,7 +51,9 @@ request options, `OptionalTimestamp` is really nullable (upstream put
 `nullable` beside a `$ref`, where OpenAPI 3.0 ignores it), `mfa.passkey_login_enabled`
 and `account.authentication_method` are declared, `POST .../recovery-codes`
 answers 200, and our own `GET .../totp/svg` (`core.views.ManageTOTPSvgView`) is
-added. Every operation may also answer 503 `UnavailableResponse`
+added; `X-Session-Token` is a security scheme (`SessionToken`) in allauth 65.22 and
+later, so our `totp/svg` operation copies the `security` of the status
+operation rather than a header parameter. Every operation may also answer 503 `UnavailableResponse`
 (`temporarily_unavailable`): with Redis unreachable a security control (a rate
 limit, TOTP replay protection) refuses the call rather than lift itself
 (`src/core/middleware/strict_cache.py`, the rule beside `STRICT_KEY_PREFIXES`
@@ -61,3 +63,37 @@ fails on any key an endpoint serves that the document does not declare.
 A new correction is a hook on the adapter where allauth offers one, otherwise
 an entry in `CORRECTIONS`, and in both cases a case in the contract test that
 fails without it.
+
+## Reauthentication
+
+A call that needs a recent proof of identity (managing a second factor, and
+the storefront's account deletion in `user.views.account`) answers 401 with
+the ways this customer can give it, `data.flows`, from
+`allauth.account.internal.flows.reauthentication.get_reauthentication_flows`:
+
+* `reauthenticate`: a customer with a usable password.
+* `mfa_reauthenticate`: a customer with an authenticator.
+* `reauthenticate_by_code`: a code mailed to a verified address of the
+  customer (allauth 65.22; `POST .../auth/reauthenticate/code/request`,
+  `.../confirm`, `.../resend`). **Off for now**:
+  `ACCOUNT_REAUTHENTICATION_METHODS` in `src/settings/auth.py` leaves out
+  `code`, the three endpoints answer 403, and `declare_every_flow` keeps the
+  value out of `Flow.id`. The storefront live in production rejects a
+  `Flow.id` it does not know (422), so the flow is switched on only after a
+  storefront that completes it is live, in three releases, each one checked
+  with `api-contract/api-contract.sh compare`: this document (new paths, the
+  `SessionToken` security scheme, `recipients`, the enum without the value),
+  then the storefront generated from the document with the value, then the
+  release that deletes the setting (the document differs by that one enum
+  value).
+
+A customer with none of the methods that are on (no password, no
+authenticator) is not asked while the code method is off
+(`TenantAccountAdapter.is_reauthentication_required`, deleted with the
+setting): allauth up to 65.21 counted such a customer as always freshly
+reauthenticated, and 65.22's refusal would leave them no way to delete their
+account or add a second factor until the code method is on.
+
+`AuthenticationMethod` keeps the titles its two code entries had before 65.22
+(`keep_the_code_methods_titles`): a consumer's contract check pairs the entries
+of a `oneOf` by title.

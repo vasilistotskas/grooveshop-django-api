@@ -7,9 +7,9 @@ rows and anything else keyed on an address. Source: `src/core/client_ip.py`
 Never read
 `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` directly to identify a
 caller. What Traefik can vouch for is its TCP peer — a Cloudflare edge
-node for proxied traffic (and a `10.42.x.x` SNAT gateway before the
-Service moved to `externalTrafficPolicy: Local`; a public request was
-recorded as `10.42.1.0` on 2026-09-16). Keying anonymous throttles on it
+node for proxied traffic (the Service runs with
+`externalTrafficPolicy: Local`, so the peer is never an in-cluster SNAT
+address). Keying anonymous throttles on it
 makes a budget shared by everyone behind that address
 (`order_create_anon` at 10/minute let one client lock out every guest
 checkout). `X-Real-IP` on the SSR path is the caller's own
@@ -52,8 +52,7 @@ header, so a caller cannot give one order a fresh payment budget by sending
 another cart id or token. The same two throttles guard the gift-card
 purchase (`POST giftcard/purchase`), which has no order `pk`: a gateway call
 there is budgeted on the address. An id that is no uuid, names no cart or
-order, or comes without the secret is keyed on the address, as before the
-gateway rule. The cart writes create a cart when the one they
+order, or comes without the secret is keyed on the address. The cart writes create a cart when the one they
 name does not resolve (a cart-item create, a coupon apply), so an id that
 earned a budget just by being well formed would let a client that makes ids
 up escape the per-address burst limit on cart creation and the tight coupon
@@ -83,9 +82,9 @@ no cart.
 (`src/meta_capi/signals.py`, and the order's Meta context set by
 `_meta_context_from` in `src/order/views/order.py`, which drops the body's
 value), is `edge_client_ip` or nothing: the peer is
-a proxy, not the visitor. It is named for where the proof comes from: CodeQL treats
-any function whose name says `trusted` or `secret` as a source of
-secrets, so under its old name every log line carrying an address was a
-clear-text-logging alert. Operator-side detail, including the fact that the secret
+a proxy, not the visitor. The function is named for where the proof comes
+from: CodeQL treats any function whose name says `trusted` or `secret` as a
+source of secrets, so such a name would make every log line carrying an
+address a clear-text-logging alert. Operator-side detail, including the fact that the secret
 lives in two separate Cloudflare accounts, is in
 `grooveshop-infrastructure/docs/edge-trust-boundary.md`.

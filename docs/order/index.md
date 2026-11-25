@@ -40,8 +40,7 @@ prose, and put a paragraph under its table, never in a cell. A file that
 outgrows the limit is split on a subject, and this table gains a row.
 
 Last refresh: 2026-11-24 (every pay way creates the order first and pays
-it afterwards; the payment-first Stripe path, `retry-payment` and the
-order's `create_payment_intent` are removed, [§3.1](creation.md); before
+it afterwards, [§3.1](creation.md); before
 that 2026-11-21: an order's address line 2, [§3.3](creation-address.md);
 an order has one payable payment link: a request for one returns the live
 one, [§4](payments.md); the cart digest leaves out the pay way and

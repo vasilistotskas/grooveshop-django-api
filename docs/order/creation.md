@@ -6,10 +6,9 @@ and says which file holds each § number used here.
 ## 3. Order creation paths
 
 One entry point in `src/order/services.py`,
-`OrderService.create_order_from_cart` (§3.1), for every pay way. The
-payment-first Stripe path (`cart/create-payment-intent`, then `POST /order`
-with `payment_intent_id`) was removed in #818: no money moves before the
-locked quote has run every refusal.
+`OrderService.create_order_from_cart` (§3.1), for every pay way. Every
+order is created before it is paid, so no money moves before the locked
+quote has run every refusal.
 
 ### 3.0 One total: the checkout quote and the expected total
 
@@ -146,8 +145,7 @@ caller:
   - **A code, not an enum value.** As `total_changed`, `cart_changed` is
     sent under `error.type` `invalid_order_data`
     (`order.enum.create_error.CART_CHANGED_CODE`), and only to a request
-    carrying `expectedCartDigest`. Optional until the storefront and the
-    gateway send it; a later release requires it (#755).
+    carrying `expectedCartDigest`, which is optional.
 - **`POST /api/v1/cart/quote`** takes the checkout's choices, each
   optional (`CartQuoteRequestSerializer`). A delivery is priced
   once `shippingKind` and `countryId` are both given (order creation
@@ -244,7 +242,7 @@ caller:
   UCP/ACP checkout. The body carries no payment; the cart comes from
   `X-Cart-Id`.
 - Sets `status=PENDING`, `payment_status=PENDING`.
-- **Every online pay way is order-first** (#818). An order for Stripe or
+- **Every online pay way is order-first.** An order for Stripe or
   Viva is created PENDING with nothing charged and no `payment_id`, the cart
   kept (`Order.awaits_online_payment`; it clears on `order_paid`), the
   courier voucher deferred to the payment, and the payment opened
@@ -269,13 +267,12 @@ caller:
   `OrderItem` insert (below).
 - **Product locks are taken in ascending pk order, all in one statement, before
   the first row that references a product is inserted.** The cart-item query
-  locks only the cart lines (`of=("self",)`; the join used to lock the products
-  too, in the cart's line order), then
+  locks only the cart lines (`of=("self",)`, not the joined products), then
   `OrderService._lock_order_products` → `StockManager.lock_products` locks
   every product the order touches (cart lines, the cart session's reservations,
-  free-gift products) once, `ORDER BY` pk. Two carts holding the same products
-  in different line orders used to take them in opposite orders, which
-  PostgreSQL resolves by aborting one checkout. It must precede the
+  free-gift products) once, `ORDER BY` pk, so two carts holding the same
+  products in different line orders never take them in opposite orders, which
+  PostgreSQL would resolve by aborting one checkout. It must precede the
   `OrderItem` inserts because each takes `FOR KEY SHARE` on its product, which
   conflicts with `FOR UPDATE`: two checkouts that insert first and lock after
   wait on each other whatever order they then ask in. The per-product locks in
@@ -300,9 +297,9 @@ caller:
   a time. A checkout therefore never reads a hold set a re-reserve is half way
   through replacing. A reload,
   a retry, an agent completing twice, a changed quantity or a removed line
-  therefore never leave the cart blocked by its own earlier holds
-  (`stock == quantity` used to answer 409 on the second attempt and keep the
-  units held for the TTL) and never leave a hold on a product the cart no
+  therefore never leave the cart blocked by its own earlier holds (with
+  `stock == quantity`, a second attempt would otherwise answer 409 and keep
+  the units held for the TTL) and never leave a hold on a product the cart no
   longer has. Other sessions' holds still count, so two carts still exclude
   each other for the last unit. If any line is short the whole call rolls
   back (`CartStockUnavailableError`, one entry per short line, answered as 409

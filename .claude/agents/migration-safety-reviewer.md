@@ -145,7 +145,7 @@ applies cleanly.
 Use this format. Be terse — one line per finding. Include file:line where
 possible.
 
-```
+```text
 Migration safety review
 
 UNSAFE
@@ -159,7 +159,7 @@ UNSAFE
 CONDITIONAL
   src/order/migrations/0089_add_status_index.py:8
     AddIndex(Order, fields=["status"])
-    Order has ~5M rows in prod; CREATE INDEX may exceed the PreSync hook's 1800s activeDeadlineSeconds
+    Order is a large hot table; CREATE INDEX may exceed the PreSync hook's 1800s activeDeadlineSeconds
     Fix: use AddIndexAdaptively with atomic = False
 
 SAFE

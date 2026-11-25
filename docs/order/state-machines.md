@@ -7,7 +7,7 @@ and says which file holds each § number used here.
 
 ### 2.1 OrderStatus transitions (`ALLOWED_TRANSITIONS` in `src/order/lifecycle/service.py`, read by `OrderLifecycleService.update_order_status`)
 
-```
+```text
 PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
    │           │           │          │
    │           │           │          └──► RETURNED → REFUNDED
@@ -53,15 +53,14 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     poll and the COD reconcile and swept hourly by
     `order.tasks.complete_paid_delivered_orders` for everything that lands
     outside those two moments (a payment entered by hand, a webhook after
-    delivery, an inline attempt that failed once — prod orders 252, 253, 73, 92
-    on 2026-09-20).
+    delivery, an inline attempt that failed once).
   - `PROCESSING → SHIPPED` also from an ACS `attempted` state: a failed
-    delivery attempt proves the parcel shipped (prod order 267 sat at
-    PROCESSING for the ten days ACS held it). And a shipment the summary still
+    delivery attempt proves the parcel shipped, even while ACS holds it
+    for days. And a shipment the summary still
     calls `new` is lifted to `in_transit` when `ACS_TrackingDetails` holds any
     checkpoint that is not a print (`_has_left_sender`), because ACS reports
     `shipment_status=5` / `delivery_flag=0` / no reason for a parcel waiting at
-    a Smartpoint (prod order 284).
+    a Smartpoint.
   - A CANCELED shipment state (only ever produced by the admin retire action or
     a voucher cancel, never by tracking) routes the order through
     `OrderLifecycleService.cancel_order` (`OrderLifecycleService.cancel_for_dead_shipment`,
@@ -83,11 +82,11 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
     `cancel_order` already ran); a PENDING / PROCESSING order keeps its status,
     its stock and its payment, and needs follow-up (§2.3) until staff create a
     new parcel ("Create BoxNow parcel now", [§5.2](shipping-boxnow.md)) or
-    cancel the order; a shipped one is logged and left alone. Owner's decision
-    of 2026-11-10 (#600), which reversed v3.242.6, where the event canceled the
-    order through `cancel_for_dead_shipment`: a staff member who canceled a
-    parcel to replace it lost the order, and the event could cancel an order
-    before the customer's own cancel (which refunds) reached its lock.
+    cancel the order; a shipped one is logged and left alone (owner decision).
+    Canceling the order through `cancel_for_dead_shipment` on the event would
+    lose the order of a staff member who canceled a parcel to replace it, and
+    could cancel an order before the customer's own cancel (which refunds)
+    reached its lock.
   - Carrier bridge: when a carrier reports DELIVERED or RETURNED while the
     order is still PENDING/PROCESSING (state jump between polls / missed
     webhook), `_apply_order_status_transition` walks the missing SHIPPED step
@@ -112,13 +111,13 @@ No explicit table — flips are direct assignments. Common paths:
 **Starting a payment.** A FAILED payment stays FAILED until a new attempt
 settles it: the shopper opens a new hosted link (`create_checkout_session`)
 and its webhook moves the payment on; no path writes the payment back to
-PENDING (`retry-payment` was removed with the payment-first path, #818). Both
+PENDING. Both
 endpoints that start a payment (`create_checkout_session`,
 `confirm_agent_payment`) share `OrderViewSet._payment_start_refusal`: a paid
 order gets 400 "This order has already been paid.", a CANCELED or otherwise
 advanced one 400 "This order is no longer open for payment." — before the
 provider is called, because `cancel_order` settles an unpaid payment to
-CANCELED too, and reopening it let a charge land on a dead order. The
+CANCELED too, and reopening it would let a charge land on a dead order. The
 provider call itself runs unlocked; `create_checkout_session` then records
 its session through `OpenPayment.lock_unchanged`, which locks the row and,
 if its status, payment status, payment id or recorded session changed

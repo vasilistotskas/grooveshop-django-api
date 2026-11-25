@@ -21,7 +21,7 @@ This skill audits the latest migration (or a named one) for that hazard and pres
 If the user named one, use that path. Otherwise find the most recent migration across all apps:
 
 ```bash
-ls -t */migrations/0*.py 2>/dev/null | head -5
+ls -t src/*/migrations/0*.py 2>/dev/null | head -5
 ```
 
 ### 2. Read the migration file
@@ -107,7 +107,7 @@ Flag any migrations that would require `--fake` to apply cleanly in a fresh envi
 
 ## Output Format
 
-```
+```text
 Migration: <path>
 Verdict: SAFE | UNSAFE | NEEDS REVIEW
 

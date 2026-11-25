@@ -4,11 +4,11 @@ A catalogue file names image URLs and a social provider names an avatar URL.
 Fetched with a bare `requests.get`, either could point a worker at
 `http://169.254.169.254/` (the cloud metadata service), at a service on the
 cluster network or at `localhost` (SSRF). `core.net.safe_fetch.safe_fetch(url,
-max_bytes=...)` is the one way to download such a URL. Its callers today are
+max_bytes=...)` is the one way to download such a URL. Its callers are
 the social-avatar task (`src/user/tasks.py`, URL from `src/user/signals.py`, the bytes
 then through `prepare_servable_image`, so a file that is not a servable raster
-is dropped and GPS is stripped); the
-catalogue import's image phase will be the second.
+is dropped and GPS is stripped) and the BoxNow locker catalogue fetch
+(`src/shipping_boxnow/catalogue.py`).
 
 ## The rules
 

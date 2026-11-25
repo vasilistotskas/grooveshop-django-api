@@ -14,8 +14,8 @@ in each store's own schema (`texts` is in `TENANT_APPS`), unique on
 `(surface, namespace, key, language)`, with django-simple-history. It is
 sparse: a text the store never edited has no row, and the storefront's
 default applies. `namespace` and `key` are the storefront's own ids, so
-nothing here is a foreign key. `surface` is `storefront` today; emails join
-later.
+nothing here is a foreign key. `surface` is `storefront`, the only
+value (`TextSurface`).
 
 The staff member is a platform-public identity, so it is a plain id read
 through `updated_by_staff` (`src/tenant/staff_actors.py`), like every other

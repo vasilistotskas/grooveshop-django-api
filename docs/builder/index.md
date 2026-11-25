@@ -23,7 +23,7 @@ the file for what you are changing. The headings keep their names.
 | [`documents.md`](documents.md) | the model, a document, the storefront's catalogue, what a save checks, translations, references, the theme's contrast, typed data props, and what purges a page when a record changes |
 | [`publishing.md`](publishing.md) | writes, what a release moves, the API and its declared refusals, the live preview, the editor's link pickers, share-preview links, presence, the feature switches, scheduled publishing |
 | [`media.md`](media.md) | the media library, importing an image the store already shows, resolving media for a draft, images documents still name by URL, a rewrite in place and the way back |
-| [`sign-in-and-defaults.md`](sign-in-and-defaults.md) | signing in to the editor, what is copied from the storefront, default documents for a new store, the demo store's pages, what is not here yet |
+| [`sign-in-and-defaults.md`](sign-in-and-defaults.md) | signing in to the editor, what is copied from the storefront, default documents for a new store, the demo store's pages |
 
 Keep each file well under 40,000 characters. A file that outgrows the
 limit is split on a subject, and this table gains a row.

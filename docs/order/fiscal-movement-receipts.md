@@ -87,9 +87,9 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   keeps its date. Every payload is checked against AADE's
   v2.0.2 XSDs, vendored in `src/order/accounting/mydata/xsd/`, before it is
   sent.
-- **AADE's rules this section relies on, and which were checked.** #760
-  was sent to AADE's myDATA sandbox (`mydataapidev.aade.gr`) through the
-  platform's own builder, service and client.
+- **AADE's rules this section relies on, and which were checked.** The
+  documents were sent to AADE's myDATA sandbox (`mydataapidev.aade.gr`)
+  through the platform's own builder, service and client.
   *Verified against the myDATA sandbox on 2026-11-20:* the movement
   document's shape above (`itemDescr` on every line, error 230; issuer
   name and address with its number, counterpart with name and address
@@ -243,7 +243,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
   element (`xs:byte` 1-4 in the v2.0.2 XSD) the REST API documentation
   allows an ERP to send (1, 2 and 4 are a licensed provider's). A receipt
   AADE refused, or whose credentials it refused, is not stamped: that is no
-  loss of connection. The task retries as before, and
+  loss of connection. The task retries, and
   `order.tasks.retry_receipts_with_mydata` (beat
   `retry-receipts-with-mydata`, every 5 minutes, every store suspended or
   not) sends every receipt AADE may hold unanswered, plain or with
@@ -343,7 +343,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     recorded on the row (the admin's cancel of a document issued in error
     too). A refusal, or a courier that
     never answered: the parcel may be on its way, so the receipt stands,
-    reaches the customer, and goes the credit path as before; one never
+    reaches the customer, and goes the credit path; one never
     sent (its worker stopped before the send), or whose last send has no
     answer, is sent then, its MARK looked up first, since the hold was what
     the sweep sent it for.
@@ -371,7 +371,7 @@ dispatch point. For an order whose carrier keeps a shipment of its own
     `Invoice.cancel_held_for_staff_at` and writes one order note naming the
     cause; the receipt stays set aside, the sweep leaves it, and every
     later settle returns at once. A listing that does not answer (a
-    timeout, a 5xx) is no such answer and is retried as before. Staff check
+    timeout, a 5xx) is no such answer and is retried. Staff check
     with the accountant, then resolve it from the order: "Cancel receipt in
     myDATA (issued in error)" cancels it once AADE sees it, and "Issue
     credit documents (myDATA)" releases it to the credit path

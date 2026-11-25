@@ -38,7 +38,7 @@ query plus one count-only query per filter, that filter's clause left out.
 
 `attribute_values` always uses groups, one per attribute
 (`src/product/attribute_selection.py`). `category` and `brand` do so only with
-`sidebarFacets=true`; without it a request keeps today's narrowed counts.
+`sidebarFacets=true`; without it a request keeps the narrowed counts.
 
 ## `sidebarFacets`
 
@@ -69,9 +69,9 @@ always describe the query the listing shows.
 The engine settings these queries depend on (which fields filter, which
 compare, the facet value cap) are in [index settings](index-settings.md).
 
-The equality of each count with the separate request the storefront used to
-make is pinned by `tests/integration/search/test_product_search_sidebar_facets.py`
-(live engine, 14 filter combinations times two scopes).
+The equality of each count with a request made for that facet alone is pinned by
+`tests/integration/search/test_product_search_sidebar_facets.py` (live engine,
+every filter combination in `COMBINATIONS`, in two scopes).
 
 ## Facet reads are not searches
 

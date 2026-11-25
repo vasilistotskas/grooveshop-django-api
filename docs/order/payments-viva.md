@@ -5,7 +5,7 @@ and says which file holds each § number used here. Stripe, cash on delivery and
 what every provider shares (per-tenant credentials, disputes) are in
 [`payments.md`](payments.md).
 
-### 4.3 Viva Wallet online
+## 4.3 Viva Wallet online
 
 Settlement: `src/order/payments/viva_settlement.py::handle_payment_created`,
 run by the webhook (`src/order/views/viva_webhook.py`) and by
@@ -34,12 +34,11 @@ Differences from the Stripe path that are easy to miss:
   still fires, but the canonical state-machine validator is
   skipped — Viva trusts that ``status==PENDING`` before the
   payment landed.
-- **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
+- **PROCESSING suppression** mirrors Stripe: the
   handler calls ``OrderLifecycleService.suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
   so the customer doesn't get back-to-back payment-confirmed +
-  order_processing emails when Viva confirms payment. Without
-  this, the post-save handler would dispatch both.
+  order_processing emails when Viva confirms payment.
 - **Confirmation** is the same as Stripe's: the handler confirms the
   order (``OrderLifecycleService.confirm``, ``Order.confirmed_at`` claimed
   once), and ``order_confirmed`` queues the payment-confirmed email, the
@@ -98,10 +97,9 @@ is the status of the ORIGINAL payment), a refund or void
 Claimed" types, `VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS`, are chargebacks
 and are booked as such, see *Dispute lifecycle per provider*) and a
 **negative** `amount`.
-The handler used to wait for the refund transaction itself to read
-REFUNDED, which Viva never reports, so every real 1797 was skipped — and
-recorded as processed, so Viva never retried. Nothing is read from the
-unauthenticated body except `ParentId`:
+Viva never reports a refund transaction as REFUNDED, so the handler does not
+wait for that. Nothing is read from the unauthenticated body except
+`ParentId`:
 
 1. `_verify_viva_reversal` retrieves the refund transaction (an error raises
    → 500 → Viva retries, and the multi-tenant candidate loop moves on) and
@@ -142,7 +140,7 @@ unauthenticated body except `ParentId`:
    is derived from the ledger's sums by `record_refund`
    ([§7.3](payment-ledger.md)). Nothing is
    read from Viva about what was captured: the ledger holds it. There is no
-   "is the order paid" status guard any more: a verified refund of a recorded
+   "is the order paid" status guard: a verified refund of a recorded
    payment is a fact whatever the status says, and an unpaid order has no
    CHARGE for it to name.
 5. `order_refunded` fires with `amount` = this refund
@@ -164,9 +162,8 @@ The dispatcher stores the handler's real outcome in
 `VivaWebhookEvent.outcome`: every skip above (and a 1798 that changed
 nothing) is `skipped`, a booked refund `processed`. Ops: each tenant's Viva
 account needs the *Transaction Reversal Created* webhook subscribed
-(Settings → API Access → Webhooks). Production had received no 1797 by
-2026-10-10, so check the subscription before assuming that a refund made in
-Viva's dashboard reached the order. Dispute tracking needs a second
+(Settings → API Access → Webhooks). Check the subscription before assuming that a refund
+made in Viva's dashboard reached the order. Dispute tracking needs a second
 subscription, *Account Transaction Created* (2054), in the same place. The
 provider fee needs a third, *Transaction Price Calculated* (1799):
 `_handle_transaction_price_calculated` retrieves the transaction like every
@@ -185,7 +182,7 @@ answered 200 and recorded nowhere
 (`viva_settlement.OUTCOME_NOT_RECORDED`), so it cannot stand in for Viva's own
 event for that refund.
 
-**Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
+**Post-payment redirect.** Smart Checkout's
 success/failure URLs are static strings configured on the source in
 the Viva merchant portal — the API accepts no per-order success URL.
 Viva appends ``?t=<transaction_id>&s=<order_code>&lang=..&eventId=<int32
@@ -196,13 +193,11 @@ Nitro route ``/checkout/viva-return``, which calls the public
 ``/checkout/success/{uuid}``. The endpoint resolves ``t`` →
 ``payment_id`` (post-webhook) with fallback ``s`` →
 ``metadata.viva_order_codes`` (every code the order issued, appended at
-session creation, so it wins the browser-vs-webhook race). Pitfalls encoded in
-history:
+session creation, so it wins the browser-vs-webhook race). Mind that
 ``s`` is the 16-digit order code, NOT an ``F`` status flag, and
-``eventId`` is an int32 Viva event code, NOT ``merchantTrns`` — two
-earlier frontend implementations assumed otherwise and broke the
-success redirect (customer landed on the homepage via the
-``/checkout`` empty-cart bounce).
+``eventId`` is an int32 Viva event code, NOT ``merchantTrns``: reading
+them otherwise sends the customer to the homepage via the
+``/checkout`` empty-cart bounce.
 
 The 200 answer is a union published as a `oneOf` discriminated on
 `kind`: `order` carries `id`, `uuid`, `status`, `paymentStatus`;

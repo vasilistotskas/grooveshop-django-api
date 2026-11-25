@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -236,6 +236,10 @@ class CheckoutQuote:
     grand_total: Money | None
     amount_due: Money | None
     cart_digest: str | None
+    #: The delivery as it was priced: its kind normalised and, for a home
+    #: delivery that named none, the carrier checkout resolved. Order
+    #: creation assigns this carrier, never a second resolution.
+    shipping_choice: ShippingChoice | None
 
     @property
     def currency(self) -> str:
@@ -355,6 +359,18 @@ class OrderQuoteService:
 
         shipping_charge = None
         if shipping is not None:
+            # One carrier for the whole quote, resolved once: priced,
+            # digested and assigned to the order (``shipping_choice``), so
+            # a zone or rate edit committing during the request cannot
+            # price one carrier and assign another.
+            kind, carrier = cls._carrier(
+                shipping.kind,
+                shipping.provider_code,
+                shipping.country_id,
+                weight_grams,
+                shipping.region_id,
+            )
+            shipping = replace(shipping, kind=kind, provider_code=carrier)
             shipping_charge = cls.shipping_cost(
                 order_value=threshold_value,
                 country_id=shipping.country_id,
@@ -446,6 +462,7 @@ class OrderQuoteService:
             grand_total=grand_total,
             amount_due=amount_due,
             cart_digest=cart_digest,
+            shipping_choice=shipping,
         )
 
     @staticmethod
@@ -566,7 +583,7 @@ class OrderQuoteService:
         ``Order.shipping_kind``'s own default. Everything that depends
         on the kind reads it here — the price (:meth:`_carrier`), the
         carrier the order is assigned
-        (``OrderService._resolve_shipping_provider``) and the pay ways it
+        (:attr:`CheckoutQuote.shipping_choice`) and the pay ways it
         may use (:meth:`offered_pay_ways`) — so none of them can take a
         kind-less order for something else. Judged by no kind at all,
         such an order was priced as a home delivery and took a pay way
@@ -588,9 +605,9 @@ class OrderQuoteService:
 
         A home delivery (:meth:`delivery_kind`) that names no carrier
         takes the active home-delivery carrier for the destination (the
-        country and the region's zone), by the helper that assigns the
-        order's carrier, so the price charged and the carrier assigned
-        always agree.
+        country and the region's zone). :meth:`quote` resolves it once and
+        hands it to the order (:attr:`CheckoutQuote.shipping_choice`), so
+        the price charged and the carrier assigned always agree.
         """
         from shipping.enum import ShippingKind
         from shipping.services import ShippingService

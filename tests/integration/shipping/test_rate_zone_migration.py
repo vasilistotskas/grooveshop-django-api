@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from django.db import connection
 from django.test import TestCase
+from django.utils import timezone
 
 from tests.utils.migrations import migrate_to
 
@@ -52,18 +53,33 @@ class TestRatesMoveIntoZones(TestCase):
 
     def test_each_country_gets_one_whole_country_zone(self):
         self._rates_before("GR", "QZ")
+        apps = migrate_to(BEFORE)
+        rates_before = sorted(
+            apps.get_model("shipping", "ShippingRate").objects.values_list(
+                "pk", "country_id", "kind", "price"
+            )
+        )
 
         apps = migrate_to(AFTER)
         Zone = apps.get_model("shipping", "ShippingZone")
         Rate = apps.get_model("shipping", "ShippingRate")
 
-        zones = {zone.country_id: zone for zone in Zone.objects.all()}
-        self.assertEqual(set(zones), {"GR", "QZ"})
+        self.assertEqual(
+            sorted(Zone.objects.values_list("country_id", flat=True)),
+            ["GR", "QZ"],
+        )
         self.assertFalse(
             apps.get_model("shipping", "ShippingZoneRegion").objects.exists()
         )
-        for rate in Rate.objects.all():
-            self.assertEqual(rate.zone_id, zones[rate.country_id].pk)
+        zones = dict(Zone.objects.values_list("country_id", "pk"))
+        self.assertEqual(
+            sorted(
+                Rate.objects.values_list(
+                    "pk", "country_id", "kind", "price", "zone_id"
+                )
+            ),
+            sorted((*rate, zones[rate[1]]) for rate in rates_before),
+        )
 
     def test_a_zone_is_named_after_its_country(self):
         self._rates_before("GR")
@@ -229,4 +245,70 @@ class TestTheBackfillIsSafeToRunAgain(TestCase):
 
         self.assertEqual(
             list(Rate.objects.values_list("pk", flat=True)), [kept.pk]
+        )
+
+
+class TestTheContractRerun(TestCase):
+    """What the release before writes during the rollout, as the contract
+    release finds it when it runs ``0024``'s function again."""
+
+    def _greece(self, apps):
+        Zone = apps.get_model("shipping", "ShippingZone")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Rate.objects.all().delete()
+        return Zone.objects.filter(
+            country_id="GR", regions__isnull=True
+        ).first() or Zone.objects.create(name="Greece", country_id="GR")
+
+    def test_a_rate_re_pointed_to_another_country_moves_there(self):
+        apps = migrate_to(AFTER)
+        Country = apps.get_model("country", "Country")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        greece = self._greece(apps)
+        Country.objects.get_or_create(
+            alpha_2="QZ", defaults={"alpha_3": "QZX", "sort_order": 0}
+        )
+        # Greece's base zone, but the release before set it to QZ.
+        rate = Rate.objects.create(
+            provider=Provider.objects.get(code="flat_rate"),
+            zone=greece,
+            country_id="QZ",
+            kind="home_delivery",
+            price=Decimal("3.00"),
+        )
+        _settle_deferred_constraints()
+
+        _backfill()(apps, SimpleNamespace(connection=connection))
+
+        rate.refresh_from_db()
+        self.assertEqual(rate.zone.country_id, "QZ")
+        self.assertNotEqual(rate.zone_id, greece.pk)
+
+    def test_a_history_row_gets_its_countrys_base_zone(self):
+        apps = migrate_to(AFTER)
+        History = apps.get_model("shipping", "HistoricalShippingRate")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        greece = self._greece(apps)
+        History.objects.all().delete()
+        History.objects.create(
+            id=1,
+            provider_id=Provider.objects.get(code="flat_rate").pk,
+            country_id="GR",
+            kind="home_delivery",
+            price=Decimal("3.00"),
+            price_currency="EUR",
+            free_shipping_threshold_currency="EUR",
+            is_active=True,
+            created_at=timezone.now(),
+            updated_at=timezone.now(),
+            history_date=timezone.now(),
+            history_type="~",
+        )
+
+        _backfill()(apps, SimpleNamespace(connection=connection))
+
+        self.assertEqual(
+            list(History.objects.values_list("zone_id", flat=True)),
+            [greece.pk],
         )

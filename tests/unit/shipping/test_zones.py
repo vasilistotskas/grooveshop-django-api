@@ -442,6 +442,8 @@ class TestARateWithoutAZone:
     def zoneless(self):
         served = CountryFactory(num_regions=0)
         enable_rate(served)
+        # A zoned ACS rate, so the station sync has a country to sync.
+        enable_rate(served, provider_code="acs", kind=ShippingKind.PICKUP_POINT)
         written_by_the_old_release = CountryFactory(num_regions=0)
         rate = enable_rate(served, provider_code="acs")
         with connection.cursor() as cursor:
@@ -484,7 +486,7 @@ class TestARateWithoutAZone:
             sync_acs_stations.run()
 
         synced = {call.kwargs["country"] for call in sync.call_args_list}
-        assert synced, "the store's zoned ACS rates are synced"
+        assert zoneless.served in synced
         assert None not in synced
         assert zoneless.country not in synced
 

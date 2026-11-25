@@ -190,7 +190,13 @@ class HomeCoverage:
             regions={
                 region: zone in delivering for zone, region in zone_regions
             },
-            reached=frozenset(zone_country[zone] for zone in delivering),
+            # Three reads: a zone deleted after the first is not in
+            # ``zone_country``, and reaches nothing.
+            reached=frozenset(
+                zone_country[zone]
+                for zone in delivering
+                if zone in zone_country
+            ),
         )
 
     def serves(self, country_code: str | None, region_code: str | None) -> bool:

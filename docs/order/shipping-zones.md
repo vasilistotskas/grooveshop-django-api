@@ -16,7 +16,9 @@ the store's own configuration on top of them, in its schema:
   with regions covers only those, and **overrides the base zone for them**.
 - **`shipping.ShippingZoneRegion`**: the region set, a through model whose
   `region` is unique, so in one store a region is in one zone at most and
-  every destination resolves to one zone.
+  a destination resolves to one zone at most: none where its country has
+  no base zone and its region is in no region zone (`zone_for` returns
+  `None`, and nothing is priced there).
 - **`shipping.ShippingRate.zone`**: a rate belongs to a zone, one per
   `(provider, zone, kind)` ([§5.0](shipping.md)).
 

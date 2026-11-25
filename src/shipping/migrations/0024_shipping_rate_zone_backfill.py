@@ -17,23 +17,30 @@ import logging
 
 from django.conf import settings
 from django.db import migrations
+from django.db.models import F, Q
 
 logger = logging.getLogger(__name__)
 
 
-def _base_zone(apps, db, country_id):
-    """The country's base zone, the oldest if a store somehow has two
-    (only the admin form keeps it to one), or a new one named after the
-    country, under a name no other zone has."""
-    ShippingZone = apps.get_model("shipping", "ShippingZone")
-    CountryTranslation = apps.get_model("country", "CountryTranslation")
-
-    zone = (
-        ShippingZone.objects.using(db)
+def _oldest_base_zone(apps, db, country_id):
+    """The country's base zone, the oldest if a store somehow has two:
+    only the admin form keeps it to one."""
+    return (
+        apps.get_model("shipping", "ShippingZone")
+        .objects.using(db)
         .filter(country_id=country_id, regions__isnull=True)
         .order_by("pk")
         .first()
     )
+
+
+def _base_zone(apps, db, country_id):
+    """:func:`_oldest_base_zone`, or a new one named after the country,
+    under a name no other zone has."""
+    ShippingZone = apps.get_model("shipping", "ShippingZone")
+    CountryTranslation = apps.get_model("country", "CountryTranslation")
+
+    zone = _oldest_base_zone(apps, db, country_id)
     if zone is not None:
         return zone
     name = (
@@ -62,54 +69,78 @@ def _base_zone(apps, db, country_id):
 
 
 def zone_every_rate(apps, schema_editor):
-    """Put each rate without a zone in its country's base zone.
+    """Put each rate in the base zone of the country it carries, where it
+    is not already in a zone that country's rates are written for.
 
-    The contract release runs this again for the rates the release before
-    shipping zones inserted during the rollout. One whose (provider, kind)
-    the base zone already has a rate for is that rate's duplicate, never
-    chargeable (``shipping.zones.chargeable`` skips a rate without a
-    zone): it is deleted and logged, rather than failing the migration on
-    the unique ``(provider, zone, kind)``.
+    The first run zones every rate. The contract release runs it again
+    for the rates the release before wrote during the rollout: one it
+    inserted (no zone), and one it re-pointed to another country (a
+    country other than the one this release writes for its zone,
+    ``ShippingZone.rate_country_id``: the zone's own for a base zone, none
+    for a region zone). A rate whose (provider, kind) the base zone
+    already prices is that rate's duplicate, never chargeable as written:
+    it is deleted and logged, rather than failing the migration on the
+    unique ``(provider, zone, kind)``. History rows get their country's
+    base zone too, where it has one.
     """
     ShippingRate = apps.get_model("shipping", "ShippingRate")
+    HistoricalShippingRate = apps.get_model(
+        "shipping", "HistoricalShippingRate"
+    )
+    ShippingZoneRegion = apps.get_model("shipping", "ShippingZoneRegion")
     db = schema_editor.connection.alias
     schema = schema_editor.connection.schema_name
 
-    countries = (
-        ShippingRate.objects.using(db)
+    region_zones = ShippingZoneRegion.objects.using(db).values("zone_id")
+    misplaced = ShippingRate.objects.using(db).filter(
+        Q(zone__isnull=True)
+        | Q(zone__in=region_zones)
+        | ~Q(zone__country_id=F("country_id")),
+        country__isnull=False,
+    )
+    for country_id in list(
+        misplaced.order_by().values_list("country_id", flat=True).distinct()
+    ):
+        zone = _base_zone(apps, db, country_id)
+        moving = misplaced.filter(country_id=country_id).exclude(zone=zone)
+        priced = set(
+            ShippingRate.objects.using(db)
+            .filter(zone=zone)
+            .exclude(pk__in=moving.values("pk"))
+            .values_list("provider_id", "kind")
+        )
+        duplicates = []
+        for rate in moving:
+            key = (rate.provider_id, rate.kind)
+            if key in priced:
+                duplicates.append(rate.pk)
+            else:
+                priced.add(key)
+        if duplicates:
+            logger.warning(
+                "Deleted %d shipping rates of %s in schema %s: zone %s "
+                "already has a rate for their provider and kind (ids %s)",
+                len(duplicates),
+                country_id,
+                schema,
+                zone.pk,
+                duplicates,
+            )
+            ShippingRate.objects.using(db).filter(pk__in=duplicates).delete()
+        moving.update(zone=zone)
+
+    for country_id in list(
+        HistoricalShippingRate.objects.using(db)
         .filter(zone__isnull=True, country__isnull=False)
         .order_by()
         .values_list("country_id", flat=True)
         .distinct()
-    )
-    for country_id in list(countries):
-        zone = _base_zone(apps, db, country_id)
-        priced = set(
-            ShippingRate.objects.using(db)
-            .filter(zone=zone)
-            .values_list("provider_id", "kind")
-        )
-        unzoned = ShippingRate.objects.using(db).filter(
-            country_id=country_id, zone__isnull=True
-        )
-        duplicates = [
-            rate.pk
-            for rate in unzoned
-            if (rate.provider_id, rate.kind) in priced
-        ]
-        if duplicates:
-            logger.warning(
-                "Deleted %d shipping rates without a zone in schema %s: "
-                "zone %s already has a rate for their provider and kind "
-                "in %s (ids %s)",
-                len(duplicates),
-                schema,
-                zone.pk,
-                country_id,
-                duplicates,
-            )
-            ShippingRate.objects.using(db).filter(pk__in=duplicates).delete()
-        unzoned.update(zone=zone)
+    ):
+        zone = _oldest_base_zone(apps, db, country_id)
+        if zone is not None:
+            HistoricalShippingRate.objects.using(db).filter(
+                zone__isnull=True, country_id=country_id
+            ).update(zone=zone)
 
 
 def unzone_every_rate(apps, schema_editor):

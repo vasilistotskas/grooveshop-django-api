@@ -292,9 +292,11 @@ accepting Cyprus orders at the Greek flat rate.
 - **`ShippingService.resolve_home_delivery_provider(country_code)`**
   picks the lowest-priority active home-delivery provider that has a
   rate for the country (or, with no country yet, the lowest-priority
-  active one regardless) — shared by `_resolve_shipping_provider` (the
-  order's FK) and `shipping_cost` (the price), so both always agree on
-  which carrier a plain `home_delivery` request routes to.
+  active one regardless), among the carriers checkout's gate takes
+  (`carrier_offers`). `OrderQuoteService.quote` resolves it once and
+  prices it, and order creation assigns that carrier
+  (`CheckoutQuote.shipping_choice`, `_assign_shipping_provider`), so the
+  price and the carrier always agree.
 - **Release N migration** (`shipping/0011_convert_legacy_pricing_to_
   rates.py`) copies each tenant's existing Setting values — or the
   frozen historical default when a row is missing — into GR-only rate

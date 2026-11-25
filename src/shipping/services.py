@@ -401,8 +401,8 @@ class ShippingService:
 
         The order MUST have ``shipping_provider`` set — orders created
         through either of the ``OrderService.create_order_from_cart*``
-        paths always go through ``_resolve_shipping_provider`` which
-        sets it. A missing provider here means the order is genuinely
+        paths always go through ``_assign_shipping_provider``, which
+        sets it from the quote. A missing provider here means the order is genuinely
         provider-less (e.g. flat-rate home delivery without a courier
         adapter) — silently return.
 

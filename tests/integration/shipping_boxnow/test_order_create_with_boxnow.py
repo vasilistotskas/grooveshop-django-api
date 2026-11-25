@@ -131,7 +131,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "shipping_price": "2.50",
             # Registry-driven dispatch — the order serializer resolves
             # the carrier adapter from this explicit ``(provider, kind)``
-            # pair (see ``order/services._resolve_shipping_provider``).
+            # pair (see ``order/services._assign_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
         }

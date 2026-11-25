@@ -1505,9 +1505,9 @@ class OrderViewSet(BaseModelViewSet):
             ),
             "billing_city": validated_data.get("billing_city", ""),
             "billing_zipcode": validated_data.get("billing_zipcode", ""),
-            # Registry-driven shipping dispatch: explicit
-            # ``(shipping_provider_code, shipping_kind)`` flows through
-            # ``_resolve_shipping_provider`` → carrier adapter.
+            # Registry-driven shipping dispatch: the quote prices this
+            # ``(shipping_provider_code, shipping_kind)`` pair, and
+            # ``_assign_shipping_provider`` gives the order its carrier.
             "shipping_provider_code": validated_data.get(
                 "shipping_provider_code"
             ),

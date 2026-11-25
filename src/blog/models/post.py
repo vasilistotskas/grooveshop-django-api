@@ -186,7 +186,7 @@ class BlogPost(
 # written here.
 class BlogPostTranslation(
     TranslatedFieldsModel, SeoTranslationModel, IndexMixin
-):  # ty: ignore[invalid-method-override]
+):  # ty: ignore[incompatible-method-override]
     master = TranslationsForeignKey(
         "blog.BlogPost",
         on_delete=models.CASCADE,

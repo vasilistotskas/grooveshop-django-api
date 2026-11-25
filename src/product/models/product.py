@@ -708,7 +708,7 @@ class Product(
 # written here.
 class ProductTranslation(
     TranslatedFieldsModel, SeoTranslationModel, IndexMixin
-):  # ty: ignore[invalid-method-override]
+):  # ty: ignore[incompatible-method-override]
     master = TranslationsForeignKey(
         "product.Product",
         on_delete=models.CASCADE,

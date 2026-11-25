@@ -468,8 +468,7 @@ class TestAnOverriddenBaseZone:
     @pytest.fixture
     def overridden(self):
         """Two regions, each in a region zone of its own: one delivers
-        home, the other does not. The base zone has a home and a pickup
-        rate."""
+        home, the other does not. The base zone has a home rate."""
         country = CountryFactory(num_regions=0)
         crete, islands = (RegionFactory(country=country) for _ in "ab")
         enable_rate(country, price=MAINLAND)

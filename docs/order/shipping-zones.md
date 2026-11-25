@@ -157,6 +157,9 @@ carrier gate (`carrier_offers`), so the `shipping` and `regions_countries`
 surfaces both declare, in `invalidated_by`:
 
 - `ShippingZone` and `ShippingZoneRegion`;
+- `Region` (and `Country`, for the pickers): public rows, so a platform edit
+  purges every store. A region added to a country, or removed, decides
+  whether its base zone delivers home anywhere (`reaching`);
 - `ShippingProvider`: a carrier switched on or off changes what is
   shippable;
 - `shipping_acs.AcsStation`: ACS offers lockers in a country only while it

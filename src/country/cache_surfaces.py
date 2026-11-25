@@ -28,7 +28,13 @@ SURFACES = (
         # lockers in a country only while it has synced stations there,
         # and a carrier's credentials on ``Tenant`` decide whether it
         # delivers at all (``shipping.tasks.purge_carrier_gate_surfaces``).
+        # The reference rows themselves are public: a platform edit of one
+        # purges every store.
         invalidated_by=(
+            "country.Country",
+            "country.CountryTranslation",
+            "region.Region",
+            "region.RegionTranslation",
             "shipping.ShippingProvider",
             "shipping.ShippingRate",
             "shipping.ShippingZone",

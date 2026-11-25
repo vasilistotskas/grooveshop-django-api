@@ -76,7 +76,7 @@ _DESTRUCTIVE_SQL = re.compile(
 )
 
 _IDENTIFIER = r'(?:"[^"]+"|[A-Za-z_]\w*)'
-_TABLE_REF = rf"(?:{_IDENTIFIER}\.)?(?P<table>{_IDENTIFIER})"
+_TABLE_REF = rf"(?:{_IDENTIFIER}\s*\.\s*)?(?P<table>{_IDENTIFIER})"
 _IF_EXISTS = r"(?:IF\s+EXISTS\s+)?"
 _ALTER_TABLE = re.compile(
     rf"\bALTER\s+TABLE\s+{_IF_EXISTS}(?:ONLY\s+)?{_TABLE_REF}"
@@ -96,6 +96,27 @@ _RENAME = re.compile(
     rf"|(?:COLUMN\s+)?(?P<column>{_IDENTIFIER})\s+TO\b)",
     re.IGNORECASE,
 )
+
+# A quoted identifier is kept, a string constant emptied and a comment made
+# the whitespace PostgreSQL reads it as. A dollar-quoted body is kept: a
+# ``DO`` block's is SQL that runs.
+_QUOTED_OR_COMMENT = re.compile(
+    r"""(?P<identifier>"(?:[^"]|"")*")"""
+    r"""|(?P<constant>'(?:[^']|'')*')"""
+    r"""|--[^\n]*|/\*.*?\*/""",
+    re.DOTALL,
+)
+
+
+def _statements(sql: str) -> str:
+    """``sql`` with nothing in it that only looks like SQL."""
+
+    def replace(match: re.Match[str]) -> str:
+        if match["identifier"]:
+            return match["identifier"]
+        return "''" if match["constant"] else " "
+
+    return _QUOTED_OR_COMMENT.sub(replace, sql)
 
 
 def _unquoted(identifier: str) -> str:
@@ -295,7 +316,7 @@ def _run_sql(
 ) -> list[str]:
     if not walk.allow(migration.app_label, **operation.hints):
         return []
-    sql = _sql_text(operation.sql)
+    sql = _statements(_sql_text(operation.sql))
     if not _DESTRUCTIVE_SQL.search(sql):
         return []
     applied, pending = walk.applied, walk.pending

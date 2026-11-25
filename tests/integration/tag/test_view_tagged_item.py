@@ -181,6 +181,77 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("tag_id", response.data)
 
+    def _field_codes(self, response, field):
+        return [error["code"] for error in response.data["fields"][field]]
+
+    # The read serializer can draw only the models CONTENT_OBJECT_SERIALIZERS
+    # names, and the schema declares contentObject non-nullable. A row
+    # pointing at another model made every read of it a 500, and one
+    # pointing at a missing object served contentObject: null.
+    def test_create_refuses_a_content_type_it_cannot_serve(self):
+        payload = {
+            "tag_id": self.tag.id,
+            "content_type": ContentType.objects.get_for_model(self.tag).id,
+            "object_id": self.tag.id,
+        }
+
+        response = self.client.post(
+            self.get_tagged_item_list_url(), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            self._field_codes(response, "content_type"), ["does_not_exist"]
+        )
+        self.assertEqual(TaggedItem.objects.count(), 1)
+
+    def test_create_refuses_an_object_that_does_not_exist(self):
+        product_type = ContentType.objects.get_for_model(self.product)
+        payload = {
+            "tag_id": self.tag.id,
+            "content_type": product_type.id,
+            "object_id": self.product.id + 1000,
+        }
+
+        response = self.client.post(
+            self.get_tagged_item_list_url(), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "content_object_not_found")
+        self.assertEqual(
+            self._field_codes(response, "object_id"),
+            ["content_object_not_found"],
+        )
+        self.assertEqual(TaggedItem.objects.count(), 1)
+
+    def test_partial_update_refuses_an_object_that_does_not_exist(self):
+        response = self.client.patch(
+            self.get_tagged_item_detail_url(self.tagged_item.id),
+            {"object_id": self.product.id + 1000},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            self._field_codes(response, "object_id"),
+            ["content_object_not_found"],
+        )
+        self.tagged_item.refresh_from_db()
+        self.assertEqual(self.tagged_item.object_id, self.product.id)
+
+    def test_partial_update_refuses_a_content_type_it_cannot_serve(self):
+        response = self.client.patch(
+            self.get_tagged_item_detail_url(self.tagged_item.id),
+            {"content_type": ContentType.objects.get_for_model(self.tag).id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            self._field_codes(response, "content_type"), ["does_not_exist"]
+        )
+
     def test_update_valid(self):
         new_tag = TagFactory(active=True)
         payload = {

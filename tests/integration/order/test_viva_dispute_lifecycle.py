@@ -25,8 +25,9 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderHistory
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.payments import payment_hold, viva_settlement
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.views.viva_webhook import (
     _handle_account_transaction_event,
     _handle_webhook_event,
@@ -210,7 +211,7 @@ class TestDisputeLost:
 
 class TestDisputeLostOnAPartlyRefundedSale:
     def _refund(self, order, amount):
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=order.payment_transactions.get(
                 kind=PaymentTransactionKind.CHARGE
@@ -371,6 +372,70 @@ class TestEventsThatAreNotOurDisputes:
 
         assert not _chargebacks(order).exists()
 
+    def test_a_sale_the_ledger_never_booked_is_read_once(self):
+        """The sale is retrieved once, before the order is locked, and that
+        answer books it: a lost dispute of a payment no webhook booked is
+        recorded against it, with no second Retrieve under the lock."""
+        order = OrderFactory(
+            num_order_items=0,
+            pay_way=PayWayFactory.create_online_payment("viva_wallet"),
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            payment_id="",
+            amount_due=Money(Decimal(str(CAPTURED)), "EUR"),
+            metadata={"viva_order_codes": [str(ORDER_CODE)]},
+        )
+
+        with _viva("ML") as fake, patch(EMAIL):
+            response = _process_dispute_event_in_tenant(
+                sale_id=SALE, transaction_id="wallet-unbooked"
+            )
+
+        assert response.status_code == 200
+        assert fake.retrieved == [SALE]
+        [row] = _chargebacks(order)
+        assert row.charge.provider_reference == SALE
+
+        # No webhook settles a sale Viva lists as a lost dispute: the read
+        # back puts the order on the store's review worklist, never leaves it
+        # PENDING on none.
+        listing = {
+            "Transactions": [
+                {
+                    "TransactionId": SALE,
+                    "StatusId": "ML",
+                    "Amount": CAPTURED,
+                    "ParentId": None,
+                }
+            ],
+            "Success": True,
+        }
+        with (
+            FakeVivaApi(by_order_code={str(ORDER_CODE): (200, listing)}),
+            patch("emails.send.send_email"),
+        ):
+            viva_settlement.settle_landed_payment(order)
+
+        order.refresh_from_db()
+        assert payment_hold.awaits_payment_review(order)
+
+    def test_an_open_dispute_of_the_orders_unbooked_payment_is_noted(self):
+        """An order paid before the ledger recorded its charge: a dispute
+        Viva reports open on that payment (``M``) is money taken, so the
+        charge is booked from the sale already read and the dispute noted,
+        never answered 500 for every retry."""
+        order = _paid_order()
+        order.payment_transactions.all().delete()
+
+        email = _dispute("M", "wallet-open-unbooked")
+
+        assert order.payment_transactions.filter(
+            kind=PaymentTransactionKind.CHARGE, provider_reference=SALE
+        ).exists()
+        order.refresh_from_db()
+        assert order.metadata.get("disputed")
+        email.assert_called_once()
+
     def test_an_unverifiable_sale_answers_500_and_writes_nothing(self):
         order = _paid_order()
 
@@ -459,7 +524,7 @@ class TestRefundRefusedWhileDisputed:
         order.refresh_from_db()
 
         with pytest.raises(PaymentError, match="dispute is open"):
-            OrderService.refund_order(order, reason="goodwill")
+            RefundService.refund_order(order, reason="goodwill")
 
         assert not order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND

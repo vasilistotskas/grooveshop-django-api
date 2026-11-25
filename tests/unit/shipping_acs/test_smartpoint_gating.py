@@ -7,6 +7,8 @@ exist for the delivery country; there is no setting to flip.
 from __future__ import annotations
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from shipping.enum import ShippingKind
 from shipping.interfaces import get_provider
@@ -96,10 +98,63 @@ def test_validate_payload_blocks_when_locker_id_missing():
     assert "acs_station_external_id" in errors
 
 
-def test_validate_payload_passes_with_locker_id():
+def test_validate_payload_passes_with_a_deliverable_station():
+    AcsStationFactory(external_id="LOC-001", branch_code="", country_code="GR")
     adapter = get_provider("acs")
     errors = adapter.validate_order_payload(
         kind=ShippingKind.PICKUP_POINT,
-        payload={"acs_station_external_id": "LOC-001"},
+        payload={"acs_station_external_id": "LOC-001", "country_id": "GR"},
     )
     assert errors == {}
+
+
+@pytest.mark.parametrize(
+    ("country_code", "is_active"),
+    [("CY", True), ("GR", False)],
+    ids=["another-country", "withdrawn"],
+)
+def test_validate_payload_refuses_a_station_it_cannot_deliver_to(
+    country_code, is_active
+):
+    AcsStationFactory(
+        external_id="LOC-001",
+        branch_code="",
+        country_code=country_code,
+        is_active=is_active,
+    )
+    adapter = get_provider("acs")
+    errors = adapter.validate_order_payload(
+        kind=ShippingKind.PICKUP_POINT,
+        payload={"acs_station_external_id": "LOC-001", "country_id": "GR"},
+    )
+    assert set(errors) == {"acs_station_external_id"}
+
+
+def test_a_set_of_countries_is_answered_in_one_station_query(
+    acs_configured_tenant,
+):
+    AcsStationFactory(country_code="GR")
+    AcsStationFactory(country_code="CY", shop_kind=AcsShopKind.SHOP)
+    adapter = get_provider("acs")
+
+    with CaptureQueriesContext(connection) as captured:
+        enabled = adapter.kind_enabled_countries(PICKUP, ["gr", "CY", "BG"])
+
+    assert enabled == {"GR"}
+    station_queries = [
+        q for q in captured if "shipping_acs_acsstation" in q["sql"]
+    ]
+    assert len(station_queries) == 1
+    # The same answer as the one-country gate.
+    assert enabled == {
+        code
+        for code in ("GR", "CY", "BG")
+        if adapter.is_kind_enabled(PICKUP, country_code=code)
+    }
+
+
+def test_no_country_is_enabled_without_acs_credentials():
+    AcsStationFactory(country_code="GR")
+
+    assert not get_provider("acs").kind_enabled_countries(PICKUP, ["GR"])
+    assert not get_provider("acs").kind_enabled_countries(HOME, ["GR"])

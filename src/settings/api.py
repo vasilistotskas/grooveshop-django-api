@@ -53,7 +53,7 @@ REST_FRAMEWORK = {
         "user": None if DEBUG else "150000/day",
         # Per-endpoint scopes. Applied via throttle_classes on specific views
         # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
-        # in core.api.throttling) — the global anon/user throttles continue to
+        # in each app's ``throttles`` module) — the global anon/user throttles continue to
         # apply on top.
         "contact": None if DEBUG else "5/minute",
         "feedback": None if DEBUG else "5/minute",
@@ -155,7 +155,7 @@ REST_FRAMEWORK = {
 }
 
 # How long a cart remembers the gift-card codes it has already tried
-# (``core.api.throttling.GiftCardCodeThrottle``): within it, sending one
+# (``giftcard.throttles.GiftCardCodeThrottle``): within it, sending one
 # of them again is use, not a new guess. About the length of a checkout.
 GIFT_CARD_CODES_SEEN_TTL_SECONDS = int(
     getenv("GIFT_CARD_CODES_SEEN_TTL_SECONDS", "1800")
@@ -193,6 +193,9 @@ SPECTACULAR_SETTINGS = {
     ],
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
+        # After the camel-case hook: a path parameter is named as its URL
+        # template names it (OpenAPI), only query names are camel-cased.
+        "core.api.schema.name_path_parameters_as_their_template",
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api.schema.postprocess_schema_parameters_to_accept_strings",
         "core.api.schema.publish_error_schemas",

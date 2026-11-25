@@ -522,65 +522,6 @@ class TestStripe:
         assert response.status_code == 200, response.data
         close.assert_called_once()
 
-    def test_a_retry_expires_the_open_session_first(self):
-        order, client = _order("stripe", payment_status=PaymentStatus.FAILED)
-        expires = timezone.now() + timedelta(minutes=31)
-        _with_session(order, "cs_1", expires)
-        with (
-            patch.object(
-                stripe.checkout.Session,
-                "retrieve",
-                return_value=_stripe_session("cs_1", "open", expires),
-            ),
-            patch.object(stripe.checkout.Session, "expire") as expire,
-            patch(
-                "order.payments.payment.StripePaymentProvider.process_payment",
-                return_value=(
-                    True,
-                    {
-                        "payment_id": "pi_2",
-                        "status": PaymentStatus.PENDING,
-                        "client_secret": "secret",
-                        "amount": "10.00",
-                        "currency": "EUR",
-                        "provider": "stripe",
-                    },
-                ),
-            ),
-        ):
-            response = client.post(
-                reverse("order-retry-payment", kwargs={"pk": order.pk}),
-                {},
-                format="json",
-            )
-
-        assert response.status_code == 200, response.data
-        expire.assert_called_once_with("cs_1", api_key="sk_test_dummy")
-
-    def test_a_retry_after_a_paid_session_is_refused(self):
-        order, client = _order("stripe", payment_status=PaymentStatus.FAILED)
-        expires = timezone.now() + timedelta(minutes=31)
-        _with_session(order, "cs_1", expires)
-
-        with (
-            patch.object(
-                stripe.checkout.Session,
-                "retrieve",
-                return_value=_stripe_session(
-                    "cs_1", "complete", expires, payment_status="paid"
-                ),
-            ),
-            patch.object(stripe.PaymentIntent, "create") as create,
-        ):
-            response = client.post(
-                reverse("order-retry-payment", kwargs={"pk": order.pk}),
-                {},
-                format="json",
-            )
-
-        assert response.status_code == 400, response.data
-        create.assert_not_called()
-
 
 class TestStripeAfterThisReview:
     """The stand-in review of #768: a delayed payment that failed, a late
@@ -674,7 +615,7 @@ class TestStripeAfterThisReview:
         create.assert_not_called()
 
     def test_a_session_loses_to_an_intent_opened_meanwhile(self):
-        """A retry in one tab opens an intent while "pay now" in another
+        """An agent's delegated card opens an intent while "pay now"
         mints a session: the session records nothing and is expired."""
         order, client = _order("stripe")
         expires = timezone.now() + timedelta(minutes=31)
@@ -699,41 +640,6 @@ class TestStripeAfterThisReview:
         order.refresh_from_db()
         assert "stripe_checkout_session_id" not in (order.metadata or {})
         assert order.payment_id == "pi_2"
-
-    def test_an_intent_loses_to_a_session_opened_meanwhile(self):
-        order, client = _order("stripe", payment_status=PaymentStatus.FAILED)
-
-        def mint_while_a_session_is_recorded(*_args, **_kwargs):
-            Order.objects.filter(pk=order.pk).update(
-                metadata={"stripe_checkout_session_id": "cs_1"}
-            )
-            return (
-                True,
-                {
-                    "payment_id": "pi_2",
-                    "status": PaymentStatus.PENDING,
-                    "client_secret": "secret",
-                    "amount": "10.00",
-                    "currency": "EUR",
-                    "provider": "stripe",
-                },
-            )
-
-        with patch(
-            "order.payments.payment.StripePaymentProvider.process_payment",
-            side_effect=mint_while_a_session_is_recorded,
-        ):
-            response = client.post(
-                reverse("order-retry-payment", kwargs={"pk": order.pk}),
-                {},
-                format="json",
-            )
-
-        assert response.status_code == 409, response.data
-        assert response.data["code"] == "order_changed_during_payment"
-        order.refresh_from_db()
-        assert order.payment_id == ""
-        assert "client_secret" not in response.data
 
     def test_reusing_a_session_closes_an_open_intent(self):
         order, client = _order("stripe", payment_id="pi_1")
@@ -867,7 +773,7 @@ class TestVivaCredentialsPerCall:
             provider._get_basic_auth_header()
 
     def test_an_oauth_only_store_still_settles_its_webhooks(self):
-        from order.views.viva_webhook import _verify_transaction
+        from order.payments.viva_settlement import verify_transaction
 
         transaction = Mock(status_code=200)
         transaction.json.return_value = {
@@ -882,7 +788,7 @@ class TestVivaCredentialsPerCall:
             _oauth_only(),
             patch("requests.get", return_value=transaction),
         ):
-            status, data = _verify_transaction("tx_1")
+            status, data = verify_transaction("tx_1")
 
         assert status == PaymentStatus.COMPLETED
         assert data["order_code"] == 1111

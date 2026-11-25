@@ -23,7 +23,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
-from user.utils.subscription import claim_guest_subscriptions
+from user.services.subscription import claim_guest_subscriptions
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialLogin

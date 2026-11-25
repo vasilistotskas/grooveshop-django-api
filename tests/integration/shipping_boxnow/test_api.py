@@ -13,6 +13,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from shipping_boxnow.factories import BoxNowLockerFactory
+from tests.utils.boxnow import nearest_locker
 
 
 @pytest.mark.django_db
@@ -48,6 +49,126 @@ class TestLockerListEndpoint:
 
         assert "active-001" in ids
         assert "inactive-001" not in ids
+
+
+@pytest.mark.django_db
+class TestLockerListExactFilters:
+    """Exact lookups of one locker a client names (the agent gateway's
+    UCP pickup destination); the active-only rule still holds."""
+
+    @staticmethod
+    def _list(**params):
+        response = APIClient().get(
+            reverse("shipping-boxnow-locker-list"), params
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+        return {
+            (row["externalId"], row["countryCode"])
+            for row in response.json()["results"]
+        }
+
+    def test_external_id_is_exact(self):
+        BoxNowLockerFactory(external_id="exact-4")
+        BoxNowLockerFactory(external_id="exact-40")
+
+        assert self._list(externalId="exact-4") == {("exact-4", "GR")}
+
+    def test_country_code(self):
+        BoxNowLockerFactory(external_id="exact-cy", country_code="CY")
+        BoxNowLockerFactory(external_id="exact-gr", country_code="GR")
+
+        assert self._list(externalId="exact-cy", countryCode="cy") == {
+            ("exact-cy", "CY")
+        }
+        assert self._list(externalId="exact-gr", countryCode="CY") == set()
+
+    def test_a_withdrawn_locker_is_never_listed(self):
+        BoxNowLockerFactory(external_id="exact-gone", is_active=False)
+
+        assert self._list(externalId="exact-gone") == set()
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("boxnow_live_network")
+class TestLockerListBySize:
+    """The compartment size filter and the size fields of each locker."""
+
+    @staticmethod
+    def _list(**params):
+        response = APIClient().get(
+            reverse("shipping-boxnow-locker-list"), params
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+        return {row["externalId"]: row for row in response.json()["results"]}
+
+    def test_the_size_is_an_exact_membership(self):
+        BoxNowLockerFactory(external_id="sz-all", compartment_sizes=[1, 2, 3])
+        BoxNowLockerFactory(external_id="sz-1-3", compartment_sizes=[1, 3])
+        BoxNowLockerFactory(external_id="sz-1", compartment_sizes=[1])
+        BoxNowLockerFactory(external_id="sz-unknown", compartment_sizes=[])
+
+        listed = self._list(compartmentSize=2, search="sz-")
+
+        assert set(listed) == {"sz-all"}
+        assert set(self._list(compartmentSize=1, search="sz-")) == {
+            "sz-all",
+            "sz-1-3",
+            "sz-1",
+        }
+
+    def test_the_sizes_are_serialised_and_compose_with_the_other_filters(self):
+        BoxNowLockerFactory(
+            external_id="sz-cy", country_code="CY", compartment_sizes=[2, 3]
+        )
+        BoxNowLockerFactory(
+            external_id="sz-gr", country_code="GR", compartment_sizes=[2, 3]
+        )
+
+        listed = self._list(
+            compartmentSize=3, countryCode="CY", externalId="sz-cy"
+        )
+
+        assert listed["sz-cy"]["compartmentSizes"] == [2, 3]
+        assert set(listed) == {"sz-cy"}
+
+    def test_a_size_outside_one_to_three_is_a_400(self):
+        response = APIClient().get(
+            reverse("shipping-boxnow-locker-list"), {"compartmentSize": 4}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_limited_availability_follows_the_setting(self, settings):
+        settings.BOXNOW_LIMITED_AVAILABILITY_BELOW = 0.87
+        BoxNowLockerFactory(external_id="av-ok", availability_probability=0.87)
+        BoxNowLockerFactory(
+            external_id="av-low", availability_probability=0.869
+        )
+        BoxNowLockerFactory(
+            external_id="av-unknown", availability_probability=None
+        )
+
+        listed = self._list(search="av-")
+
+        assert listed["av-ok"]["limitedAvailability"] is False
+        assert listed["av-low"]["limitedAvailability"] is True
+        assert listed["av-unknown"]["limitedAvailability"] is False
+
+
+@pytest.mark.django_db
+def test_a_stage_store_ignores_the_size_filter(boxnow_configured_tenant):
+    """No stage locker has a size, so the filter would hide every one."""
+    BoxNowLockerFactory(external_id="st-unknown", compartment_sizes=[])
+
+    response = APIClient().get(
+        reverse("shipping-boxnow-locker-list"),
+        {"compartmentSize": 2, "search": "st-"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert [row["externalId"] for row in response.json()["results"]] == [
+        "st-unknown"
+    ]
 
 
 @pytest.mark.django_db
@@ -92,22 +213,7 @@ class TestLockerNearestEndpoint:
         address fields — the serializer previously declared snake_case names
         with no source, silently dropping them (G0056).
         """
-        mock_locker = {
-            "id": "4",
-            "type": "apm",
-            "imageUrl": "https://cdn.boxnow.gr/apm-4.png",
-            "lat": "38.0",
-            "lng": "23.7",
-            "title": "Test Locker",
-            "name": "Chalandri Locker",
-            "postalCode": "15232",
-            "country": "GR",
-            "note": "",
-            "addressLine1": "Leoforos 125",
-            "addressLine2": "Building B",
-            "region": "el-GR",
-            "distance": 0.5,
-        }
+        mock_locker = nearest_locker()
 
         mock_client = MagicMock()
         mock_client.return_value.find_closest_locker.return_value = mock_locker
@@ -200,10 +306,9 @@ class TestLockerNearestEndpoint:
 
     def _searched_size(self, **headers):
         mock_client = MagicMock()
-        mock_client.return_value.find_closest_locker.return_value = {
-            "id": "4",
-            "type": "apm",
-        }
+        mock_client.return_value.find_closest_locker.return_value = (
+            nearest_locker()
+        )
         with patch("shipping_boxnow.client.BoxNowClient", mock_client):
             response = self.client.post(
                 self._url(),
@@ -234,10 +339,9 @@ class TestLockerNearestEndpoint:
 
     def test_a_size_sent_by_the_client_is_ignored(self):
         mock_client = MagicMock()
-        mock_client.return_value.find_closest_locker.return_value = {
-            "id": "4",
-            "type": "apm",
-        }
+        mock_client.return_value.find_closest_locker.return_value = (
+            nearest_locker()
+        )
         with patch("shipping_boxnow.client.BoxNowClient", mock_client):
             response = self._post(compartmentSize=3)
         assert response.status_code == status.HTTP_200_OK

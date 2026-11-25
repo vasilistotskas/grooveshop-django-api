@@ -8,7 +8,7 @@ atomically**: ``GETDEL`` reads and deletes in one round trip, so of two
 requests with one ticket exactly one gets the user and the other nothing,
 and an intercepted ticket is worthless after its first use.
 
-Every ticket lives under ``STRICT_NAMESPACE`` (``core.caches``): a miss here
+Every ticket lives under ``STRICT_NAMESPACE`` (``core.cache_backend``): a miss here
 switches a security control off, so an unreachable Redis raises instead of
 failing open (a lost ``set`` would hand out a ticket nobody can redeem, a
 lost ``GETDEL`` would leave one redeemable). The cache key function puts the
@@ -25,7 +25,7 @@ import secrets
 
 from django.core.cache import cache
 
-from core.caches import STRICT_NAMESPACE
+from core.cache_backend import STRICT_NAMESPACE
 
 logger = logging.getLogger(__name__)
 

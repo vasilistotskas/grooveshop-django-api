@@ -1,50 +1,25 @@
-import json
-import logging
-
-from celery.exceptions import CeleryError
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import DatabaseError, connection, transaction
-from django.middleware.csrf import get_token
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
     extend_schema_view,
 )
-from kombu.exceptions import OperationalError as BrokerOperationalError
-from redis import Redis, RedisError
 from rest_framework import serializers, status
 from rest_framework.decorators import (
     action,
-    api_view,
-    authentication_classes,
-    permission_classes,
-    throttle_classes,
 )
 from rest_framework.metadata import SimpleMetadata
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from core.api.permissions import IsStoreStaff
-from core.api.serializers import (
-    ErrorResponseSerializer,
-    HealthCheckResponseSerializer,
-    PublicSettingsSerializer,
-    SettingDetailSerializer,
-    SettingSerializer,
-)
-from core.celery import celery_app
+from core.api.action_config import SerializersConfig
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
-from core.store_settings import PUBLIC_SETTING_KEYS
-from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
-from tenant.membership import is_store_staff
-
-logger = logging.getLogger(__name__)
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 available_languages = [
@@ -382,7 +357,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
 # Apply an extra action's ``@action(...)`` arguments when the view is
 # wired by hand, as DRF's router does.
 #
-# The URL confs call ``ViewSet.as_view({"post": "retry_payment"})``
+# The URL confs call ``ViewSet.as_view({"post": "create_checkout_session"})``
 # directly, and only the router merges the action's decorator
 # arguments (``throttle_classes``, ``permission_classes``,
 # ``pagination_class``, ``queryset``, ...) into the view it builds
@@ -520,314 +495,3 @@ class BaseModelViewSet(
         meta = Metadata()
         data = meta.determine_metadata(request, self)
         return Response(data)
-
-
-def _broker_errors() -> tuple[type[BaseException], ...]:
-    """What a ping raises when the broker is down or drops the connection.
-
-    kombu raises its own ``OperationalError`` when it cannot connect, and
-    the transport's connection and channel errors from a connection it
-    already holds: after a broker restart, the first ping on the pooled
-    connection raised ``ConnectionResetError``, and ``health_check``
-    answered 500 instead of ``celery: false``.
-    """
-    with celery_app.connection_for_write() as broker:
-        return (
-            BrokerOperationalError,
-            *broker.connection_errors,
-            *broker.channel_errors,
-        )
-
-
-# `@extend_schema` over `@api_view` is drf-spectacular's own documented
-# pattern (see its FAQ). The suppressions on the decorators below are a ty
-# limitation, not a defect here: `djangorestframework-stubs` declares
-# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
-# annotated with the class's own TypeVar — and ty will not resolve that
-# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
-# Reduced to 25 lines with no Django involved: the same Protocol with a
-# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
-# Upstream master still declares it the same way, so a stubs bump does
-# not help. Suppressed per line rather than per file so real
-# argument-type errors in these modules are still reported.
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    summary=_("Check the health status of database, Redis, and Celery"),
-    description=_("Check the health status of database, Redis, and Celery"),
-    tags=["Health"],
-    responses=HealthCheckResponseSerializer,
-)
-@api_view(["GET"])
-# No throttling: DRF's default throttles hit the Redis cache before the
-# view runs, so a Redis outage would 500 this endpoint — turning the
-# dependency check into a hard failure instead of the graceful
-# per-service booleans below. Probes also must never consume (or
-# exhaust) the shared anonymous throttle bucket.
-@throttle_classes([])
-def health_check(request):
-    health_status = {
-        "database": False,
-        "redis": False,
-        "celery": False,
-    }
-
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        health_status["database"] = True
-    except DatabaseError:
-        health_status["database"] = False
-
-    try:
-        redis_conn = Redis.from_url(settings.REDIS_URL)
-        try:
-            redis_conn.ping()
-            health_status["redis"] = True
-        finally:
-            redis_conn.close()
-    except RedisError:
-        health_status["redis"] = False
-
-    try:
-        celery_status = celery_app.control.ping(timeout=3)
-        health_status["celery"] = bool(celery_status)
-    except (CeleryError, *_broker_errors()):
-        health_status["celery"] = False
-
-    response = Response(health_status)
-    get_token(request)
-    return response
-
-
-@extend_schema(exclude=True)  # ty: ignore[invalid-argument-type]
-@api_view(["GET"])
-@authentication_classes([])
-@permission_classes([AllowAny])
-# No throttling — see health_check. For this endpoint it would also be
-# a hidden shared dependency: the throttle's Redis GET runs before the
-# view, so a Redis blip would fail the probe on every pod at once even
-# though the view itself touches no backing service.
-@throttle_classes([])
-def health_live(request):
-    """Lightweight probe — confirms the worker processes requests.
-
-    Unlike ``health_check`` (which pings the database, Redis, and Celery
-    and is suited to the *startup* gate), this touches no backing
-    service, so a slow or unavailable dependency can never fail the
-    Kubernetes readiness/liveness probes and de-register or restart
-    healthy workers.
-    """
-    return Response({"status": "ok"})
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    summary=_("List all available settings"),
-    description=_("Retrieve all settings with their names, values, and types"),
-    tags=["Settings"],
-    responses={
-        200: SettingSerializer(many=True),
-        500: ErrorResponseSerializer,
-    },
-)
-@api_view(["GET"])
-# Per-store data, so the store's own staff may read it. It was
-# gated on IsPlatformSuperuser, which on a tenant host reads
-# is_superuser off a tenant-schema row — see is_platform_superuser.
-@permission_classes([IsStoreStaff])
-def list_settings(request):
-    """List all available settings with their values."""
-    try:
-        from extra_settings.models import Setting
-
-        settings_list = []
-        all_settings = Setting.objects.all()
-
-        for setting in all_settings:
-            settings_list.append(
-                {
-                    "name": setting.name,
-                    "value": str(setting.value),
-                    "type": setting.value_type,
-                }
-            )
-
-        from core.api.serializers import SettingSerializer
-
-        serializer = SettingSerializer(settings_list, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception:
-        logger.exception("Error listing settings")
-
-        return Response(
-            {
-                "detail": _("Failed to retrieve settings"),
-                "code": "settings_unavailable",
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    summary=_("Get setting by key"),
-    description=_("Retrieve a specific setting value by its key name"),
-    tags=["Settings"],
-    parameters=[
-        OpenApiParameter(
-            name="key",
-            description=_("Setting key name (e.g., GIFT_CARD_MIN_AMOUNT)"),
-            required=True,
-            type=str,
-            location=OpenApiParameter.QUERY,
-        ),
-    ],
-    responses={
-        200: SettingDetailSerializer,
-        404: ErrorResponseSerializer,
-        500: ErrorResponseSerializer,
-    },
-)
-@api_view(["GET"])
-def get_setting_by_key(request):
-    """Get a specific setting by its key name.
-
-    Public (whitelisted) keys are accessible without authentication.
-    All other keys require admin access.
-    """
-    try:
-        from core.store_settings import DECLARED_DEFAULTS, store_setting
-
-        key = request.query_params.get("key")
-
-        if not key:
-            error_data = {
-                "detail": _("Setting key is required"),
-                "error": "missing_key",
-                "code": "missing_key",
-            }
-            return Response(
-                error_data,
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # This endpoint serves the store settings the platform declares,
-        # nothing else. `key` comes straight off the query string, and
-        # an unbounded lookup once read the Django settings module
-        # through django-extra-settings' conf fallback: any staff token
-        # got `SECRET_KEY`. That fallback is off now, and an undeclared
-        # name is indistinguishable from one that does not exist.
-        if key not in DECLARED_DEFAULTS:
-            return Response(
-                {
-                    "detail": _("Setting not found or access denied."),
-                    "code": "setting_not_found",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if (key not in PUBLIC_SETTING_KEYS) and (
-            not is_store_staff(request.user)
-        ):
-            return Response(
-                {
-                    "detail": _("Setting not found or access denied."),
-                    "code": "setting_not_found",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        serializer = SettingDetailSerializer(
-            {
-                "name": key,
-                "value": _serialize_setting_value(store_setting(key)),
-            }
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception:
-        logger.exception("Error retrieving setting")
-
-        return Response(
-            {
-                "detail": _("Failed to retrieve setting"),
-                "code": "setting_unavailable",
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-
-def _serialize_setting_value(value) -> str:
-    # json-typed settings hold dicts/lists — ``str()`` would produce a
-    # Python repr (single quotes) the storefront can't JSON.parse.
-    if isinstance(value, dict | list):
-        return json.dumps(value)
-    return str(value)
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    summary=_("Get public settings"),
-    description=_(
-        "Retrieve every anonymously readable store setting in one call, "
-        "keyed by setting name: every PUBLIC_SETTING_KEYS entry, with "
-        "the store's value or, when the store has none, the value the "
-        "platform declares for it."
-    ),
-    tags=["Settings"],
-    responses={
-        200: PublicSettingsSerializer,
-        500: ErrorResponseSerializer,
-    },
-)
-@api_view(["GET"])
-def get_public_settings(request):
-    """The storefront's ONE settings read per render.
-
-    Every server render used to fetch its feature flags and store
-    values one key at a time — around thirty ``settings/get`` round
-    trips per page — which is what saturated the storefront under a
-    crawler burst (Ahrefs, 2026-09-11). One query in the request's
-    tenant schema replaces them; the storefront caches the payload per
-    tenant.
-
-    Every key is present with its effective value: the store's, else
-    the one the platform declares. So no client keeps a default of its
-    own that can drift from the declared one.
-    """
-    try:
-        from contact.attachments import parse_attachment_types
-        from core.store_setting_shapes import (
-            public_scalar_values,
-            public_structured_values,
-        )
-        from core.store_settings import store_settings
-
-        raw = store_settings(PUBLIC_SETTING_KEYS)
-        typed = public_structured_values(raw)
-        serializer = PublicSettingsSerializer(
-            {
-                "settings": {
-                    key: _serialize_setting_value(value)
-                    for key, value in sorted(raw.items())
-                },
-                "announcement_bar": typed["ANNOUNCEMENT_BAR"],
-                "auth_panel": typed["AUTH_PANEL"],
-                "funding_banner": typed["FUNDING_BANNER"],
-                "store_offices": typed["STORE_OFFICES"] or [],
-                "business_hours": typed["BUSINESS_HOURS"],
-                "values": public_scalar_values(raw),
-                "contact_attachments_types": list(
-                    parse_attachment_types(raw["CONTACT_ATTACHMENTS_TYPES"])
-                ),
-            }
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception:
-        logger.exception("Error retrieving public settings")
-
-        return Response(
-            {
-                "detail": _("Failed to retrieve settings"),
-                "code": "settings_unavailable",
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )

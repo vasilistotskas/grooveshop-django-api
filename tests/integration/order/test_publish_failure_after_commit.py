@@ -48,7 +48,9 @@ def test_a_broker_failure_after_the_order_commits_keeps_the_order_flow():
         num_order_items=0,
     )
     order.pay_way = PayWayFactory.create_offline_payment()
-    order.save(update_fields=["pay_way"])
+    # Placed now: the factory's own save already confirmed it.
+    order.confirmed_at = None
+    order.save(update_fields=["pay_way", "confirmed_at"])
 
     with (
         patch.object(

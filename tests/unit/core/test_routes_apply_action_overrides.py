@@ -6,8 +6,8 @@ decorator arguments into the view (``SimpleRouter.get_routes``:
 ``initkwargs.update(action.kwargs)``). Wired by hand, every
 ``throttle_classes``, ``permission_classes``, ``pagination_class`` or
 ``queryset`` declared on an action was silently ignored — among them the
-payment-attempt throttles of ``create_payment_intent`` and
-``retry_payment``. ``RouterActionOverridesMixin`` restores the router's
+payment-attempt throttles of ``create_checkout_session`` and
+``confirm_agent_payment``. ``RouterActionOverridesMixin`` restores the router's
 behaviour; this walks the real URL conf to prove every route gets it.
 """
 
@@ -63,7 +63,9 @@ def test_every_routed_action_carries_its_declared_overrides():
 
 
 def test_the_payment_attempt_throttles_reach_the_payment_endpoints():
-    view = get_resolver().resolve("/api/v1/order/1/retry-payment").func
+    view = (
+        get_resolver().resolve("/api/v1/order/1/create_checkout_session").func
+    )
 
     assert {
         throttle.__name__ for throttle in view.initkwargs["throttle_classes"]

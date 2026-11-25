@@ -10,11 +10,15 @@ the pickup point both the quote and the order take.
 
 from __future__ import annotations
 
+from django.db.models import prefetch_related_objects
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from product.managers.product import main_image_prefetch
+from promotion.enum import CouponRejectionReason
 from shipping.enum import FreeShippingSource, ShippingKind
+from shipping.interfaces import providers_by_field_rank
 
 
 class PickupPointSerializer(serializers.Serializer):
@@ -23,28 +27,20 @@ class PickupPointSerializer(serializers.Serializer):
     take the same fields, so the quote's ``cartDigest`` covers the
     point the order is sent to."""
 
-    # BoxNow locker (required when carrier=boxnow + kind=pickup_point)
-    boxnow_locker_id = serializers.CharField(
-        max_length=64,
-        required=False,
-        allow_blank=True,
-        help_text=_("BoxNow APM locker ID from the widget"),
-    )
-    # ACS station, only honoured when shipping_provider_code='acs'.
-    acs_station_external_id = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_(
-            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
-        ),
-    )
-    acs_station_branch = serializers.CharField(
-        max_length=32,
-        required=False,
-        allow_blank=True,
-        help_text=_("ACS_Station_Branch_Destination value."),
-    )
+    def get_fields(self):
+        """Every registered carrier's pickup-point fields
+        (``checkout_fields`` named in its ``location_keys``, by its
+        ``field_rank``), then the declared ones: the carriers register
+        after this class is defined."""
+        return {
+            **{
+                name: field
+                for carrier in providers_by_field_rank()
+                for name, field in carrier.checkout_fields().items()
+                if name in carrier.location_keys
+            },
+            **super().get_fields(),
+        }
 
 
 class ExpectedTotalSerializer(serializers.Serializer):
@@ -83,6 +79,105 @@ class QuoteAppliedPromotionSerializer(serializers.Serializer):
             entry.promotion.safe_translation_getter("name", any_language=True)
             or ""
         )
+
+
+class QuoteLineSerializer(serializers.Serializer):
+    """One cart line as the quote priced it (``QuoteLine``)."""
+
+    id = serializers.IntegerField(
+        source="item_id", help_text=_("The cart item the line is.")
+    )
+    product_id = serializers.IntegerField(source="product.pk")
+    product_name = serializers.SerializerMethodField(
+        help_text=_("The product's name in the request's language.")
+    )
+    main_image_path = serializers.CharField(
+        source="product.main_image_path",
+        help_text=_(
+            "Storage path of the product's main image; empty without one."
+        ),
+    )
+    quantity = serializers.IntegerField()
+    unit_price = serializers.DecimalField(
+        source="unit_price.amount",
+        help_text=_("The price per unit the shopper pays, before promotions."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    total_price = serializers.DecimalField(
+        source="total_price.amount",
+        help_text=_("quantity units at unitPrice, before promotions."),
+        max_digits=11,
+        decimal_places=2,
+    )
+    promotion_discount = serializers.DecimalField(
+        help_text=_(
+            "The part of discountTotal this line carries; the lines' "
+            "amounts sum to it."
+        ),
+        max_digits=11,
+        decimal_places=2,
+    )
+
+    def get_product_name(self, line) -> str:
+        return (
+            line.product.safe_translation_getter("name", any_language=True)
+            or ""
+        )
+
+
+class AppliedCouponSerializer(serializers.Serializer):
+    """What one attached coupon code does for the cart
+    (``CouponVerdict``): exactly one of ``amount``, ``freeShipping``,
+    ``gift`` and ``rejection`` holds. The cart's ``appliedCoupons`` and
+    the quote's are rendered by it and declared by
+    ``APPLIED_COUPONS_SCHEMA``."""
+
+    code = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=11, decimal_places=2)
+    free_shipping = serializers.BooleanField()
+    gift = serializers.BooleanField()
+    rejection = serializers.CharField(allow_null=True)
+
+
+# The one declaration of an ``appliedCoupons`` list, the cart's and the
+# quote's. Inline, not a component: drf-spectacular lifts an enum on a
+# component's property into a ``oneOf`` of enum components, which the
+# consumers typed against this nullable string read as a type change.
+APPLIED_COUPONS_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string"},
+            "amount": {
+                "type": "number",
+                "description": (
+                    "Money this code takes off; 0 when its benefit is not "
+                    "money, or it is refused"
+                ),
+            },
+            "freeShipping": {
+                "type": "boolean",
+                "description": "This code waives shipping",
+            },
+            "gift": {
+                "type": "boolean",
+                "description": "This code earns a gift the order ships with",
+            },
+            "rejection": {
+                "type": "string",
+                "nullable": True,
+                "enum": [*CouponRejectionReason.values, None],
+                "description": (
+                    "Why the promotions refuse the attached code now; null "
+                    "while it applies"
+                ),
+            },
+        },
+        "required": ["code", "amount", "freeShipping", "gift", "rejection"],
+    },
+}
 
 
 class QuoteBlockingCouponSerializer(serializers.Serializer):
@@ -147,6 +242,15 @@ class QuoteShippingOptionSerializer(serializers.Serializer):
             "choosing it is refused."
         ),
     )
+    compartment_size = serializers.IntegerField(
+        allow_null=True,
+        help_text=_(
+            "The locker compartment size the cart packs into (1 small, 2 "
+            "medium, 3 large) on a BOX NOW pickup option; null elsewhere "
+            "and when the cart fits none. Pass it as ``compartmentSize`` "
+            "to list the lockers that take this cart."
+        ),
+    )
 
 
 class QuotePayWayOptionSerializer(serializers.Serializer):
@@ -175,6 +279,14 @@ class CheckoutQuoteSerializer(serializers.Serializer):
     ``amountDue`` and ``expectedTotal`` without both.
     """
 
+    lines = serializers.SerializerMethodField(
+        help_text=_(
+            "The cart's lines the quote priced, from the same read as "
+            "itemsSubtotal and cartDigest: what the digest covers of each "
+            "(product, quantity, unit price, promotion money), with the "
+            "product's name and image."
+        ),
+    )
     items_subtotal = serializers.DecimalField(
         source="items_subtotal.amount",
         help_text=_("The cart's lines at the prices the shopper pays."),
@@ -193,6 +305,12 @@ class CheckoutQuoteSerializer(serializers.Serializer):
         help_text=_(
             "One entry per promotion that took money off; the amounts "
             "sum to discountTotal."
+        ),
+    )
+    applied_coupons = serializers.SerializerMethodField(
+        help_text=_(
+            "The verdict on each coupon code attached to the cart, as "
+            "the promotions in this quote decided it."
         ),
     )
     blocking_coupon = QuoteBlockingCouponSerializer(
@@ -274,6 +392,19 @@ class CheckoutQuoteSerializer(serializers.Serializer):
             "one."
         ),
     )
+
+    @extend_schema_field(APPLIED_COUPONS_SCHEMA)
+    def get_applied_coupons(self, quote) -> list:
+        return list(AppliedCouponSerializer(quote.coupons, many=True).data)
+
+    @extend_schema_field(QuoteLineSerializer(many=True))
+    def get_lines(self, quote) -> list:
+        # Each line shows its product's main image: one query for all
+        # of them, not one per line.
+        prefetch_related_objects(
+            [line.product for line in quote.lines], main_image_prefetch()
+        )
+        return list(QuoteLineSerializer(quote.lines, many=True).data)
 
 
 class CartQuoteSerializer(CheckoutQuoteSerializer):

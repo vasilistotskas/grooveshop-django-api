@@ -1,10 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
@@ -28,7 +28,9 @@ from core.validators import address as address_rules
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     DISPATCHED_STATUSES,
+    ORDER_STATUSES_SHIPPING_NOTHING,
     PAYMENT_CLOSING_STATUSES,
+    PAYMENT_STATUSES_KEEPING_NOTHING,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
@@ -120,6 +122,56 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         final order (audit trail, stock-discrepancy debugging).
     """
 
+    #: The buyer's delivery address: what a pickup-point order locks against
+    #: an owner's edit (``OrderWriteSerializer``), and part of
+    #: ``PERSONAL_FIELDS``.
+    SHIPPING_ADDRESS_FIELDS: ClassVar[tuple[str, ...]] = (
+        "street",
+        "street_number",
+        "address_line_2",
+        "city",
+        "zipcode",
+        "place",
+        "floor",
+        "location_type",
+    )
+    #: The invoice's counterparty: personal, and GDPR erasure keeps it only
+    #: on an order whose invoice was issued (``order.privacy``), with
+    #: that invoice (tax law).
+    BILLING_FIELDS: ClassVar[tuple[str, ...]] = (
+        "billing_vat_id",
+        "billing_country",
+        "billing_company_name",
+        "billing_tax_office",
+        "billing_activity",
+        "billing_street",
+        "billing_street_number",
+        "billing_city",
+        "billing_zipcode",
+    )
+    #: The buyer's own data on an order: what a data export lists and what
+    #: GDPR erasure clears, ``BILLING_FIELDS`` of an issued invoice excepted
+    #: (``order.privacy``). A new personal field joins here, and
+    #: ``tests/unit/user/test_erasure_covers_every_order_personal_field.py``
+    #: fails for one the staging anonymiser scrubs that is missing.
+    PERSONAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        *SHIPPING_ADDRESS_FIELDS,
+        "customer_notes",
+        *BILLING_FIELDS,
+    )
+    #: The paths inside ``metadata`` that hold the buyer's own data: the
+    #: browser identity the Conversions API reads (IP address, user agent,
+    #: Meta's browser and click ids) and the reason typed when cancelling.
+    #: Exported and erased with ``PERSONAL_FIELDS``.
+    PERSONAL_METADATA: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("meta",),
+        ("cancellation", "reason"),
+    )
+
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
@@ -171,10 +223,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     first_name = models.CharField(_("First Name"), max_length=255)
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
-    street_number = models.CharField(_("Street Number"), max_length=255)
+    street_number = models.CharField(
+        _("Street Number"), max_length=255, blank=True
+    )
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
+    # What the street line does not hold: a flat, a floor, a building
+    # (UCP's ``extended_address``). Free text, separate from the notes; the
+    # ACS voucher carries it in ``Delivery_Notes``, as ACS's
+    # ``Recipient_Address`` is the street alone.
+    address_line_2 = models.CharField(
+        _("Address line 2"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     phone = PhoneNumberField(_("Phone Number"))
     customer_notes = models.TextField(
         _("Customer Notes"), blank=True, default=""
@@ -256,6 +321,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     status_updated_at = models.DateTimeField(
         _("Status Updated At"), auto_now=False, null=True, blank=True
+    )
+    confirmed_at = models.DateTimeField(
+        _("Confirmed At"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the order was confirmed and the customer and the store "
+            "were told about it: when it was placed, or, for a card "
+            "payment, when the payment went through. Empty for a card "
+            "order that was never paid."
+        ),
     )
     shipped_at = models.DateTimeField(
         _("Shipped At"),
@@ -441,6 +518,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         default="",
         db_default="",
         help_text=_("Series and number of that credit invoice."),
+    )
+    personal_data_erased_at = models.DateTimeField(
+        _("Personal data erased at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the buyer's personal data was erased (GDPR). Carrier data "
+            "that arrives later is erased too."
+        ),
     )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
@@ -711,7 +797,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # reported ``updated_at`` equal to its ``created_at``.
         #
         # That is not cosmetic. ``updated_at`` is a documented API filter
-        # (order/filters.py exposes gte/lte/date), so "orders changed
+        # (src/order/filters.py exposes gte/lte/date), so "orders changed
         # since X" silently omitted every status change. Worse,
         # ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
         # bucket with ``updated_at__lt=now - GRACE``, intending a retry
@@ -720,7 +806,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # cancellable on the very next run, with no grace at all.
         #
         # Fixed here rather than at ~35 call sites so it cannot be missed
-        # again — order/inventory/stock.py and the shipping services already
+        # again — src/order/inventory/stock.py and the shipping services already
         # pass "updated_at" by hand, which is the convention Order's own saves
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing
@@ -816,17 +902,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         if not self.zipcode:
             errors["zipcode"] = [_("Zipcode is required.")]
 
-        required_address_fields = ["street", "street_number", "city"]
-        missing_fields = [
-            field
-            for field in required_address_fields
-            if not getattr(self, field)
-        ]
-
-        if missing_fields:
-            errors["address"] = [
-                _("Street, street number, and city are required.")
-            ]
+        # Each under its own field, so a form shows it on that input (a key
+        # that is no field makes ``ModelForm.add_error`` raise: a 500 in the
+        # admin). A pickup point's street line may name no number
+        # (``OrderCreateFromCartSerializer._deliver_to_pickup_point``).
+        required_address_fields = ["street", "city"]
+        if self.shipping_kind != ShippingKind.PICKUP_POINT:
+            required_address_fields.append("street_number")
+        for field in required_address_fields:
+            if not getattr(self, field):
+                errors[field] = [
+                    self._meta.get_field(field).error_messages["blank"]
+                ]
 
         if not errors:
             # Postcode format + street/number mix-ups, only for an
@@ -845,10 +932,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         when deductions — promotion, loyalty redemption, gift card —
         cover the whole total (see ``is_paid``); ``calculate_order_total_
         amount`` is exactly that remainder. Anything else is a payment
-        booked on an order whose amount due was never set: the admin
-        form, which edits both fields, is the path this guards (the demo
+        booked on an order whose amount due was never set (the demo
         fixtures that produced eight such rows no longer go through
-        ``save`` at all).
+        ``save`` at all). Model validation refuses to save such a row,
+        whatever the save changes; the admin shows both fields read-only
+        (``OrderAdmin.readonly_fields``), so the error is the order's, not
+        a field's.
 
         Not a ``CheckConstraint``: the total is a sum over the order's
         lines, which a row constraint cannot see. An unsaved order has
@@ -860,8 +949,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             return {}
         if self.calculate_order_total_amount().amount == 0:
             return {}
+        # Not under ``amount_due``: a form error on a read-only field has no
+        # input to land on (``ModelForm.add_error`` raises: a 500).
         return {
-            "amount_due": [
+            NON_FIELD_ERRORS: [
                 _(
                     "A completed payment needs an amount due, unless "
                     "discounts, loyalty points or gift cards cover the "
@@ -951,7 +1042,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def full_address(self) -> str:
-        return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
+        """The delivery address on one line: the street and its number, the
+        address line 2 when there is one, then the postcode and the city
+        ("Ερμού 12, 3ος όροφος, 10563 Αθήνα")."""
+        street = f"{self.street} {self.street_number}".strip()
+        place = f"{self.zipcode} {self.city}".strip()
+        return ", ".join(
+            part for part in (street, self.address_line_2, place) if part
+        )
 
     @property
     def customer_full_name(self) -> str:
@@ -1049,6 +1147,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         Cash-on-delivery is never "awaiting" — nothing is owed online,
         so those carts still clear the moment the order is placed.
+
+        A settled payment (``SETTLED_PAYMENT_STATUSES``) awaits nothing,
+        whichever it is: an order paid and then partly refunded still
+        ships and gets its courier voucher. The one-row form of
+        ``order.managers.order.awaiting_online_payment_q``.
         """
         pay_way = self.pay_way
         if (
@@ -1056,7 +1159,24 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             or PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
         ):
             return False
-        return not self.is_paid
+        return self.payment_status not in SETTLED_PAYMENT_STATUSES
+
+    @property
+    def ships_nothing(self) -> bool:
+        """True when no parcel is to leave for this order: it was canceled
+        or refunded as an order, or it was paid online and the store keeps
+        nothing of the payment (a full refund leaves the order's own status
+        where it was). The carriers refuse to create a shipment for it, and
+        their admin buttons say why. The one-row form of
+        ``order.managers.order.ships_nothing_q``."""
+        if self.status in ORDER_STATUSES_SHIPPING_NOTHING:
+            return True
+        pay_way = self.pay_way
+        return (
+            pay_way is not None
+            and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
+            and self.payment_status in PAYMENT_STATUSES_KEEPING_NOTHING
+        )
 
     @property
     def can_be_canceled(self) -> bool:
@@ -1071,7 +1191,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """Whether the customer's cancel button should be on offer.
 
         A customer cancel asks the courier to take the parcel back
-        before the order changes (``OrderService.cancel_order``), so on
+        before the order changes (``OrderLifecycleService.cancel_order``), so on
         top of the status rule the offer ends once local data shows the
         courier would refuse: an ACS voucher already on an issued pickup
         list, a BoxNow parcel past ``NEW``. Read from local rows only —

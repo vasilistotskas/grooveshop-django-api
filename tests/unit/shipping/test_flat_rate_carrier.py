@@ -34,7 +34,7 @@ class TestRegistration(TestCase):
 
     def test_it_asks_for_no_per_order_payload(self):
         """No locker, no pickup point, nothing for the shopper to pick."""
-        assert FlatRateCarrier.payload_keys == ()
+        assert get_provider("flat_rate").checkout_fields() == {}
 
     def test_every_kind_is_enabled_without_credentials(self):
         """The point of the adapter.

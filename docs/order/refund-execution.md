@@ -27,9 +27,9 @@ refunded, payment by payment) and:
 - works in **three steps, so no transaction is open while a provider answers**.
   Every connection kills a session idle in a transaction after ten seconds
   (`idle_in_transaction_session_timeout`, `src/settings/database.py`), and
-  `refund_order` used to hold its transaction and the order lock across the
-  provider's HTTP call: a slow provider meant a refund made there and lost here
-  (and, inside `cancel_order`, a whole cancel rolled back). Now: **(1) claim**:
+  a transaction held across the provider's HTTP call would be killed on a
+  slow answer, leaving a refund made there and lost here (and, inside
+  `cancel_order`, a whole cancel rolled back). So: **(1) claim**:
   under the order lock, validate against the ledger and write one
   `RefundAttempt` per share (`src/order/models/refund_attempt.py`: order,
   `kind` `PROVIDER` or `STORED_VALUE`, the charge it refunds (none for stored
@@ -40,12 +40,13 @@ refunded, payment by payment) and:
   settled or declined attempt lets go (`RefundAttempt.objects.live()`). **(2)
   call** the provider with
   `idempotency_key=f"refund-{attempt.idempotency_key}"` and no transaction
-  open. **(3) record**: under the lock again, `record_refund` writes the REFUND
-  row, settles the attempt and signals `order_refunded`;
+  open. **(3) record**: under the lock again, `RefundService.book_refund` books
+  it (the REFUND row through `PaymentLedger.record_refund`, then the attempt
+  and its allocation) and `order_refunded` is signalled;
 - records each refund the provider accepted as it goes, and signals it, so a
   failure on the second payment keeps (and has announced) the first; the shares
   after a refused one are released (`DECLINED`), they were never called;
-- returns a `RefundResult` (`src/order/services.py`): `refunded` (the money
+- returns a `RefundResult` (`src/order/refunds/service.py`): `refunded` (the money
   that actually moved, a `Money`), `refund_ids`, and `declined` (the provider's
   answer for the share it did not make, `None` when every share was). Never a
   yes/no: a refund declined part-way reports what DID move, so no caller tells
@@ -53,9 +54,8 @@ refunded, payment by payment) and:
   `paid_something` are the two questions callers ask). `declined["error"]` can
   carry raw provider text, so it is for logs and staff screens, never a
   customer;
-- for an order whose capture the ledger never recorded (it settled while the
-  previous release was serving, or was created from an already-succeeded intent
-  whose event never reached it), reads the capture from the provider once and
+- for an order whose capture the ledger never recorded (for example one created
+  from an already-succeeded intent whose event never reached it), reads the capture from the provider once and
   records it (`PaymentLedger.ensure_charge`); a capture the provider cannot
   confirm refuses the refund (staff NOTE, nothing sent) instead of leaving
   money returned and the order unbooked.
@@ -87,7 +87,7 @@ refund may have been made, writes a staff note saying so, and lets the webhook,
 a retry or the reconciliation below settle it. It keeps holding its amount
 until one does. **A webhook that books the refund mid-call** (`refund.created`
 or 1797 arriving before step 3) settles the matching `PENDING` attempt (same
-charge, same amount, whatever its age) in `record_refund`, and step 3 then
+charge, same amount, whatever its age) in `RefundService.book_refund`, and step 3 then
 books nothing and signals nothing: the refund is counted once and announced
 once. A Stripe attempt Stripe ANSWERED with an error keeps that answer for its
 key for up to 24 hours: refund it in the dashboard instead, and the webhook
@@ -101,9 +101,9 @@ stay under the 24 hours Stripe remembers a key) is *overdue*
 attempt is never sent again: a retry of its amount is refused (Stripe may have
 forgotten the key, so a resend could refund twice). Three things resolve it,
 all through the ledger paths a refund made in one go takes
-(`OrderService.book_share` settles, a `DECLINED` status frees):
+(`RefundService.book_share` settles, a `DECLINED` status frees):
 
-- the provider's webhook (`record_refund`);
+- the provider's webhook (`RefundService.book_refund`);
 - the beat task `order.tasks.reconcile_pending_refunds`
   (`reconcile-pending-refunds`, hourly, through
   `tenant.tasks.fanout_reconcile_pending_refunds`), which asks the provider
@@ -118,7 +118,7 @@ all through the ledger paths a refund made in one go takes
   (`ParentId`) of a refund or void type for exactly the attempt's amount (this
   listing nests the type, `TransactionType.TransactionTypeId`, where Retrieve
   Transaction has a flat `transactionTypeId`; checked against a real demo
-  refund on staging, 2026-11-08); `StatusId` `F` settles, `E` declines, a
+  refund on staging); `StatusId` `F` settles, `E` declines, a
   refund the ledger already holds is not given to a second attempt. Nothing
   found, several candidates, a different amount, an unreadable provider, a cash
   share (no provider) or a missing credential leave it `PENDING` and stamp
@@ -154,9 +154,8 @@ the ledger's sums do), and are recorded, in REFUNDED or PARTIALLY_REFUNDED,
 both settled statuses a late `payment_intent.succeeded` cannot write over.
 `requires_action` waits on the customer and `failed` / `canceled` returned
 nothing: none is recorded, the order stays COMPLETED, and staff find Stripe's
-refund id and status in a NOTE on the order. The provider no longer reports a
-payment status at all (`refund_payment` returns `refund_id`, `amount`,
-`payment_id`). A refund Stripe accepted and later fails (`refund.failed`,
+refund id and status in a NOTE on the order. The provider reports no payment
+status (`refund_payment` returns `refund_id`, `amount`, `payment_id`). A refund Stripe accepted and later fails (`refund.failed`,
 `refund.updated`, `charge.refund.updated`) is reversed on the ledger:
 `handle_stripe_refund_failed` writes one `REFUND_REVERSAL` row keyed on the
 refund id, so the money counts as held and refundable again, `payment_status`
@@ -176,7 +175,7 @@ REFUNDED, once, with the last refund**: the loyalty points
 once per order). Gift-card value does not go through `order_refunded`: there is
 no receiver for it. `refund_order` credits the cards itself, in parts, with the
 value of a refund beyond the provider's money (`GiftCardService.credit_refund`,
-called from `OrderService._return_stored_value`; [§7.2](refunds.md)). When the
+called from `RefundService._return_stored_value`; [§7.2](refunds.md)). When the
 order used gift cards and points, the excess is split between them in
 proportion to what each has not yet got back
 (`PaymentLedger.split_stored_value`): the cards get their share, not the whole
@@ -186,7 +185,7 @@ cancel returns the whole redemption
 (`giftcard.signals.handle_order_canceled_giftcard` →
 `giftcard.tasks.credit_refund_to_gift_cards`).
 The email, the toast, the history row and the Meta `Refund` event fire on every
-refund, partial Stripe dashboard refunds included (they used to be silent).
+refund, partial Stripe dashboard refunds included.
 
 **A refund the provider did not make is not recorded.** `refund_order` returns
 a `RefundResult` with `declined` set and changes nothing for that share:
@@ -201,15 +200,13 @@ part-way; the admin "Cancel selected orders" action raises an error message for
 it.
 
 **Viva (`VivaWalletPaymentProvider.refund_payment`).** Cancel Transaction
-requires `amount` (cents), so the request always carries it, and so does every
-call now: the service always names an amount (a full refund is the ledger's
-remainder, never "ask Viva what it captured"). HTTP 2xx is not success: Viva
+requires `amount` (cents), so the request always carries it: the service
+always names an amount (a full refund is the ledger's remainder, never "ask
+Viva what it captured"). HTTP 2xx is not success: Viva
 reports refusals in a 200 body, so only `Success` true with `ErrorCode` 0
 counts, and the body's `TransactionId` (the refund transaction) is the ledger's
 reference for the refund. `DELETE /api/transactions/{id}` has no idempotency
 parameter (Viva's `idempotencyKey` is on the `/acquiring/v1/transactions/{id}`
 route), so none is sent; Viva refuses a refund above what is left on the
 payment, and the ledger's unique constraint on the refund transaction id keeps
-it from being recorded twice. Before #134 the amount was omitted and the body
-ignored, so every in-app Viva refund booked REFUNDED while Viva kept the
-payment at `F`.
+it from being recorded twice.

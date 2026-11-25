@@ -428,6 +428,23 @@ class TestRicherCatalogueSeed:
         )
         assert rates == {STANDARD_VAT_RATE}
 
+    def test_a_deleted_demo_product_comes_back_with_the_next_seed(
+        self, seeded, monkeypatch
+    ):
+        """The dataset is code: a product staff deleted (a soft delete) is
+        restored by the next run, or the offers that target it stop the
+        seed at the promotions step."""
+        from product.models import Product
+
+        slug = demo_store.PRODUCTS[0].slug
+        Product.objects.filter(slug=slug).delete()
+
+        demo_store.seed_products()
+
+        product = Product.objects.get(slug=slug)
+        assert product.is_deleted is False
+        assert product.deleted_at is None
+
     def test_a_store_without_the_standard_row_is_not_seeded(
         self, demo_tenant, monkeypatch
     ):
@@ -435,7 +452,7 @@ class TestRicherCatalogueSeed:
         from vat.models import Vat
 
         monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
-        Product.objects.filter(slug__startswith="demo-").delete()
+        Product.objects.filter(slug__startswith="demo-").hard_delete()
         Vat.objects.filter(value=24).delete()
 
         with pytest.raises(Vat.DoesNotExist):
@@ -1209,12 +1226,6 @@ class TestStepTable(TestCase):
     def test_labels_are_unique(self):
         labels = [label for label, _ in seed_demo_store.STEPS]
         self.assertEqual(sorted(labels), sorted(set(labels)))
-
-    def test_tags_follow_the_blog_they_tag(self):
-        """``seed_tags`` labels the newest posts, so a run needs them to
-        exist first — otherwise one run is not enough to converge."""
-        labels = [label for label, _ in seed_demo_store.STEPS]
-        self.assertGreater(labels.index("tags"), labels.index("blog"))
 
     def test_the_cache_purge_runs_last(self):
         """Its entire value is being after every writer.

@@ -105,9 +105,12 @@ class ResetManager:
 
             for model in models_to_reset:
                 if self._should_reset_model(model):
-                    count = model.objects.count()
+                    # ``_base_manager``: a reset removes every row for
+                    # good, soft-deleted ones included, and a soft-delete
+                    # model's own queryset would only mark them deleted.
+                    count = model._base_manager.count()
                     if count > 0:
-                        model.objects.all().delete()
+                        model._base_manager.all().delete()
                         self.stdout.write(
                             f"  Deleted {count} {model.__name__} records"
                         )
@@ -128,8 +131,8 @@ class ResetManager:
         with transaction.atomic():
             for model in app_config.get_models():
                 if self._should_reset_model(model):
-                    count = model.objects.count()
-                    model.objects.all().delete()
+                    count = model._base_manager.count()
+                    model._base_manager.all().delete()
                     self.stdout.write(
                         f"  Deleted {count} {model.__name__} records from {app_config.name}"
                     )

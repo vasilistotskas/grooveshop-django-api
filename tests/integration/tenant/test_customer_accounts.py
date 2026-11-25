@@ -273,7 +273,6 @@ def test_an_account_holders_order_notifies_only_while_accounts_are_on(
         ("notify_order_created_live", ()),
         ("notify_order_status_changed_live", ("SHIPPED",)),
         ("notify_payment_confirmed_live", ()),
-        ("notify_payment_failed_live", ()),
         ("notify_order_refunded_live", ()),
     ],
 )

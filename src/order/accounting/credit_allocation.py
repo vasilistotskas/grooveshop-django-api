@@ -13,7 +13,7 @@ is left on the receipt:
 * :func:`allocate_pro_rata` spreads an amount over that headroom, to the
   cent, capped to it; a claim that does not fit is refused by its caller
   before any money moves.
-* A refund claim is allocated by ``OrderService._claim_refund`` when it is
+* A refund claim is allocated by ``RefundService._claim_refund`` when it is
   made: a bare amount pro rata over the headroom, a refund by lines (see
   :mod:`order.refunds.refund_lines`) as its own pieces, each at its line's rate,
   which must fit their rates (:func:`first_short_rate`). Every other source (a refund nobody claimed, a returned chargeback)
@@ -67,6 +67,7 @@ from order.models.refund_attempt import (
     RefundAttemptKind,
     RefundAttemptStatus,
 )
+from order.payments.payment_ledger import PaymentLedger
 
 _ZERO = Decimal(0)
 
@@ -176,63 +177,6 @@ def has_rates(order: Order) -> bool:
     """Whether there is anything to allocate against: an order without
     taxable lines (and no receipt) has no rates, and owes no credit."""
     return bool(_base(order)[0])
-
-
-def goods_returned(
-    order: Order, *, before: PaymentTransaction | None = None
-) -> Decimal:
-    """The goods the provider's money has paid back, as it stood at a cut:
-    what every refund that moved before the ledger row *before* (``None``:
-    every one that moved) returned of goods (``goods_claimed``: what it
-    owed after the duplicate payment), less what the provider reported
-    failed of it by the same cut. A reversal booked at or after the cut is
-    not yet known there, however late the refund is decided. Gift card and
-    points returns are not the provider's money; a chargeback is no part of
-    it (``PaymentLedger.excess_held`` takes off only what a lost dispute
-    took of the duplicate payment itself: a dispute on the sale is sale
-    money lost, whichever way staff decide its goods). A refund's
-    duplicate-payment part owes no credit and is no goods: the order is
-    still for what the ledger holds less this, so the excess is what is
-    above it (``PaymentLedger.excess_held``)."""
-    rows = (
-        CreditAllocation.objects.filter(
-            order=order,
-            moved_at__isnull=False,
-            goods_claimed__gt=0,
-            decision__isnull=True,
-        )
-        .exclude(refund_attempt__kind=RefundAttemptKind.STORED_VALUE)
-        .select_related("refund", "refund_attempt__refund")
-    )
-    if before is not None:
-        rows = rows.filter(moved_at__lt=before.created_at)
-    sources = [(row, row.refund or row.refund_attempt.refund) for row in rows]
-    if not sources:
-        return _ZERO
-    reversals = PaymentTransaction.objects.filter(
-        kind=PaymentTransactionKind.REFUND_REVERSAL,
-        provider_reference__in={
-            refund.provider_reference for _row, refund in sources if refund
-        },
-    )
-    if before is not None:
-        reversals = reversals.filter(
-            Q(created_at__lt=before.created_at)
-            | Q(created_at=before.created_at, pk__lt=before.pk)
-        )
-    failed: dict[tuple[str, str], Decimal] = {}
-    for reversal in reversals:
-        key = (reversal.provider, reversal.provider_reference)
-        failed[key] = failed.get(key, _ZERO) + Decimal(reversal.amount.amount)
-    total = _ZERO
-    for row, refund in sources:
-        paid = Decimal((refund or row.refund_attempt).amount.amount)
-        if refund:
-            paid -= failed.get(
-                (refund.provider, refund.provider_reference), _ZERO
-            )
-        total += max(min(row.goods_claimed, paid), _ZERO)
-    return total
 
 
 def pieces_of(allocation: Mapping[Decimal, Decimal]) -> list[Piece]:
@@ -699,8 +643,6 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
     # release serving after the migration): what it put back onto cards is
     # payment the receipt holds. One that moved before an existing receipt
     # is netted by it and owes none, like every other source.
-    from order.payments.payment_ledger import PaymentLedger
-
     receipts = dict(
         Invoice.objects.filter(**scope).values_list("order_id", "created_at")
     )
@@ -775,8 +717,6 @@ def allocate_order(order: Order) -> int:
     cost is that a younger source waits too, until the claim resolves and
     the next run decides both.
     """
-    from order.payments.payment_ledger import PaymentLedger
-
     done = 0
     pending = sorted(
         owing_sources(order),
@@ -896,8 +836,6 @@ def acknowledge_uncovered(order: Order, *, user) -> int:
 def _blocks(order: Order, owing: Owing, claim: RefundAttempt) -> bool:
     """Whether *claim* (PENDING) keeps *owing* undecided: whether releasing
     it alone, with no refund, would change what the source owes."""
-    from order.payments.payment_ledger import PaymentLedger
-
     if claim.pk in owing.exclude:
         return False
     excess = _ZERO
@@ -976,8 +914,6 @@ def excess_holders(
     """The PENDING provider claims that hold part of the order's duplicate
     payment that a refund of *amount* claimed now would take: releasing
     one alone would leave it more excess."""
-    from order.payments.payment_ledger import PaymentLedger
-
     held = min(PaymentLedger.refundable_excess(order, exclude=exclude), amount)
     return [
         claim
@@ -1153,7 +1089,6 @@ __all__ = [
     "excess_holders",
     "first_short_rate",
     "free_reversed",
-    "goods_returned",
     "has_rates",
     "headroom",
     "headroom_total",

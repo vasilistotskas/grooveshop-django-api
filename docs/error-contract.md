@@ -43,19 +43,23 @@ where the serializer nests:
 - The schema publishes the shapes as `ApiError`, `ApiValidationError` and
   `ApiFieldError`; plain-error response serializers carry an optional
   `code`.
-- A 400 is documented as `ApiValidationError` or a plain body (`anyOf`),
-  never as the plain body alone: a validation body has no `detail`.
-  `core.api.schema.publish_error_schemas` adds the validation variant to every
-  400 whose view declares a plain body (`PLAIN_400_BODIES`: `ErrorResponse`
-  becomes `ApiError`; `PaymentProviderError` is listed beside `ApiError`), so a view keeps
-  declaring `ErrorResponseSerializer` and a view with its own 400 body
-  (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
+- A 400 is documented as `ApiValidationError` or `ApiError` (`anyOf`), plus
+  the view's own body when it names one, never as one body alone: any view
+  can raise a validation error (a body with no `detail`) or a `ParseError`.
+  A 404 a view documents with its own body (`B2BErrorResponse`) gets
+  `ApiError` beside it, the body of a `NotFound` from `get_object` or a
+  feature gate. `core.api.schema.publish_error_schemas` writes both, so a
+  view keeps declaring `ErrorResponseSerializer` (a 400 of it becomes
+  `ApiValidationError` or `ApiError`) or its own body.
 - `ErrorResponse` is `{detail, code}` only. The one plain body that carries
   more is `PaymentProviderError` (`error`: the provider call's result), sent
   by the four order actions that call the payment provider.
 - `tests/unit/core/api/test_error_schema.py` checks real 400, 401, 403, 404,
   409 and 429 bodies against what their operation documents (the `documented`
-  fixture in `tests/conftest.py`). No operation documents a 405 or 415; the
+  fixture in `tests/conftest.py`), and `tests/response_contract.py` judges
+  every JSON error body a test receives whose operation documents that status
+  with a JSON schema; an undocumented status, a 405 and a body that is not
+  JSON are counted, not judged. No operation documents a 405 or 415; the
   handler sends the same `{detail, code}` for them.
 
 ## Raising one
@@ -102,15 +106,21 @@ from a missing one.
 calls it for raised exceptions), so those keep their own shape. Where a
 stable discriminator already existed, `code` now repeats it:
 
-- `{"detail", "reason"}` (cart coupons, quotes and payment intents, gift
+- `{"detail", "reason"}` (cart coupons, quotes, gift
   cards, business profile): `code` equals `reason`. `POST /cart/quote`
   answers a delivery it cannot price this way, with
-  `shipping_unavailable`, `shipping_parcel_too_large` or
-  `shipping_weight_exceeded` (`shipping.enum.ShippingRefusal`), so a
-  client can drop the selection and go on. A loyalty refusal there and on
-  the payment intent carries the loyalty program's code when it has one
-  (`loyalty_redemption_too_small`), else `loyalty_redemption_invalid`. The payment intent and order
-  creation keep `invalid_order_data` with the message under
+  `shipping_unavailable`, `shipping_region_unavailable` (the delivery
+  reaches the country but not the region's shipping zone),
+  `shipping_parcel_too_large` or `shipping_weight_exceeded`
+  (`shipping.enum.ShippingRefusal`), so a
+  client can drop the selection and go on, and a pickup point that cannot
+  be confirmed to take the cart with `pickup_point_too_small` or
+  `pickup_point_size_unknown` (`shipping.interfaces.PickupPointUnfit`;
+  order creation answers those two as field errors on the carrier's
+  location field). A loyalty refusal there carries the loyalty program's
+  code when it has one (`loyalty_redemption_too_small`), else
+  `loyalty_redemption_invalid`. Order creation keeps `invalid_order_data`
+  with the message under
   `fieldErrors.shippingProviderCode` for the same three.
 - `{"detail", "error": {"type"}}` (order create and cancel): `code` equals
   `error.type`. One exception, for now: an order refused because its total
@@ -136,11 +146,37 @@ A view that cannot reach a strict cache key (a rate limit that cannot count,
 a TOTP replay check, an IdP code, a single-use ticket) refuses the request,
 on every route, with **503** and the code `temporarily_unavailable`
 (`src/core/middleware/strict_cache.py`; the rule beside
-`STRICT_KEY_PREFIXES` in `src/core/caches.py`). The body is the route's own
+`STRICT_KEY_PREFIXES` in `src/core/cache_backend.py`). The body is the route's own
 shape: `{detail, code}` on a DRF view, allauth's
 `{status, errors: [{code, message}]}` on `/_allauth/`, OAuth's
 `{error, error_description}` on the IdP's `identity/o/api/` endpoints, and an
-HTML page anywhere else. Never a 429 and never a 500.
+HTML page anywhere else. Never a 429 and never a 500: a view's own
+catch-all re-raises `REDIS_UNAVAILABLE` so the middleware answers it
+(`OrderViewSet.create`).
+
+## Temporary 503s with Retry-After
+
+A 503 whose cause is ours and passes on its own says when to try again in
+`Retry-After` (DRF sends it from the exception's `wait`), names no field,
+and keeps the body `{detail, code}`. A client retries the same request
+after that delay (the idempotency middleware stores no 5xx, so the same
+`Idempotency-Key` runs again) and never asks the shopper to change a
+choice for it:
+
+- `pickup_point_check_unavailable` (`shipping.api_errors.
+  PickupPointCheckUnavailable`, `POST /order`): the order names a pickup
+  point its carrier's catalogue does not hold, and Redis failed after the
+  order throttles counted the request but before the resync guard was
+  taken, so the point could not be looked for again
+  (`ShippingService.pickup_point_address`). `Retry-After` is
+  `PICKUP_POINT_CHECK_RETRY_AFTER_SECONDS` (30 s). No order is created and
+  no resync runs. A Redis outage that lasts the whole request never gets
+  this far: the fail-closed order-create throttles refuse it first with
+  `temporarily_unavailable` ([a security store that is down](#a-security-store-that-is-down)), so
+  a client retrying `POST /order` treats both codes as "try again".
+
+`carrier_unavailable` (`shipping.api_errors.CarrierUnavailable`) is the
+courier's outage, a 503 without `Retry-After`.
 
 ## Which codes are returned (monitoring)
 
@@ -155,10 +191,10 @@ line sees both, once each. In production it is one JSON object (the
 ```json
 {"level": "INFO", "logger": "core.middleware.access_log",
  "schema": "webside", "correlation_id": "…",
- "message": "POST api/v1/order/<int:pk>/create_payment_intent 400 812.4ms payment_intent_failed",
- "method": "POST", "route": "api/v1/order/<int:pk>/create_payment_intent",
+ "message": "POST api/v1/order/<int:pk>/create_checkout_session 400 812.4ms checkout_session_failed",
+ "method": "POST", "route": "api/v1/order/<int:pk>/create_checkout_session",
  "status": 400, "duration_ms": 812.4, "db_queries": 14, "db_ms": 233.1,
- "code": "payment_intent_failed"}
+ "code": "checkout_session_failed"}
 ```
 
 - `route` is the URL pattern, never the path; `schema` is the store. No

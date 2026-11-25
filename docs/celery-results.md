@@ -19,5 +19,5 @@ Task Results admin (`core.admin.TaskResultAdmin`, platform-only) shows a Store
 column and a Store filter built on it. Consequences: adding a `chord()` or `group()` — which do
 need results — means setting `ignore_result=False` on that task, not
 flipping the global; and "did the nightly task run?" is answered by
-`PeriodicTask.last_run_at` or `MonitoredTask`'s log line, never by that
+`scheduler.PeriodicTask.last_run_at` or `MonitoredTask`'s log line, never by that
 table. The reasoning is spelled out where the settings are defined.

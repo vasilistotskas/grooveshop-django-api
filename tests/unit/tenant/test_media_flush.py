@@ -68,8 +68,8 @@ class TestFlushTenantMedia:
 
 class TestSuspendDispatchesFlush:
     def test_suspend_dispatches_media_flush(self):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_tenant")
         with mock.patch(
@@ -89,8 +89,8 @@ class TestSuspendDispatchesFlush:
         still active and keep serving it until the next poll."""
         from django.db import transaction
 
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_on_commit")
         pending = []
@@ -114,8 +114,8 @@ class TestSuspendDispatchesFlush:
         assert dispatch.call_args.kwargs["headers"]["_schema_name"] == "public"
 
     def test_noop_resuspend_does_not_dispatch(self):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_resuspend")
         suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
@@ -131,8 +131,8 @@ class TestSuspendDispatchesFlush:
     def test_dispatch_failure_does_not_break_suspend(self):
         from kombu.exceptions import OperationalError
 
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_broker_down")
         with mock.patch(
@@ -206,8 +206,9 @@ class TestLifecyclePlansTheEdgePurge:
         settings.MEDIA_STREAM_BASE_URL = "https://assets.grooveshop.space"
 
     def test_suspend_hands_the_task_zone_ids_never_a_token(self):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason, TenantDomain
+        from tenant.models import TenantDomain
 
         tenant = store_tenant(
             "edge_suspend",
@@ -318,8 +319,8 @@ class TestLifecyclePlansTheEdgePurge:
         ]
 
     def test_an_unplannable_row_does_not_stop_the_suspension(self):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         tenant = store_tenant("edge_unplannable")
         with (

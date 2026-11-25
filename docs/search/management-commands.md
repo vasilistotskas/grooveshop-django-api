@@ -6,7 +6,7 @@ unless stated otherwise; without either it runs against the schema bound to the 
 connection. `--all-tenants` reaches the active stores only: these commands call
 Meilisearch for each store (`TenantCommandMixin.include_suspended_stores`). A suspended
 store's indexes miss the deploys' settings and the daily sync, so `activate_tenant`
-queues `core.tasks.sync_meilisearch_indexes` for the store when it reactivates it; that
+queues `sync_meilisearch_indexes` (`src/meili/tasks.py`) for the store when it reactivates it; that
 sync applies each index's settings before its documents. Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
 classmethod in `src/meili/models.py`.
 
@@ -35,7 +35,7 @@ Syncs one model's index, e.g. `product.ProductTranslation` or `blog.BlogPostTran
 
 Without either option it runs in the public schema, which holds no store's
 products. A release that adds a field to the index document needs this with
-`--all-tenants` after the deploy, so documents indexed before it gain the field.
+`--all-tenants` after the deploy, so documents indexed earlier gain the field.
 
 ## `meilisearch_drop`
 
@@ -68,7 +68,7 @@ exits non-zero if any failed. Each settings task is awaited for
 default), because a changed filterable or sortable attribute makes the engine rebuild
 that index. See [index settings](index-settings.md) for what is applied and why.
 
-Every other wait for an index task (the document additions of `meilisearch_sync_index` and `meilisearch_sync_all_indexes`, clears, drops) lasts `MEILISEARCH["TASK_TIMEOUT_MS"]` (`MEILI_TASK_TIMEOUT_MS`, 5 minutes by default) unless the caller names a time. The SDK's own default of five seconds failed a bulk sync of a large index with a timeout the engine went on to finish. The one-document index and remove tasks keep a short fixed wait on purpose: a timeout there is retried with backoff, which frees the worker.
+Every other wait for an index task (the document additions of `meilisearch_sync_index` and `meilisearch_sync_all_indexes`, clears, drops) lasts `MEILISEARCH["TASK_TIMEOUT_MS"]` (`MEILI_TASK_TIMEOUT_MS`, 5 minutes by default) unless the caller names a time, because a bulk sync of a large index outlasts the SDK's own default of five seconds. The one-document index and remove tasks keep a short fixed wait on purpose: a timeout there is retried with backoff, which frees the worker.
 
 | Option | Description |
 |---|---|
@@ -102,25 +102,23 @@ always lists the model's `MeiliMeta.primary_key` (`pk` by default) with
 equality only and no facet search, whatever `filterable_fields` says. The
 settings reach the engine through `meilisearch_apply_settings`, which the Argo
 CD PreSync hook runs with `--all-tenants` before any pod of the release rolls,
-so the attribute is filterable before a filter delete can be issued. A release
-still serving during the rollout never issues one (it deletes by ids or one
-document at a time, neither of which needs a filterable attribute). If that
+so the attribute is filterable before a filter delete can be issued. If that
 hook step fails (its failure is swallowed so a tenant-less bring-up does not
 block the sync), a filter delete fails as a task error naming the attribute
 until `meilisearch_apply_settings` is run. The engine's payload limit
 (100 MB by default) is the only documented bound on the filter, so ids are not
 chunked.
 
-**Rollout window.** `meili.index_documents` is a new task name. While a release
-rolls, a new web pod can publish it to the `meilisearch` queue (routed by the
-`meili.*` pattern in `CELERY_TASK_ROUTES`) before every old worker is gone, and
-an old worker answers a name it does not register with "unregistered task" and
-drops the message: those documents stay as they were until the next full sync.
-The repo has no earlier rule for this, so the heal is the daily
-`sync-meilisearch-indexes` beat entry (02:00, every store), which upserts every
-qualifying document and prunes the stale ones. Run `meilisearch_sync_index`
-(or `meilisearch_sync_all_indexes`) once after the rollout of a release that
-adds a task name to close the window at once.
+**Rollout window.** A release that adds a task name to the `meilisearch` queue
+(routed by the `meili.*` pattern in `CELERY_TASK_ROUTES`) has a window while it
+rolls: a new web pod can publish the name before every old worker is gone, and an
+old worker answers a name it does not register with "unregistered task" and drops
+the message, so those documents stay as they were until the next full sync. The
+heal is the daily `sync-meilisearch-indexes` beat entry (02:00, every store),
+which upserts every qualifying document and prunes the stale ones. Run
+`meilisearch_sync_all_indexes` once after the rollout to close the window at
+once: `meilisearch_sync_index` only upserts, so it leaves a document that
+should have been removed.
 
 A writer that saves many rows wraps them in `meili.batching.collect_reindex()`.
 While it is open the product post-save signal, the product-attribute signal and

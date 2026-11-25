@@ -1,5 +1,5 @@
 """Payment history rows record ``PaymentStatus`` values, not lowercase
-literals (``order/signals/handlers.py``).
+literals (``src/order/signals/handlers.py``).
 
 ``Order.payment_status`` stores the upper-case enum value, so a history
 row written as ``"completed"`` / ``"failed"`` matched no status and read
@@ -85,14 +85,11 @@ def test_payment_succeeded_history_uses_enum_values():
 def test_payment_failed_history_uses_enum_values():
     order = _pending_order("pi_hist_fail")
 
-    with (
-        patch(
-            "order.signals.handlers.OrderService.handle_payment_failed",
-            return_value=PaymentEventOutcome(
-                order, PaymentStatus.PENDING, applied=True
-            ),
+    with patch(
+        "order.signals.handlers.OrderService.handle_payment_failed",
+        return_value=PaymentEventOutcome(
+            order, PaymentStatus.PENDING, applied=True
         ),
-        patch("order.signals.handlers.send_payment_failed_email.apply_async"),
     ):
         handle_stripe_payment_failed(
             sender=None, event=_event("evt_hist_fail", "pi_hist_fail")
@@ -109,7 +106,7 @@ def test_payment_failed_history_uses_enum_values():
 
 
 class TestVivaWebhookHistory:
-    """``order/views/viva_webhook.py`` writes the same rows for Viva."""
+    """``src/order/views/viva_webhook.py`` writes the same rows for Viva."""
 
     @staticmethod
     def _history(order):
@@ -118,25 +115,25 @@ class TestVivaWebhookHistory:
         ).latest("id")
 
     def test_payment_created(self):
-        from order.views.viva_webhook import _handle_payment_created
+        from order.payments.viva_settlement import handle_payment_created
 
         order = _pending_order("viva_hist_created")
         order.metadata = {"viva_order_codes": ["OC1"]}
         order.save(update_fields=["metadata"])
         with (
             patch(
-                "order.views.viva_webhook._verify_transaction",
+                "order.payments.viva_settlement.verify_transaction",
                 return_value=(
                     PaymentStatus.COMPLETED,
                     verified_payment(order, "OC1"),
                 ),
             ),
-            patch("order.views.viva_webhook.dispatch_on_commit"),
+            patch("order.signals.handlers.dispatch_on_commit"),
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ),
         ):
-            _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_c")
+            handle_payment_created(order, {"StatusId": "F"}, "viva_txn_c")
 
         assert (
             self._history(order).new_value["payment_status"]

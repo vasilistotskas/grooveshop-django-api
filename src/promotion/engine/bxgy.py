@@ -45,7 +45,7 @@ def bxgy_discounted_units(
       monotonic as the shopper adds items.
 
     "Cheapest" ties break by cart item pk, so every evaluation of the
-    same cart (preview, payment intent, order creation) discounts the
+    same cart (preview, quote, order creation) discounts the
     same lines. Empty while the promotion earns nothing.
     """
     buy_qty = promotion.buy_quantity or 0

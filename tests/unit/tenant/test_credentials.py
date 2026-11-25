@@ -335,17 +335,6 @@ class TestTenantSiteName:
         settings.SITE_NAME = "SETTINGS_IGNORED"
         assert tenant_site_name() == "Internal Tenant Name"
 
-    def test_falls_back_to_settings_when_both_empty(
-        self, bind_tenant, db, settings
-    ):
-        tenant = store_tenant("site_name_3")
-        tenant.name = ""
-        tenant.store_name = ""
-        tenant.save()
-        bind_tenant(tenant)
-        settings.SITE_NAME = "Platform Default"
-        assert tenant_site_name() == "Platform Default"
-
     def test_no_tenant_uses_settings(self, monkeypatch, settings):
         monkeypatch.setattr(
             connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False

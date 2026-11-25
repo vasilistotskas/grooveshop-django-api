@@ -8,6 +8,9 @@
 * ``GET /api/v1/shipping/policy`` — the store's standing shipping
   policy (one row per provider × kind × country it offers), for the
   storefront's Organization structured data.
+* ``GET /api/v1/shipping/product/<product_id>`` — the cheapest
+  delivery of one product bought on its own, for the product page's
+  "shipping from X" line.
 * ``GET /api/v1/shipping/providers`` — admin-only list of provider rows
   for diagnostics.
 """
@@ -15,6 +18,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
@@ -27,10 +31,12 @@ from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.utils.views import cache_methods
+from product.models.product import Product
 from shipping.models import ShippingProvider
 from shipping.serializers import (
     FreeShippingInfoQuerySerializer,
     FreeShippingInfoSerializer,
+    ProductShippingSerializer,
     ShippingOptionSerializer,
     ShippingOptionsQuerySerializer,
     ShippingPolicyEntrySerializer,
@@ -56,9 +62,21 @@ class ShippingOptionsView(APIView):
                 name="country_code",
                 description=(
                     "ISO 3166-1 alpha-2 country code (e.g. 'GR'). "
-                    "Required — a ``ShippingRate`` is per-country."
+                    "Required — a ``ShippingRate`` belongs to a zone of "
+                    "one country."
                 ),
                 required=True,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="region_id",
+                description=(
+                    "The delivery region's code, once chosen. A home "
+                    "delivery is priced by the shipping zone of the "
+                    "region; without one, by the zone covering the whole "
+                    "country."
+                ),
+                required=False,
                 type=str,
             ),
             OpenApiParameter(
@@ -102,12 +120,13 @@ class ShippingOptionsView(APIView):
     def get(self, request: Request) -> Response:
         query = ShippingOptionsQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        # Required on the serializer now — a ``ShippingRate`` is
-        # per-country, so there is no destination-agnostic matrix.
+        # Required on the serializer — a ``ShippingRate`` belongs to a
+        # zone of one country, so there is no destination-agnostic matrix.
         country_code = query.validated_data["country_code"]
         amount = float(query.validated_data.get("order_value_amount") or 0)
         currency = query.validated_data.get("currency") or "EUR"
         weight_grams = query.validated_data.get("weight_grams")
+        region_id = query.validated_data.get("region_id") or None
 
         # The caller's cart, found the way every cart endpoint finds it
         # (``X-Cart-Id`` / the signed-in user). None when it names none.
@@ -119,6 +138,7 @@ class ShippingOptionsView(APIView):
             currency=currency,
             weight_grams=weight_grams,
             items=items,
+            region_id=region_id,
         )
         serializer = ShippingOptionSerializer(options, many=True)
         return Response(serializer.data)
@@ -211,6 +231,49 @@ class ShippingPolicyView(APIView):
     def get(self, request: Request) -> Response:
         serializer = ShippingPolicyEntrySerializer(
             ShippingService.shipping_policy(), many=True
+        )
+        return Response(serializer.data)
+
+
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["get"])
+class ProductShippingView(APIView):
+    """The cheapest delivery of one product bought on its own.
+
+    Read-only and public, for a shopper not known yet, so every caller
+    gets the same answer and it is cached like the other public
+    catalogue reads. The ``shipping``, ``products`` and ``promotions``
+    cache surfaces purge it: a rate, the product (price, weight, size)
+    and a promotion each move it.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        operation_id="getProductShipping",
+        summary="What shipping one product costs",
+        description=(
+            "The cheapest delivery checkout would charge a cart holding "
+            "this product alone, to the store's first shipping country: "
+            "after the free-shipping threshold and the automatic "
+            "promotions such a cart gets, leaving out every delivery "
+            "that cannot carry the product (weight cap, parcel size). "
+            "``estimate`` is null when the store ships nowhere or no "
+            "delivery can take the product. Returns 404 when the "
+            "product does not exist or is not active."
+        ),
+        responses={
+            200: ProductShippingSerializer,
+            404: ErrorResponseSerializer,
+        },
+        tags=["Shipping"],
+    )
+    def get(self, request: Request, product_id: int) -> Response:
+        product = get_object_or_404(
+            Product.objects.filter(active=True).select_related("vat"),
+            pk=product_id,
+        )
+        serializer = ProductShippingSerializer(
+            {"estimate": ShippingService.product_shipping_from(product)}
         )
         return Response(serializer.data)
 

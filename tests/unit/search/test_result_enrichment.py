@@ -17,7 +17,9 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from djmoney.money import Money
 
+from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
+from product.models.image import ProductImage
 from product.models.product import Product, ProductTranslation
 from search.serializers import ProductTranslationSerializer
 from tenant.features import feature_on
@@ -40,13 +42,25 @@ def _en_translation_pks(products):
     )
 
 
+def _with_main_image(products):
+    # The factory's ``is_main`` is a random boolean: every product here
+    # gets a main image, so each hit reads its path and size.
+    for product in products:
+        ProductImageFactory(product=product, is_main=True)
+    return products
+
+
 @pytest.mark.django_db
 def test_search_result_enrichment_is_constant_query():
-    products = ProductFactory.create_batch(2, num_images=1, num_reviews=2)
+    products = _with_main_image(
+        ProductFactory.create_batch(2, num_images=0, num_reviews=2)
+    )
     with CaptureQueriesContext(connection) as small:
         _serialize_hits(_en_translation_pks(products))
 
-    products += ProductFactory.create_batch(3, num_images=1, num_reviews=2)
+    products += _with_main_image(
+        ProductFactory.create_batch(3, num_images=0, num_reviews=2)
+    )
     with CaptureQueriesContext(connection) as large:
         _serialize_hits(_en_translation_pks(products))
 
@@ -85,6 +99,48 @@ def test_a_zero_price_is_serialized_as_zero_not_null():
     assert by_master[priced.id]["final_price"] == float(
         priced.final_price.amount
     )
+
+
+@pytest.mark.django_db
+def test_a_hit_carries_the_stored_size_of_its_main_image():
+    """The size is the main image's stored one, as every other product
+    endpoint states it, even when another image comes first in the
+    gallery; a product with no image has no size."""
+    pictured = ProductFactory(num_images=0, num_reviews=0)
+    ProductImageFactory(product=pictured, is_main=False, sort_order=0)
+    ProductImageFactory(
+        product=pictured,
+        is_main=True,
+        sort_order=1,
+        image__width=800,
+        image__height=600,
+    )
+    bare = ProductFactory(num_images=0, num_reviews=0)
+
+    by_master = {
+        row["master"]: row
+        for row in _serialize_hits(_en_translation_pks([pictured, bare]))
+    }
+
+    assert by_master[pictured.id]["main_image_width"] == 800
+    assert by_master[pictured.id]["main_image_height"] == 600
+    assert by_master[bare.id]["main_image_width"] is None
+    assert by_master[bare.id]["main_image_height"] is None
+
+
+@pytest.mark.django_db
+def test_a_main_image_of_unknown_size_has_a_path_and_no_size():
+    product = ProductFactory(num_images=0, num_reviews=0)
+    main = ProductImageFactory(product=product, is_main=True)
+    ProductImage.objects.filter(pk=main.pk).update(
+        image_width=None, image_height=None
+    )
+
+    (row,) = _serialize_hits(_en_translation_pks([product]))
+
+    assert row["main_image_path"]
+    assert row["main_image_width"] is None
+    assert row["main_image_height"] is None
 
 
 @pytest.mark.django_db

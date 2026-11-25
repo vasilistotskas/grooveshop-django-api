@@ -18,6 +18,23 @@ from tenant.celery import run_for_all_tenants
 from tests.utils.staff import store_tenant
 
 
+def _registered_fanouts() -> list:
+    """Every fan-out task the worker registers, by its name
+    (``tenant.tasks.fanout_*``): ``tenant.tasks`` holds most, a carrier
+    app its own. Every app's ``tasks`` is imported first, as the worker's
+    autodiscovery does."""
+    from django.utils.module_loading import autodiscover_modules
+
+    from core import celery_app
+
+    autodiscover_modules("tasks")
+    return [
+        task
+        for name, task in sorted(celery_app.tasks.items())
+        if name.startswith("tenant.tasks.fanout_")
+    ]
+
+
 class TestRunForAllTenants:
     @pytest.mark.django_db
     def test_dispatches_one_send_per_active_tenant(self, db):
@@ -89,7 +106,8 @@ class TestSuspendedStores:
     ``include_suspended`` job ever reached a suspended store (#753).
     """
 
-    #: The jobs a suspended store still gets: the retention sweeps, the work
+    #: The jobs a suspended store still gets: the retention sweeps, the
+    #: erasure of carrier data that reached an erased order late, the work
     #: a customer's money or parcel waits on, and the agent outbox sweep,
     #: whose attempts hold a suspended store's events.
     INCLUDE_SUSPENDED = {
@@ -114,13 +132,14 @@ class TestSuspendedStores:
         "shipping_acs.tasks.purge_expired_acs_tracking_events",
         "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
         "shipping_boxnow.tasks.settle_uncertain_boxnow_creations",
+        "user.tasks.erase_late_carrier_data",
         "user.tasks.purge_unconfirmed_guest_subscriptions",
     }
 
     @staticmethod
     def _suspended_store(schema_name: str):
+        from tenant.enum import SuspendedReason
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
 
         store = store_tenant(schema_name)
         with patch("tenant.tasks.flush_tenant_media_task.apply_async"):
@@ -129,13 +148,7 @@ class TestSuspendedStores:
 
     @staticmethod
     def _run_every_fanout() -> list:
-        from tenant import tasks as tenant_tasks
-
-        wrappers = [
-            getattr(tenant_tasks, name)
-            for name in dir(tenant_tasks)
-            if name.startswith("fanout_")
-        ]
+        wrappers = _registered_fanouts()
         with (
             patch("core.celery_app.send_task") as send,
             patch("devtools.tasks.reset_demo_store_task.apply_async"),
@@ -331,10 +344,10 @@ class TestFanoutTaskWrappers:
 
     @pytest.mark.django_db
     def test_fanout_check_stale_acs_shipments(self):
-        from tenant import tasks as tenant_tasks
+        from shipping_acs import tasks as acs_tasks
 
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            tenant_tasks.fanout_check_stale_acs_shipments()
+        with patch("shipping_acs.tasks.run_for_all_tenants") as run:
+            acs_tasks.fanout_check_stale_acs_shipments()
 
         run.assert_called_once_with(
             "shipping_acs.tasks.check_stale_acs_shipments"
@@ -412,6 +425,10 @@ class TestBeatScheduleTenantCoverage:
         # committed) live in public whatever the store; each row carries
         # its own schema header.
         "tenant.tasks.redispatch_deferred_tasks",
+        # BOX NOW's public locker catalogue is one file for every store:
+        # fetched once in public, then handed to each store's own task
+        # (``apply_boxnow_locker_catalogue``) through ``run_for_all_tenants``.
+        "shipping_boxnow.tasks.sync_boxnow_locker_catalogue",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):
@@ -425,7 +442,7 @@ class TestBeatScheduleTenantCoverage:
         ]
         assert not offenders, (
             "Beat entries dispatch tenant-scoped tasks directly — add a "
-            "fanout_* wrapper in tenant/tasks.py (or allowlist a genuinely "
+            "fanout_* wrapper in src/tenant/tasks.py (or allowlist a genuinely "
             f"public-schema task above): {offenders}"
         )
 
@@ -447,13 +464,12 @@ class TestBeatScheduleTenantCoverage:
     def test_every_fanout_beat_target_exists(self):
         from django.conf import settings
 
-        from tenant import tasks as tenant_tasks
-
+        registered = {task.name for task in _registered_fanouts()}
         missing = [
             entry["task"]
             for entry in settings.CELERY_BEAT_SCHEDULE.values()
             if entry["task"].startswith("tenant.tasks.fanout_")
-            and not hasattr(tenant_tasks, entry["task"].rsplit(".", 1)[1])
+            and entry["task"] not in registered
         ]
         assert not missing, f"Beat points at missing fanout tasks: {missing}"
 

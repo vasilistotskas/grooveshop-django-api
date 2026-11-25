@@ -1,8 +1,8 @@
 import logging
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 
 logger = logging.getLogger(__name__)

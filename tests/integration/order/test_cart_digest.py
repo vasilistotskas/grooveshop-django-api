@@ -4,7 +4,7 @@
 quote the buyer was shown. ``expectedCartDigest`` refuses one whose
 CONTENTS changed at the same total: a line swapped for one at the same
 price, another pickup point. Both are compared under the cart lock by
-``OrderService._quote_under_lock`` on both creation paths.
+``OrderService._quote_under_lock``, whatever the pay way.
 
 The quote and order creation must take the same inputs, or a digest over
 the delivery would refuse every order the quote cannot see the whole of:
@@ -31,6 +31,7 @@ from pay_way.factories import PayWayFactory
 from promotion.engine.evaluation import PromotionEngine
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
+from region.factories import RegionFactory
 from shipping.models import ShippingProvider
 from shipping_boxnow.factories import BoxNowLockerFactory
 from tests.integration.order.test_checkout_quote import (
@@ -39,7 +40,7 @@ from tests.integration.order.test_checkout_quote import (
     _address,
     _checkout,
     _choices,
-    _post_intent,
+    _money,
     _post_order,
     _product,
     _quote,
@@ -183,7 +184,9 @@ class TestTheDigest:
         with patch(resolve, return_value="acs"):
             promotion = PromotionEngine.evaluate(checkout.cart, user=None)
             acs = OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(
+                    checkout.cart.get_items(), promotion
+                ),
                 promotion,
                 shipping=ShippingChoice.of(_choices(checkout)),
                 weight_grams=0,
@@ -276,7 +279,9 @@ class TestOrderCreation:
 
         assert response.status_code == 201, response.content
 
-    def test_the_payment_first_path_compares_it_too(self):
+    def test_a_stripe_order_compares_it_too(self):
+        """Stripe is paid after the order, so its order is refused for a
+        changed cart before any payment exists."""
         checkout = _checkout()
         stripe = PayWayFactory(
             provider_code="stripe",
@@ -288,15 +293,10 @@ class TestOrderCreation:
         choices = {**_choices(checkout), "pay_way_id": stripe.id}
         with fake_stripe():
             quote = _quote(checkout, **choices)
-            intent = _post_intent(checkout, stripe)
-            assert intent.status_code == 200, intent.content
             _swap_line(checkout)
 
             response = _post_order(
-                checkout,
-                pay_way_id=stripe.id,
-                payment_intent_id=intent.data["payment_intent_id"],
-                **_guards(quote),
+                checkout, pay_way_id=stripe.id, **_guards(quote)
             )
 
         assert response.status_code == 409, response.content
@@ -362,6 +362,43 @@ class TestThePickupPoint:
         assert elsewhere.status_code == 409, elsewhere.content
         assert elsewhere.json()["code"] == CART_CHANGED_CODE
         assert quoted.status_code == 201, quoted.content
+
+    def test_a_region_sent_with_a_pickup_order_does_not_change_it(
+        self, locker_checkout
+    ):
+        """A pickup order keeps no region (``_deliver_to_pickup_point``),
+        so neither the quote nor the digest reads one: a client that sends
+        the buyer's region (an island one, the region a home delivery could
+        be priced by) pays what the same order without it pays."""
+        checkout = locker_checkout
+        region = RegionFactory(country=checkout.country, alpha="ION")
+        with_region = {
+            **checkout.choices,
+            "boxnow_locker_id": "4",
+            "region_id": region.alpha,
+        }
+        quote = _quote(checkout, **with_region)
+        bare = _quote(
+            checkout,
+            **{k: v for k, v in with_region.items() if k != "region_id"},
+        )
+
+        response = _post_order(
+            checkout,
+            shipping_kind="pickup_point",
+            shipping_provider_code="boxnow",
+            boxnow_locker_id="4",
+            region_id=region.alpha,
+            **_guards(quote),
+        )
+
+        assert quote["expectedTotal"] == bare["expectedTotal"]
+        assert quote["shipping"]["price"] == bare["shipping"]["price"]
+        assert quote["cartDigest"] == bare["cartDigest"]
+        assert response.status_code == 201, response.content
+        order = Order.objects.get()
+        assert order.region_id is None
+        assert order.shipping_price.amount == _money(bare["shipping"]["price"])
 
 
 class TestTheShippingChoice:
@@ -432,7 +469,9 @@ class TestTheShippingChoice:
 
         def digest(shipping):
             return OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(
+                    checkout.cart.get_items(), promotion
+                ),
                 promotion,
                 shipping=shipping,
                 weight_grams=0,
@@ -447,7 +486,9 @@ class TestTheShippingChoice:
 
         def digest(kind):
             return OrderQuoteService.cart_digest(
-                checkout.cart,
+                OrderQuoteService.priced_lines(
+                    checkout.cart.get_items(), promotion
+                ),
                 promotion,
                 shipping=ShippingChoice(
                     kind=kind, provider_code=None, country_id="GR"
@@ -505,6 +546,7 @@ NOT_PRICED = {
     "floor",
     "location_type",
     "customer_notes",
+    "address_line_2",
     # The receipt or invoice the order is documented with.
     "document_type",
     "billing_vat_id",
@@ -519,8 +561,7 @@ NOT_PRICED = {
     # Store-side carrier overrides of the voucher, not a buyer's choice.
     "acs_charge_type",
     "acs_item_quantity",
-    # How the order is paid, guarded and recorded.
-    "payment_intent_id",
+    # How the order is guarded and recorded.
     "expected_total",
     "expected_cart_digest",
     "terms_accepted",

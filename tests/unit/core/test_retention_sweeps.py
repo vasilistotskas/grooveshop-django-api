@@ -20,8 +20,10 @@ from django.apps import apps as django_apps
 from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
+from django.utils.module_loading import autodiscover_modules
 from djmoney.money import Money
 
+from core import celery_app
 from meta_capi.models import MetaCapiEventLog
 from meta_capi.tasks import purge_expired_meta_capi_event_logs
 from order.enum.payment_transaction import PaymentFeeSource
@@ -46,7 +48,6 @@ from shipping_boxnow.factories import (
 )
 from shipping_boxnow.models import BoxNowParcelEvent
 from shipping_boxnow.tasks import purge_expired_boxnow_parcel_events
-from tenant import tasks as tenant_tasks
 
 pytestmark = pytest.mark.django_db
 
@@ -246,8 +247,13 @@ class TestScheduling:
     def test_fanout_reaches_suspended_stores_and_is_scheduled(
         self, fanout, task, entry
     ):
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            getattr(tenant_tasks, fanout)()
+        # By its name, as beat sends it: a carrier's own fan-outs live in
+        # its app under the name they had in ``tenant.tasks``.
+        autodiscover_modules("tasks")
+        registered = celery_app.tasks[f"tenant.tasks.{fanout}"]
+        module = sys.modules[registered.run.__module__]
+        with patch.object(module, "run_for_all_tenants") as run:
+            registered()
 
         run.assert_called_once_with(task, include_suspended=True)
         assert (

@@ -1,17 +1,13 @@
 import uuid
-from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
-from django.conf import settings
 from django.urls import reverse
-from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from pay_way.enum.settlement import PaySettlement
@@ -26,7 +22,7 @@ pytestmark = pytest.mark.usefixtures("checkout_legal_documents")
 
 
 class CheckoutAPITestCase(APITestCase):
-    """Order-first checkout (``POST /order`` with an offline pay way)."""
+    """Checkout (``POST /order`` with an offline pay way)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -259,100 +255,3 @@ class GuestOrderAccessTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.guest_order.id)
         self.assertIsNone(response.data["user"])
-
-    def test_guest_can_create_a_payment_intent_with_the_uuid(self):
-        order = OrderFactory(
-            user=None,
-            email="guest@example.com",
-            pay_way=PayWayFactory(provider_code="stripe"),
-            status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.PENDING,
-            num_order_items=0,
-        )
-        order.items.create(
-            product=ProductFactory(stock=10, num_images=0, num_reviews=0),
-            price=Money(Decimal("50.00"), settings.DEFAULT_CURRENCY),
-            quantity=2,
-        )
-        url = (
-            reverse("order-create-payment-intent", kwargs={"pk": order.pk})
-            + f"?uuid={order.uuid}"
-        )
-
-        with patch(
-            "pay_way.services.PayWayService.process_payment"
-        ) as mock_payment:
-            mock_payment.return_value = (
-                True,
-                {
-                    "payment_id": "pi_test123",
-                    "status": "requires_payment_method",
-                    "amount": "100.00",
-                    "currency": "EUR",
-                    "provider": "stripe",
-                    "client_secret": "pi_test123_secret",
-                },
-            )
-            response = self.client.post(url, {}, format="json")
-
-        self.assertEqual(
-            response.status_code, status.HTTP_200_OK, response.data
-        )
-        self.assertEqual(response.data["payment_id"], "pi_test123")
-
-    def test_payment_intent_forwards_the_named_fields_to_the_provider(self):
-        """``paymentMethodId`` / ``customerId`` / ``returnUrl`` reach the
-        PSP call as keyword arguments, next to ``paymentData``."""
-        order = OrderFactory(
-            user=None,
-            pay_way=PayWayFactory(provider_code="stripe"),
-            status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.PENDING,
-            num_order_items=0,
-        )
-        url = (
-            reverse("order-create-payment-intent", kwargs={"pk": order.pk})
-            + f"?uuid={order.uuid}"
-        )
-
-        with patch(
-            "pay_way.services.PayWayService.process_payment",
-            return_value=(
-                True,
-                {
-                    "payment_id": "pi_named",
-                    "status": "requires_payment_method",
-                    "amount": "10.00",
-                    "currency": "EUR",
-                    "provider": "stripe",
-                    "client_secret": "pi_named_secret",
-                },
-            ),
-        ) as mock_payment:
-            response = self.client.post(
-                url,
-                {
-                    "paymentMethodId": "pm_123",
-                    "customerId": "cus_123",
-                    "returnUrl": "https://shop.example/checkout/return",
-                    "paymentData": {"save_card": "true"},
-                },
-                format="json",
-            )
-
-        self.assertEqual(
-            response.status_code, status.HTTP_200_OK, response.data
-        )
-        mock_payment.assert_called_once()
-        kwargs = mock_payment.call_args.kwargs
-        self.assertEqual(kwargs.pop("order").pk, order.pk)
-        self.assertEqual(kwargs.pop("pay_way").pk, order.pay_way_id)
-        self.assertEqual(
-            kwargs,
-            {
-                "save_card": "true",
-                "payment_method_id": "pm_123",
-                "customer_id": "cus_123",
-                "return_url": "https://shop.example/checkout/return",
-            },
-        )

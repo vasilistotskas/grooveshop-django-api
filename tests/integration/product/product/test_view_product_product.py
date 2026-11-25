@@ -6,6 +6,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from product.enum.review import ReviewStatus
 from product.factories.brand import BrandFactory
 from product.factories.category import ProductCategoryFactory
 from product.factories.favourite import ProductFavouriteFactory
@@ -65,14 +66,14 @@ class ProductViewSetTestCase(APITestCase):
         product_review_status_true = ProductReviewFactory(
             product=self.product,
             user=self.user,
-            status="True",
+            status=ReviewStatus.TRUE,
         )
         self.reviews.append(product_review_status_true)
 
         product_review_status_false = ProductReviewFactory(
             product=self.product,
             user=user_2,
-            status="False",
+            status=ReviewStatus.FALSE,
         )
         self.reviews.append(product_review_status_false)
 

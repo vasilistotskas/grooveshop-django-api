@@ -5,10 +5,11 @@ version, which settings are translatable or references, its limits) and
 serves the result per store:
 
 ``GET /api/builder/catalogue?schema=<schema>`` answers
-``{hash, blocks: [...]}`` with ``ETag: "<hash>"``. The body is immutable per
-build, so a process keeps its copy and revalidates with ``If-None-Match``
-(a 304 carries no body). Django validates every save against that copy and
-adds only what it alone can check (``builder.validation``).
+``{hash, blocks: [...], icons: [...], ...}`` with ``ETag: "<hash>"``. The
+body is immutable per build, so a process keeps its copy and revalidates
+with ``If-None-Match`` (a 304 carries no body). Django validates every
+save against that copy and adds only what it alone can check
+(``builder.validation``).
 
 Nothing is saved on a guess: when the storefront does not answer (a fetch or
 a revalidation), :class:`StorefrontUnavailable` is raised and the caller
@@ -101,6 +102,16 @@ class RootDefinition:
     validator: Validator = field(compare=False, repr=False)
 
 
+@dataclass(frozen=True, slots=True)
+class CatalogueIcon:
+    """One icon the builder offers (the catalogue's ``icons``): its name as
+    a store saves it (``i-lucide-zap``) and the editor's label for it in
+    every language of the storefront, by language code."""
+
+    name: str
+    labels: dict[str, str]
+
+
 #: What a settings object is validated against: a block's or a document root's.
 Spec = BlockDefinition | RootDefinition
 
@@ -116,12 +127,18 @@ class Catalogue:
     #: The caps for typed data props (``dataLimits``); the catalogue states
     #: them whenever a block declares ``data``.
     data_limits: data_sources.DataLimits | None = None
+    #: The icons the builder offers (``icons``), for a field that holds one
+    #: icon outside a block: a blog category's (``blog.icons``).
+    icons: tuple[CatalogueIcon, ...] = ()
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
 
     def get(self, type_name: str) -> BlockDefinition | None:
         return self._index.get(type_name)
+
+    def icon(self, name: str) -> CatalogueIcon | None:
+        return next((icon for icon in self.icons if icon.name == name), None)
 
 
 def _optional_set(raw: Any) -> frozenset[str] | None:
@@ -261,6 +278,24 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
     )
 
 
+def _parse_icon(raw: dict[str, Any]) -> CatalogueIcon:
+    """One entry of ``icons``. A name that is not a non-empty string, or a
+    language of ``settings.LANGUAGES`` without a non-empty label, is a
+    catalogue bug, refused when it is read: the admin labels each choice in
+    its own language."""
+    name = raw["name"]
+    labels = raw["labels"]
+    if not (isinstance(name, str) and name and isinstance(labels, dict)):
+        raise ValueError("unexpected icon")
+    for code, _name in settings.LANGUAGES:
+        label = labels.get(code)
+        if not (isinstance(label, str) and label):
+            raise ValueError(f"icon {name} has no {code} label")
+    return CatalogueIcon(
+        name=name, labels={str(k): str(v) for k, v in labels.items()}
+    )
+
+
 def parse_catalogue(payload: Any) -> Catalogue:
     try:
         blocks = tuple(_parse_block(raw) for raw in payload["blocks"])
@@ -279,6 +314,7 @@ def parse_catalogue(payload: Any) -> Catalogue:
             blocks=blocks,
             roots=roots,
             templates=frozenset(str(t) for t in payload.get("templates") or ()),
+            icons=tuple(_parse_icon(raw) for raw in payload["icons"]),
             data_limits=(
                 data_sources.DataLimits.parse(raw_limits)
                 if raw_limits is not None

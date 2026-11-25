@@ -8,12 +8,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import translation
 
-from tenant.models import (
-    Tenant,
-    TenantDomain,
-    TenantMembershipRole,
-    UserTenantMembership,
-)
+from tenant.enum import TenantMembershipRole
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
 User = get_user_model()
@@ -131,6 +127,26 @@ def test_same_user_can_belong_to_two_tenants(user):
     )
     assert m_a.tenant_id != m_b.tenant_id
     assert user.tenant_memberships.count() == 2
+
+
+#: What ``str.strip()`` removes, so what ``tenant_create`` refuses.
+WHITESPACE = [chr(c) for c in range(0x110000) if chr(c).isspace()]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("name", ["", *WHITESPACE, "".join(WHITESPACE)])
+def test_a_blank_tenant_name_is_refused_by_the_database(name):
+    """The database refuses every name the command refuses, whatever
+    the database locale's ``\\s`` covers (U+00A0 is not in it)."""
+    with pytest.raises(IntegrityError, match="tenant_name_not_blank"):
+        store_tenant("unit_blank_name", name=name)
+
+
+@pytest.mark.django_db
+def test_a_name_with_surrounding_spaces_is_stored():
+    tenant = store_tenant("unit_spaced_name", name=" Store ")
+
+    assert Tenant.objects.get(pk=tenant.pk).name == " Store "
 
 
 # ---------------------------------------------------------------------------

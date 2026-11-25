@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import functools
+from typing import ClassVar
+
+from django.contrib.admin.options import ActionLocation
 from django.forms.models import _get_foreign_key
+from django.http import HttpResponseNotAllowed
+from django.utils.translation import gettext as _
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from admin.features import (
     PLACEMENTS,
@@ -11,6 +18,70 @@ from admin.features import (
     Placement,
     store_features,
 )
+
+
+class PostOnlyActionsModelAdmin(UnfoldModelAdmin):
+    """A list, row or detail action acts only on a POST, unless it reads.
+
+    Unfold serves each of those actions at a URL of its own and renders its
+    button as a link, so a plain GET of that URL would run the action's
+    body. An action with a ``dialog`` is safe: Unfold shows the form on a
+    GET and calls the body only with the form posted back. Any other
+    action answers 405 to a non-POST request, unless the admin names it in
+    ``read_actions``: a download or a redirect to a filtered list (the ACS
+    voucher download also stamps the label as printed, and stays a GET so
+    the browser can download the file).
+    ``tests/unit/admin/test_actions_confirm.py`` fails for an action that is
+    neither.
+    """
+
+    read_actions: ClassVar[frozenset[str]] = frozenset()
+
+    def get_unfold_action(self, action):
+        unfold_action = super().get_unfold_action(action)
+        routed = (
+            *self._extract_action_names(self.actions_list),
+            *self._extract_action_names(self.actions_row),
+            *self._extract_action_names(self.actions_detail),
+        )
+        if (
+            action not in routed
+            or action in self.read_actions
+            or unfold_action.dialog
+        ):
+            return unfold_action
+        method = unfold_action.method
+
+        @functools.wraps(method)
+        def post_only(request, *args, **kwargs):
+            if request.method != "POST":
+                return HttpResponseNotAllowed(["POST"])
+            return method(request, *args, **kwargs)
+
+        unfold_action.method = post_only
+        return unfold_action
+
+
+class ActionLocationModelAdmin(UnfoldModelAdmin):
+    """Keeps Django's ``action_location`` through Unfold's action choices.
+
+    Replaces ``unfold.admin.ModelAdmin.get_action_choices``, which has
+    Django 5.x's signature: it drops ``action_location`` and so triggers
+    ``RemovedInDjango2028Warning`` on every changelist. This calls the
+    method Unfold overrides, with Unfold's blank "Select action" choice.
+    Delete it once Unfold accepts ``action_location``. It must precede
+    Unfold's ``ModelAdmin`` in the bases.
+    """
+
+    def get_action_choices(
+        self,
+        request,
+        default_choices=None,
+        action_location=ActionLocation.CHANGE_LIST,
+    ):
+        return super(UnfoldModelAdmin, self).get_action_choices(
+            request, [("", _("Select action"))], action_location
+        )
 
 
 class AdminFooterMixin:
@@ -126,6 +197,18 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
     applies an action's ``allowed_permissions``).
     """
 
+    def get_actions(self, request, action_location=ActionLocation.CHANGE_LIST):
+        """dj-stripe's admins override ``get_actions`` with Django 5's
+        signature (``djstripe.admin.actions.CustomActionMixin`` and four
+        of its model admins), which Django 6 reports with a
+        ``RemovedInDjango2028Warning`` on every changelist. Their actions
+        are changelist actions, so the change form gets none, as Django
+        gives an override of the old signature. Delete once dj-stripe
+        accepts ``action_location``."""
+        if action_location != ActionLocation.CHANGE_LIST:
+            return {}
+        return super().get_actions(request)
+
     def get_urls(self):
         from django.urls import path
 
@@ -146,7 +229,6 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
     def custom_action_view(self, request, action_name: str, model_name: str):
         from django.apps import apps
         from django.core.exceptions import PermissionDenied
-        from djstripe.admin.views import ConfirmCustomAction
 
         try:
             model = apps.get_app_config("djstripe").get_model(model_name)
@@ -159,9 +241,45 @@ class StripeMirrorModelAdmin(IsSuperuserOnlyModelAdmin):
             or action_name not in target.get_actions(request)
         ):
             raise PermissionDenied
-        return ConfirmCustomAction.as_view()(
+        return _confirm_stripe_custom_action()(
             request, action_name=action_name, model_name=model_name
         )
+
+
+@functools.cache
+def _confirm_stripe_custom_action():
+    """dj-stripe's confirm view for its custom actions, whose
+    ``form_invalid`` runs the action by indexing its tuple
+    (``get_action(name)[0]``, ``djstripe/admin/views.py``), which Django 6
+    reports with a ``RemovedInDjango2028Warning``. This one calls the
+    action's ``func``. Delete once dj-stripe does."""
+    from django.contrib import messages
+    from django.contrib.admin import helpers, site
+    from djstripe import utils
+    from djstripe.admin.views import ConfirmCustomAction
+
+    class ConfirmStripeCustomAction(ConfirmCustomAction):
+        def form_invalid(self, form):
+            model_name = self.kwargs.get("model_name")
+            action_name = self.kwargs.get("action_name")
+            model = utils.get_model(model_name)
+            pks = list(
+                map(int, form.data.getlist(helpers.ACTION_CHECKBOX_NAME))
+            )
+            queryset = utils.get_queryset(pks, model_name)
+            model_admin = site._registry.get(model)
+            for msg in form.errors.values():
+                messages.add_message(
+                    self.request,
+                    messages.ERROR,
+                    msg.as_text(),
+                    fail_silently=True,
+                )
+            return model_admin.get_action(action_name).func(
+                model_admin, self.request, queryset
+            )
+
+    return ConfirmStripeCustomAction.as_view()
 
 
 class WithheldOnTenantHostModelAdmin:

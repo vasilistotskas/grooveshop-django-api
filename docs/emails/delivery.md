@@ -127,7 +127,10 @@ the transport sends under a PostgreSQL advisory lock on the delivery id
 the transport's answer, then finds the row `SENT` and sends nothing. The lock is the session's, held outside any
 transaction (a transaction open across the send would be ended by
 `idle_in_transaction_session_timeout`), so a worker that dies takes it along
-and the waiting copy sends instead. Inside a transaction (a task applied
+and the waiting copy sends instead: at once when its process ends, and within
+about a minute when its node is lost without closing the socket (every session
+sets TCP keepalives, `DB_TCP_KEEPALIVES_*` in `src/settings/database.py`; the
+server's own probes give up on a lost client after about half an hour). Inside a transaction (a task applied
 eagerly) it is the transaction's and ends with it. A send outside a task has a
 fresh id and takes no lock. A wait that runs out (`statement_timeout`, or a
 `lock_timeout` a session sets) raises

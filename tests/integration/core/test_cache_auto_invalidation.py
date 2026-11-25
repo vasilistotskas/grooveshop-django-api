@@ -388,9 +388,62 @@ class TestIgnoredUpdateFields:
         from core.cache.registry import get_surface
 
         for code in ("products", "sitemap_seo", "recommendations"):
-            assert get_surface(code).ignored_update_fields == frozenset(
+            assert get_surface(code).ignored_update_fields >= frozenset(
                 {"stock", "updated_at"}
             ), code
+
+
+class TestAccountIdentity:
+    """The blog (authors, commenters) and the product reviews show an
+    account's public identity: name, username, avatar and its size. A
+    change to it purges them; a sign-in or a loyalty update does not."""
+
+    @pytest.mark.parametrize("code", ["blog", "products"])
+    def test_the_surfaces_showing_it_declare_the_account(self, code):
+        from core.cache.registry import get_surface
+        from core.cache.surfaces import ACCOUNT_BOOKKEEPING_FIELDS
+
+        surface = get_surface(code)
+        assert "user.UserAccount" in surface.invalidated_by
+        assert surface.ignored_update_fields >= ACCOUNT_BOOKKEEPING_FIELDS
+
+    def test_bookkeeping_fields_are_account_fields_outside_the_identity(self):
+        from django.contrib.auth import get_user_model
+
+        from core.cache.surfaces import ACCOUNT_BOOKKEEPING_FIELDS
+        from user.serializers.account import UserPublicSerializer
+
+        model = get_user_model()
+        names = {f.name for f in model._meta.concrete_fields}
+        identity = set(UserPublicSerializer.Meta.fields) | {
+            "image",
+            "image_width",
+            "image_height",
+        }
+        assert names >= ACCOUNT_BOOKKEEPING_FIELDS
+        assert not identity & ACCOUNT_BOOKKEEPING_FIELDS
+
+    def test_a_sign_in_marks_nothing_and_an_avatar_change_marks(self):
+        from core.cache import invalidation
+        from core.cache.surfaces import ACCOUNT_BOOKKEEPING_FIELDS
+
+        with (
+            mock.patch.object(
+                invalidation, "_in_public_schema", return_value=False
+            ),
+            mock.patch.object(invalidation, "_mark_stale") as mark,
+        ):
+            receiver = invalidation._make_receiver(
+                "blog",
+                ACCOUNT_BOOKKEEPING_FIELDS,
+                platform_rows_in_public=True,
+            )
+            receiver(sender=None, update_fields=frozenset({"last_login"}))
+            receiver(
+                sender=None,
+                update_fields=frozenset({"image", "image_width"}),
+            )
+        mark.assert_called_once_with("blog")
 
 
 class TestPublicSchemaWrites:

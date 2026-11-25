@@ -24,7 +24,7 @@ def purchase_items(*, user, product):
     The single definition of a verified purchase: a line of the user's
     order that was delivered and paid for. That is COMPLETED, the state
     machine's closed, successful end, which a paid delivery reaches at
-    once (``OrderService.maybe_advance_to_completed``). It is also
+    once (``OrderLifecycleService.maybe_advance_to_completed``). It is also
     DELIVERED when the shopper pays at the door or to the carrier
     (``PaySettlement.collected_on_delivery``): the order then stays
     DELIVERED until the carrier's payout is reconciled, days later, which

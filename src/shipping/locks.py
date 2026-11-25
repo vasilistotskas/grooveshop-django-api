@@ -15,7 +15,7 @@ locks the shipment's row before its order's.
 A path that only ever touches the shipment locks the shipment alone, and
 must not then write the order in the same transaction. An order cancel
 holds no shipment lock at all: it commits, and only then asks the courier
-(``OrderService.cancel_attached_shipment``).
+(``OrderLifecycleService.cancel_attached_shipment``).
 """
 
 from __future__ import annotations

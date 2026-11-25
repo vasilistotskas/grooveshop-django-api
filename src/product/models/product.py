@@ -24,6 +24,7 @@ from simple_history.models import HistoricalRecords
 
 from core.fields.measurement import MeasurementField
 from core.fields.rich_text import RichTextField
+from core.measurement import DistanceUnits, WeightUnits
 from core.models import (
     MetaDataModel,
     SeoTranslationModel,
@@ -31,7 +32,6 @@ from core.models import (
     TimeStampMixinModel,
     UUIDModel,
 )
-from core.units import DistanceUnits, WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
 from core.utils.html_text import visible_text
 from core.weight import zero_weight
@@ -658,26 +658,37 @@ class Product(
         return [image.main_image_path for image in self.ordered_images]
 
     @property
-    def main_image_path(self) -> str:
-        # Use prefetched images if available (from the queryset optimizers)
-        # to avoid an N+1 query per product
+    def main_image(self) -> ProductImage | None:
+        """The main image: from the queryset optimizers' prefetch when
+        there is one (no query per product), else one query."""
         prefetched = getattr(self, "_prefetched_main_images", None)
         if prefetched is None:
             prefetched = getattr(self, "_prefetched_images", None)
             if prefetched is not None:
                 prefetched = [i for i in prefetched if i.is_main]
         if prefetched is not None:
-            product_image = prefetched[0] if prefetched else None
-        else:
-            product_image = ProductImage.objects.filter(
-                product_id=self.id, is_main=True
-            ).first()
-        if not product_image:
-            return ""
-        # Delegates to ProductImage.main_image_path which respects
-        # TenantFileSystemStorage — the schema-prefixed path is needed
-        # so the media-stream UPLOADED_MEDIA route can resolve it.
-        return product_image.main_image_path
+            return prefetched[0] if prefetched else None
+        return ProductImage.objects.filter(
+            product_id=self.id, is_main=True
+        ).first()
+
+    @property
+    def main_image_path(self) -> str:
+        # ProductImage.main_image_path respects TenantFileSystemStorage:
+        # the schema-prefixed path the media-stream UPLOADED_MEDIA route
+        # resolves.
+        product_image = self.main_image
+        return product_image.main_image_path if product_image else ""
+
+    @property
+    def main_image_width(self) -> int | None:
+        product_image = self.main_image
+        return product_image.image_width if product_image else None
+
+    @property
+    def main_image_height(self) -> int | None:
+        product_image = self.main_image
+        return product_image.image_height if product_image else None
 
     @property
     def colored_stock(self) -> SafeString:
@@ -697,7 +708,7 @@ class Product(
 # written here.
 class ProductTranslation(
     TranslatedFieldsModel, SeoTranslationModel, IndexMixin
-):  # ty: ignore[invalid-method-override]
+):  # ty: ignore[incompatible-method-override]
     master = TranslationsForeignKey(
         "product.Product",
         on_delete=models.CASCADE,
@@ -705,7 +716,7 @@ class ProductTranslation(
         null=True,
     )
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
-    description = RichTextField(_("Description"), blank=True, null=True)
+    description = RichTextField(_("Description"), blank=True, default="")
     feed_title = models.CharField(
         _("Feed title"),
         max_length=150,

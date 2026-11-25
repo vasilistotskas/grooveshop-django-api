@@ -38,11 +38,6 @@ urlpatterns = [
         name="cart-agent-token",
     ),
     path(
-        "cart/create-payment-intent",
-        CartViewSet.as_view({"post": "create_payment_intent"}),
-        name="cart-create-payment-intent",
-    ),
-    path(
         "cart/quote",
         CartViewSet.as_view({"post": "quote"}),
         name="cart-quote",

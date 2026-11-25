@@ -20,8 +20,8 @@ as ``OrderItem.vat_rate`` freezes the rate. The tax documents read that
 snapshot (``discounted_line_gross``) and never re-derive it, so editing a
 promotion or a product afterwards cannot rewrite a document already
 earned. Every split uses the same largest-remainder rule
-(``proportional_shares``), and the cart preview, the payment-intent amount
-and order creation all get their allocation from the one function,
+(``proportional_shares``), and the cart preview, the checkout quote and
+order creation all get their allocation from the one function,
 ``allocate_capped``.
 
 Gift-card amounts are deliberately NOT allocated — a gift card is a

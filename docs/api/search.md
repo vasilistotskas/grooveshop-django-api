@@ -21,16 +21,16 @@ attribution, trending queries and per-store analytics.
   reach the view. The schema advertises the camelCase form.
 - **Base URL** is `/api/v1` on the store's own API host. Never hardcode a
   merchant's domain; `webside.gr` is tenant #1's, not a platform default.
-- Languages: `el` (default), `en`, `de`.
+- Languages: `el` (default) and `en` (`settings.LANGUAGES`); any other `languageCode` is a 400.
 
 ## Endpoints
 
 | Endpoint | Method | Permission |
 |---|---|---|
-| `/api/v1/search/product` | GET | `AllowAny` |
+| `/api/v1/search/product` | GET | `AllowAny` behind `IsCatalogueEnabled` (404 when the store has the catalogue off) |
 | `/api/v1/search/blog/post` | GET | `IsBlogEnabled` (404 when the store has blog off) |
 | `/api/v1/search/click` | POST | `AllowAny` |
-| `/api/v1/search/trending` | GET | `AllowAny` |
+| `/api/v1/search/trending` | GET | `AllowAny` (`contentType=product` is 404 when the store has the catalogue off) |
 | `/api/v1/search/analytics` | GET | `IsStoreStaff` |
 
 `/search/analytics` is **store staff**, not platform superuser: the data is
@@ -74,8 +74,7 @@ the same as absent; anything but true/false/1/0 is a 400.
 Product hits carry the card fields `brandName`, `reviewCount` (approved reviews
 only), `createdAt` and `lowStockThreshold`, read from the database like
 `categoryName`, so they are never stale. `brand`, `in_stock`,
-`discount_percent` and `on_offer` are indexed; after a deploy that adds an
-indexed field, run `meilisearch_sync_all_indexes --all-tenants --app product`
+`discount_percent` and `on_offer` are indexed; after a release that adds an indexed field, run `meilisearch_sync_all_indexes --all-tenants --app product`
 (it applies the new filterable attribute and re-sends every document).
 
 Hits, the product feed (`/product/feed`) and the product page carry
@@ -117,7 +116,7 @@ products:
   reached (or freed). Marks are coalesced in the cache per tenant; one
   `reindex_offer_products_task` runs 15 seconds after the first, whatever the
   number of signals. Removed members are captured before the change, because
-  they are no longer in the scope afterwards.
+  the change takes them out of the scope.
 - `reindex_offer_window_changes_task` (beat, every 5 minutes, fanned out per
   tenant by `fanout_reindex_offer_window_changes`) reindexes the products of
   promotions whose `starts_at` / `ends_at` passed since the last run. The
@@ -131,8 +130,7 @@ Flipping promotions off or on (the store's `PROMOTIONS_ENABLED` or the plan's
 signalled: the reverse side of the M2M (`product.promotions.add(...)`); the
 nightly `sync_meilisearch_indexes` repairs it.
 
-Response is `ProductMeiliSearchResponse`: the common envelope above plus
-`facetDistribution` and `facetStats` when `facets` was requested.
+Response is `ProductMeiliSearchResponse`: `queryId`, `relaxedQuery`, `limit`, `offset`, `estimatedTotalHits` and `results`, plus `facetDistribution` and `facetStats` when `facets` was requested.
 
 ### Attribute filters and facet counts
 
@@ -148,8 +146,7 @@ The same class reads the ids for every surface that filters by attribute
 value, so they cannot drift: this search (one `attribute_values IN [...]`
 clause per attribute; a Meilisearch filter list ANDs its elements) and the
 product list's `attributeValue_In` filter (`src/product/filters/product.py`, one
-subquery per attribute). The agent gateway's catalogue calls reach this
-endpoint without one.
+subquery per attribute). The agent gateway's catalogue search never sends `attributeValues`.
 
 An id that belongs to no attribute (a deleted value in a stale link) is kept as
 a group of its own that matches no product: the request lists nothing instead
@@ -257,7 +254,7 @@ Most popular queries from the last 24 hours, cached 5 minutes per
 |---|---|---|---|
 | `startDate` | `YYYY-MM-DD` | No | all history |
 | `endDate` | `YYYY-MM-DD` | No | now |
-| `contentType` | string | No | — (`product`, `blog_post`, `federated`: the federated endpoint's searches until its removal on 2026-10-25) |
+| `contentType` | string | No | — (`product`, `blog_post`, `federated`: only on rows an earlier endpoint recorded) |
 
 Both dates are whole days in the server's `TIME_ZONE` (Europe/Athens by
 default; there is no per-store timezone), and both are included:
@@ -277,10 +274,7 @@ zero-result query was retried with its leading word dropped, the row carries
 both passes summed.
 
 The engine's timing is deliberately **not** in any search response — it is
-handed from the view to the analytics middleware on the request object, so it
-never became part of this contract. Rows written before 2026-09-14 store
-`NULL` and are excluded from the average; a range covering only those reports
-`0.0`.
+handed from the view to the analytics middleware on the request object, so it is not part of this contract. A row with no recorded timing stores `NULL` and is excluded from the average; a range with only such rows reports `0.0`.
 
 ---
 
@@ -322,7 +316,7 @@ The search, product, blog and trending endpoints carry
 `SearchThrottle` (scope `search`); `/search/click` carries
 `SearchClickThrottle` (scope `search_click`), a budget of its own so clicks
 cannot starve searches. Both are per user or IP
-(`src/core/api/throttling.py`), and the global `anon` / `user` daily throttles
+(`src/search/throttles.py`), and the global `anon` / `user` daily throttles
 apply on top. `/search/analytics` has only the global DRF defaults. Rates
 live in `settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, all disabled
 when `DEBUG`. DRF returns

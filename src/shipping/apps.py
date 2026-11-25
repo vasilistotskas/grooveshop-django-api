@@ -21,4 +21,5 @@ class ShippingConfig(AppConfig):
         # it is the platform's own fallback — a deployment that somehow
         # omitted it would leave every store without a carrier contract
         # unable to take an order.
+        from shipping import signals  # noqa: F401
         from shipping.carriers import flat_rate  # noqa: F401

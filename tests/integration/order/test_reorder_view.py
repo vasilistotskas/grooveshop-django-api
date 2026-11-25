@@ -1,6 +1,6 @@
 """``POST /api/v1/order/{id}/reorder`` (``OrderViewSet.reorder``,
-``order/views/order.py``) and ``OrderService.reorder_to_cart``
-(``order/services.py``).
+``src/order/views/order.py``) and ``OrderLifecycleService.reorder_to_cart``
+(``src/order/lifecycle/service.py``).
 
 A past order's lines are copied into the caller's own cart. Inactive and
 out-of-stock products are reported in ``skipped_items``; a line with

@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
@@ -111,7 +111,7 @@ class TestOrderCreateErrorCodes(APITestCase):
         assert response.json()["code"] == OrderCreateErrorType.CART_INVALID
 
     @patch("order.services.OrderService.validate_shipping_address")
-    @patch("order.services.OrderService.create_order_from_cart_offline")
+    @patch("order.services.OrderService.create_order_from_cart")
     def test_a_lapsed_reservation_is_reservation_unavailable(
         self, mock_create, _mock_address
     ):
@@ -133,3 +133,31 @@ class TestOrderCreateErrorCodes(APITestCase):
 
         assert isinstance(error, InvalidOrderDataError)
         assert "Cart validation failed" in str(error)
+
+
+@pytest.mark.django_db
+def test_a_cache_outage_during_creation_is_the_coded_503():
+    """A cache-held bound that fails closed raises ``REDIS_UNAVAILABLE``;
+    the view's catch-all must leave it to ``StrictCacheUnavailableMiddleware``
+    (a 503 ``temporarily_unavailable``), never answer it as a 500."""
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    from core.cache_backend import STRICT_CACHE_UNAVAILABLE_CODE
+    from order.views.order import OrderViewSet
+
+    cart = CartFactory()
+    CartItemFactory(cart=cart)
+    with patch.object(
+        OrderViewSet,
+        "_validate_and_create",
+        side_effect=RedisConnectionError("down"),
+    ):
+        response = APIClient().post(
+            reverse("order-list"),
+            {},
+            format="json",
+            HTTP_X_CART_ID=str(cart.uuid),
+        )
+
+    assert response.status_code == 503, response.content
+    assert response.json()["code"] == STRICT_CACHE_UNAVAILABLE_CODE

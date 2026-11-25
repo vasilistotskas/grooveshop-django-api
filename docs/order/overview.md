@@ -16,10 +16,9 @@ Three orthogonal axes describe every order in the system:
 **`Order.pay_way.settlement`.** Drives which create path runs (online → webhook
 completes payment; the rest → collected later) AND which carriers may serve the
 order — a carrier declares the settlements it can physically perform
-(`supported_settlements`). The pay way's former `is_online_payment` /
-`requires_confirmation` booleans are gone (`pay_way` 0034 took them out of the
-model, 0035 dropped the columns). The order's `isOnlinePayment` is a different
-field, computed from `settlement`.
+(`supported_settlements`). The pay way has no online or confirmation flags:
+`settlement` is the one discriminator. The order's `isOnlinePayment` is a
+different field, computed from `settlement`.
 
 Two order columns look like "the payment method" and are not
 interchangeable:

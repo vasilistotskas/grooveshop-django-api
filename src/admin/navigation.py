@@ -47,6 +47,7 @@ from admin.features import Availability, store_features
 from admin.permissions import opens_changelist
 from core.rosetta_access import tenant_scoped_rosetta_access
 from core.utils.tenant_urls import get_tenant_base_url
+from shipping.interfaces import registered_providers
 from tenant.membership import get_current_tenant, is_platform_superuser
 
 Item = dict[str, Any]
@@ -433,49 +434,32 @@ def store_sidebar(request: Any) -> list[Item]:
     )
 
     inactive = features.inactive_carrier_apps()
-    acs = "shipping_acs" not in inactive
-    boxnow = "shipping_boxnow" not in inactive
+
+    def carrier_pages(
+        section: str, *, in_use_only: bool = False
+    ) -> list[Item | None]:
+        """A section's pages of the carriers, in the order they declare
+        (``AdminPage.rank``, then registration). The System section keeps
+        a store's unused carriers' logs; the store's own groups do not."""
+        pages = sorted(
+            (
+                p
+                for carrier in registered_providers()
+                if not in_use_only or carrier.app_label not in inactive
+                for p in getattr(carrier.admin_pages(), section)
+            ),
+            key=lambda p: p.rank,
+        )
+        return [page(p.model, str(p.title), p.icon) for p in pages]
 
     shipping = _group(
         _("Shipping"),
         [
-            page(
-                "shipping_acs.AcsShipment", _("ACS Shipments"), "local_shipping"
-            )
-            if acs
-            else None,
-            page(
-                "shipping_acs.AcsUnrecognisedVoucher",
-                _("ACS vouchers matching no order"),
-                "qr_code",
-            )
-            if acs
-            else None,
-            page(
-                "shipping_acs.AcsVoucherHold",
-                _("ACS voucher holds"),
-                "pause_circle",
-            )
-            if acs
-            else None,
-            page(
-                "shipping_boxnow.BoxNowShipment",
-                _("BoxNow Shipments"),
-                "package_2",
-            )
-            if boxnow
-            else None,
+            *carrier_pages("shipments", in_use_only=True),
             _menu(
                 _("Pickup Points"),
                 "location_on",
-                [
-                    page("shipping_boxnow.BoxNowLocker", _("BoxNow Lockers"))
-                    if boxnow
-                    else None,
-                    page("shipping_acs.AcsStation", _("ACS Stations"))
-                    if acs
-                    else None,
-                ],
+                carrier_pages("pickup_points", in_use_only=True),
             ),
         ],
     )
@@ -492,6 +476,7 @@ def store_sidebar(request: Any) -> list[Item]:
                 _("Shipping Providers"),
                 "route",
             ),
+            page("shipping.ShippingZone", _("Shipping Zones"), "public"),
             page("vat.Vat", _("VAT Rates"), "percent"),
             # Which emails the store sends, with their preview, log and
             # suppression list; one page, not a model list.
@@ -536,15 +521,7 @@ def store_sidebar(request: Any) -> list[Item]:
                         page("order.StockLog", _("Stock Logs")),
                         page("order.OrderHistory", _("Order History")),
                         page("order.OrderItemHistory", _("Order Item History")),
-                        page(
-                            "shipping_boxnow.BoxNowParcelEvent",
-                            _("BoxNow Events"),
-                        ),
-                        page(
-                            "shipping_acs.AcsTrackingEvent",
-                            _("ACS Tracking Events"),
-                        ),
-                        page("shipping_acs.AcsApiCall", _("ACS API Calls")),
+                        *carrier_pages("audit"),
                         page(
                             "order.VivaWebhookEvent", _("Viva Webhook Events")
                         ),
@@ -560,14 +537,7 @@ def store_sidebar(request: Any) -> list[Item]:
                     _("Reconciliation"),
                     "balance",
                     [
-                        page(
-                            "shipping_acs.AcsPickupList", _("ACS Pickup Lists")
-                        ),
-                        page(
-                            "shipping_acs.AcsPickupListRun",
-                            _("ACS Pickup List Runs"),
-                        ),
-                        page("shipping_acs.AcsCodPayout", _("ACS COD Payouts")),
+                        *carrier_pages("reconciliation"),
                         page("order.InvoiceCounter", _("Receipt Counter")),
                         page("order.CreditCounter", _("Credit Counter")),
                     ],

@@ -3,8 +3,8 @@ import logging
 from django.contrib.auth import get_user_model
 
 from core import celery_app
+from core.monitored_task import MonitoredTask
 from core.retry import TRANSIENT_ERRORS
-from core.tasks import MonitoredTask
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -65,6 +65,7 @@ def notify_comment_liked_task(
             category=NotificationCategoryEnum.REVIEW,
             notification_type=NotificationTypeEnum.COMMENT_LIKED,
             link=blog_post_url,
+            distinct_by=user_id,
             # Plain text — the ``link`` carries the blog-post URL and
             # the UI treats the notification card as a single tap
             # target, so ``<a>`` tags in the copy would render as

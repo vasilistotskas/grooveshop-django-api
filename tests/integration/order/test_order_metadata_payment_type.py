@@ -80,13 +80,13 @@ class TestPaymentTypeMetadataFollowsThePayWay:
         """The regression: this said "offline" for every card order.
 
         A REDIRECT provider (Viva) is the case that actually reaches
-        this code path. ``create_order_from_cart_offline`` refuses an
+        this code path. ``create_order_from_cart`` refuses an
         online pay way unless its ``provider_code`` is in
         ``_REDIRECT_PROVIDER_CODES`` — hosted-redirect flows create the
         order first and collect payment afterwards, which is exactly how
         the 78 mislabelled production orders were written.
         """
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=_cart(),
@@ -106,7 +106,7 @@ class TestPaymentTypeMetadataFollowsThePayWay:
         locker terminal — the distinction the whole shipping layer
         turns on, and the one an auditor reading this key most needs.
         """
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=_cart(),
@@ -130,7 +130,7 @@ class TestPaymentTypeMetadataFollowsThePayWay:
             cost=Money(Decimal(0), "EUR"),
             free_threshold=Money(Decimal(0), "EUR"),
         )
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=_cart(),

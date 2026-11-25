@@ -6,7 +6,7 @@ endpoints bypass DRF entirely, so we need a separate rate limiter.
 Uses Django's Redis cache for counters (already configured in settings).
 
 **A Redis outage refuses, it never lifts the limit** (the rule beside
-``core.caches.STRICT_KEY_PREFIXES``). The counters live under
+``core.cache_backend.STRICT_KEY_PREFIXES``). The counters live under
 ``STRICT_NAMESPACE``, and ``count_in_window`` raises on an unreachable
 Redis; the request is answered by ``core.middleware.strict_cache``: 503
 ``temporarily_unavailable`` in allauth's error envelope, the same answer
@@ -22,7 +22,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE
+from core.cache_backend import REDIS_UNAVAILABLE, STRICT_NAMESPACE
 from core.client_ip import client_ip_or_peer
 from core.middleware.strict_cache import unavailable_response
 
@@ -112,7 +112,7 @@ class AllAuthRateLimitMiddleware:
             # they cannot exhaust each other's quota.
             schema = getattr(connection, "schema_name", "public") or "public"
             # Under the strict namespace: the cache never answers these
-            # from a failing Redis (``core.caches.STRICT_KEY_PREFIXES``).
+            # from a failing Redis (``core.cache_backend.STRICT_KEY_PREFIXES``).
             cache_prefix = (
                 f"{STRICT_NAMESPACE}allauth_rl:{schema}:"
                 f"{path_prefix.replace('/', '_')}"

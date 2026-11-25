@@ -1,15 +1,16 @@
-"""Zero-total settlement, gift-line injection, and PI/loyalty parity.
+"""Zero-total settlement, gift-line injection, and loyalty on an online
+order.
 
-The order-first path settles fully-covered orders without a provider;
+Order creation settles fully-covered orders without a provider;
 FREE_GIFT entitlements land as zero-price lines with real stock
-decrements; and the Stripe verification guard now prices loyalty the
-same way redeem_points does.
+decrements; and an online order is due what the quote priced, loyalty
+included, the same way redeem_points prices it.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from djmoney.money import Money
@@ -30,10 +31,7 @@ from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
@@ -109,7 +107,7 @@ class TestZeroTotalSettlement:
             benefit_type=BenefitType.FREE_SHIPPING,
         )
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -148,7 +146,7 @@ class TestGiftInjection:
         )
         self._gift_promotion(gift_product)
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -191,7 +189,7 @@ class TestGiftInjection:
             session_id="another-shopper",
         )
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -218,7 +216,7 @@ class TestGiftInjection:
         )
         promotion = self._gift_promotion(gift_product)
 
-        order = OrderService.create_order_from_cart_offline(
+        order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
@@ -234,10 +232,12 @@ class TestGiftInjection:
         assert not promotion.redemptions.exists()
 
 
-class TestLoyaltyPaymentIntentParity:
-    def test_verification_accepts_intent_priced_with_loyalty(
+class TestLoyaltyOnAnOnlineOrder:
+    def test_the_amount_due_is_priced_with_the_loyalty_discount(
         self, enable_promotions, checkout
     ):
+        """The order the shopper pays afterwards is due exactly what the
+        quote priced, the points' discount included."""
         from loyalty.models.transaction import PointsTransaction
         from order.inventory.stock import StockManager
 
@@ -270,91 +270,18 @@ class TestLoyaltyPaymentIntentParity:
             weight_grams=0,
         ).price.amount + Decimal("95.00")
 
-        with patch(
-            "order.payments.payment.get_payment_provider"
-        ) as mock_provider:
-            instance = Mock()
-            instance.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {
-                    "payment_id": "pi_loyalty",
-                    "amount": float(expected_total),
-                    "currency": "eur",
-                },
+        order = OrderService.create_order_from_cart(
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=checkout["cart"],
+                shipping_address=checkout["shipping_address"],
+                pay_way=pay_way,
+                user=user,
+                loyalty_points_to_redeem=500,
             )
-            mock_provider.return_value = instance
-
-            order = OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=checkout["cart"],
-                    shipping_address=checkout["shipping_address"],
-                    payment_intent_id="pi_loyalty",
-                    pay_way=pay_way,
-                    user=user,
-                    loyalty_points_to_redeem=500,
-                )
-            )
+        )
 
         order.refresh_from_db()
         assert order.loyalty_discount.amount == Decimal("5.00")
         assert order.amount_due.amount == expected_total
-
-    def test_verification_rejects_stale_undiscounted_intent(
-        self, enable_promotions, checkout
-    ):
-        from loyalty.models.transaction import PointsTransaction
-        from order.exceptions import PaymentAmountMismatchError
-        from order.inventory.stock import StockManager
-
-        user = checkout["user"]
-        PointsTransaction.objects.create(
-            user=user, points=500, transaction_type="EARN"
-        )
-        StockManager.reserve_stock(
-            product_id=checkout["product"].id,
-            quantity=1,
-            session_id=str(checkout["cart"].uuid),
-            user_id=user.id,
-        )
-        pay_way = PayWayFactory(
-            provider_code="stripe",
-            settlement=PaySettlement.ONLINE,
-            cost=Money(Decimal(0), "EUR"),
-            free_threshold=Money(Decimal(0), "EUR"),
-        )
-        undiscounted = OrderQuoteService.shipping_cost(
-            order_value=Money(Decimal(100), "EUR"),
-            country_id=checkout["shipping_address"]["country_id"],
-            region_id=None,
-            shipping_provider_code=None,
-            shipping_kind="home_delivery",
-            weight_grams=0,
-        ).price.amount + Decimal("100.00")
-
-        with patch(
-            "order.payments.payment.get_payment_provider"
-        ) as mock_provider:
-            instance = Mock()
-            instance.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {
-                    "payment_id": "pi_stale",
-                    "amount": float(undiscounted),
-                    "currency": "eur",
-                },
-            )
-            mock_provider.return_value = instance
-
-            with pytest.raises(PaymentAmountMismatchError):
-                OrderService.create_order_from_cart(
-                    **priced(
-                        legal_acceptance=checkout_acceptance(),
-                        cart=checkout["cart"],
-                        shipping_address=checkout["shipping_address"],
-                        payment_intent_id="pi_stale",
-                        pay_way=pay_way,
-                        user=user,
-                        loyalty_points_to_redeem=500,
-                    )
-                )
+        assert order.payment_status == PaymentStatus.PENDING

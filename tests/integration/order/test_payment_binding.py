@@ -1,14 +1,15 @@
 """A payment is bound to what it was made for.
 
-The attack: buy a Stripe gift card for exactly a cart's total, let the
-webhook complete the card, then post the same PaymentIntent id to
-``POST /api/v1/order``. The intent is real, paid and for the right amount,
-so every check that only read its state, amount and currency accepted it:
-one payment bought the card AND a paid order.
+The attack this closed: buy a Stripe gift card for exactly a cart's total,
+let the webhook complete the card, then post the same PaymentIntent id to
+``POST /api/v1/order``. The intent was real, paid and for the right amount,
+so one payment bought the card AND a paid order.
 
-Every intent we create now carries server-set metadata naming its purpose,
-its subject (the cart or purchase uuid) and the tenant, and the payment-first
-order path refuses an intent whose metadata does not name THIS cart.
+Every intent we create carries server-set metadata naming its purpose, its
+subject (the order or purchase uuid) and the tenant. Orders are created
+before any payment (#818), so an order never takes an intent from the
+request: the webhook finds an order's intent by its own ``payment_id`` or
+by an ORDER binding of this store, and nothing else.
 """
 
 from __future__ import annotations
@@ -28,18 +29,17 @@ from cart.models.item import CartItem
 from country.factories import CountryFactory
 from giftcard.models import GiftCard, GiftCardPurchase
 from giftcard.services import GiftCardService
-from order.exceptions import PaymentVerificationError
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.payments.payment import StripePaymentProvider
-from order.payments.payment_binding import PaymentPurpose
+from order.payments.payment_binding import PaymentPurpose, binding_metadata
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
-from tests.utils.checkout import priced, quoted_body
+from tests.utils.checkout import quoted_body
 from tests.utils.fake_stripe import fake_stripe
-from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -92,48 +92,22 @@ def checkout(db):
     return cart, pay_way, country
 
 
-def _address(country) -> dict:
-    return {
-        "first_name": "John",
-        "last_name": "Doe",
-        "email": "john@example.com",
-        "street": "Main St",
-        "street_number": "123",
-        "city": "Athens",
-        "zipcode": "12345",
-        "country_id": country.alpha_2,
-        "phone": "+306900000000",
-        "shipping_kind": "home_delivery",
-    }
-
-
-def _cart_intent(stripe, cart, **overrides) -> str:
-    """What ``cart_create_payment_intent`` does for ``cart``."""
-    params = {
-        "purpose": PaymentPurpose.CART,
-        "subject": str(cart.uuid),
-    }
-    params.update(overrides)
-    ok, data = StripePaymentProvider().process_payment(
-        cart.total_price,
-        order_id=f"cart_{cart.uuid}",
-        **params,
+def _succeeded(payment_id: str, metadata: dict | None = None):
+    """``OrderService.handle_payment_succeeded`` for a collected intent."""
+    return OrderService.handle_payment_succeeded(
+        payment_id,
+        captured=Money("50.00", settings.DEFAULT_CURRENCY),
+        metadata=metadata,
     )
-    assert ok, data
-    return data["payment_id"]
 
 
-def _create_order(checkout, intent_id: str) -> Order:
-    cart, pay_way, country = checkout
-    return OrderService.create_order_from_cart(
-        **priced(
-            legal_acceptance=checkout_acceptance(),
-            cart=cart,
-            shipping_address=_address(country),
-            payment_intent_id=intent_id,
-            pay_way=pay_way,
-            user=None,
-        )
+def _unpaid_order():
+    return OrderFactory(
+        num_order_items=0,
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        payment_id="",
+        pay_way=PayWayFactory.create_online_payment(),
     )
 
 
@@ -159,6 +133,8 @@ class TestOneIntentCannotBuyTwoThings:
     def test_a_paid_gift_card_intent_cannot_pay_an_order(
         self, stripe, checkout
     ):
+        """The id in the body is not read: the order is created unpaid,
+        holding no payment, and the intent stays the purchase's."""
         purchase = _buy_gift_card(stripe, checkout[0].total_price.amount)
         stripe.pay(purchase.payment_id)
         # ``payment_intent.succeeded`` completes the card.
@@ -192,117 +168,64 @@ class TestOneIntentCannotBuyTwoThings:
             **headers,
         )
 
-        assert response.status_code == 400, response.content
-        assert response.json()["code"] == "payment_verification"
-        assert not Order.objects.exists()
-        assert cart.items.count() == 1, "the cart was not consumed"
+        assert response.status_code == 201, response.content
+        order = Order.objects.get(pk=response.json()["id"])
+        assert order.payment_status == PaymentStatus.PENDING
+        assert not order.payment_id
+        assert not order.is_paid
+        assert not Order.objects.filter(payment_id=purchase.payment_id).exists()
 
-    def test_the_same_attack_before_the_intent_is_paid(self, stripe, checkout):
-        """Placing the order first and paying second was the variant: the
-        order would be created PENDING and later settled by the poll."""
-        purchase = _buy_gift_card(stripe, checkout[0].total_price.amount)
+    def test_a_gift_card_intent_naming_an_order_does_not_pay_it(self):
+        """A gift-card binding is never read as an order's, even when its
+        subject is that order's uuid."""
+        order = _unpaid_order()
 
-        with pytest.raises(PaymentVerificationError):
-            _create_order(checkout, purchase.payment_id)
-
-        assert not Order.objects.exists()
-
-    def test_a_purchase_holding_the_intent_refuses_it_whatever_it_says(
-        self, stripe, checkout
-    ):
-        """Metadata is the primary binding; the purchase row is the
-        backstop, so an intent that somehow names the cart is still refused
-        once a gift-card purchase holds it."""
-        cart = checkout[0]
-        intent_id = _cart_intent(stripe, cart)
-        GiftCardPurchase.objects.create(
-            buyer_email="buyer@example.com",
-            amount=cart.total_price,
-            recipient_email="friend@example.com",
-            provider_code="stripe",
-            payment_id=intent_id,
+        outcome = _succeeded(
+            "pi_gift_card_named_order",
+            binding_metadata(PaymentPurpose.GIFT_CARD, order.uuid),
         )
 
-        with pytest.raises(PaymentVerificationError, match="gift-card"):
-            _create_order(checkout, intent_id)
+        assert outcome is None
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
+        assert not order.payment_id
 
-        assert not Order.objects.exists()
 
+class TestAnOrderIsFoundOnlyByItsOwnBinding:
+    def test_an_order_binding_of_this_store_finds_the_order(self):
+        order = _unpaid_order()
 
-class TestTheIntentMustNameThisCart:
-    def test_an_intent_made_for_this_cart_creates_the_order(
-        self, stripe, checkout
-    ):
-        intent_id = _cart_intent(stripe, checkout[0])
-
-        order = _create_order(checkout, intent_id)
-
-        assert order.payment_id == intent_id
-
-    def test_another_carts_intent_is_refused(self, stripe, checkout):
-        other = Cart.objects.create(user=None)
-        intent_id = _cart_intent(stripe, other)
-
-        with pytest.raises(PaymentVerificationError):
-            _create_order(checkout, intent_id)
-
-        assert not Order.objects.exists()
-
-    def test_an_intent_made_for_an_existing_order_is_refused(
-        self, stripe, checkout
-    ):
-        intent_id = _cart_intent(
-            stripe,
-            checkout[0],
-            purpose=PaymentPurpose.ORDER,
-            subject=str(checkout[0].uuid),
+        outcome = _succeeded(
+            "pi_bound_to_order",
+            binding_metadata(PaymentPurpose.ORDER, order.uuid),
         )
 
-        with pytest.raises(PaymentVerificationError):
-            _create_order(checkout, intent_id)
+        assert outcome is not None
+        assert outcome.order == order
 
-    def test_another_tenants_intent_is_refused(self, stripe, checkout):
-        intent_id = _cart_intent(stripe, checkout[0])
-        stripe.intents[intent_id].metadata["tenant_schema"] = "another_store"
+    def test_another_stores_order_binding_finds_nothing(self):
+        order = _unpaid_order()
+        metadata = {
+            **binding_metadata(PaymentPurpose.ORDER, order.uuid),
+            "tenant_schema": "another_store",
+        }
 
-        with pytest.raises(PaymentVerificationError):
-            _create_order(checkout, intent_id)
+        assert _succeeded("pi_other_store", metadata) is None
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
 
-    def test_an_intent_with_no_binding_is_refused(self, stripe, checkout):
-        intent_id = _cart_intent(stripe, checkout[0])
-        stripe.intents[intent_id].metadata.clear()
+    @pytest.mark.parametrize("subject", ["", "not-a-uuid"])
+    def test_a_binding_with_no_order_uuid_finds_nothing(self, subject):
+        _unpaid_order()
+        metadata = binding_metadata(PaymentPurpose.ORDER, subject)
 
-        with pytest.raises(PaymentVerificationError):
-            _create_order(checkout, intent_id)
-
-    def test_the_refusal_does_not_leak_the_expected_uuid(
-        self, stripe, checkout
-    ):
-        other = Cart.objects.create(user=None)
-        intent_id = _cart_intent(stripe, other)
-
-        with pytest.raises(PaymentVerificationError) as raised:
-            _create_order(checkout, intent_id)
-
-        assert str(checkout[0].uuid) not in str(raised.value)
-        assert str(other.uuid) not in str(raised.value)
+        assert _succeeded("pi_no_subject", metadata) is None
+        assert not Order.objects.filter(
+            payment_status=PaymentStatus.COMPLETED
+        ).exists()
 
 
 class TestEveryIntentWeCreateIsBound:
-    def test_the_cart_endpoint_binds_the_intent_to_the_cart(
-        self, stripe, checkout
-    ):
-        cart = checkout[0]
-        intent_id = _cart_intent(stripe, cart)
-
-        assert stripe.intents[intent_id].metadata == {
-            "order_id": f"cart_{cart.uuid}",
-            "source": "django_app",
-            "tenant_schema": "public",
-            "purpose": "cart",
-            "subject": str(cart.uuid),
-        }
-
     def test_the_gift_card_purchase_binds_the_intent_to_the_purchase(
         self, stripe
     ):
@@ -314,9 +237,12 @@ class TestEveryIntentWeCreateIsBound:
         assert metadata["tenant_schema"] == "public"
 
     def test_a_caller_cannot_leave_the_binding_out(self, stripe):
-        with pytest.raises(KeyError):
+        with pytest.raises(TypeError):
             StripePaymentProvider().process_payment(
-                Money("10.00", settings.DEFAULT_CURRENCY), order_id="x"
+                Money("10.00", settings.DEFAULT_CURRENCY),
+                order_id="x",
+                order_uuid="x",
+                customer_email="",
             )
 
 

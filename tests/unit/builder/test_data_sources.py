@@ -66,7 +66,7 @@ def test_a_value_that_is_not_valid_names_nothing():
 class TestTheCataloguesLimits:
     def test_a_catalogue_that_declares_data_must_state_its_limits(self):
         from builder.storefront import StorefrontUnavailable, parse_catalogue
-        from tests.utils.builder import FakeCatalogue
+        from tests.utils.builder import FakeCatalogue, default_icons
 
         fake = FakeCatalogue()
         hero = next(b for b in fake.blocks if b["type"] == "hero")
@@ -79,6 +79,7 @@ class TestTheCataloguesLimits:
         }
         payload = {
             "hash": fake.hash,
+            "icons": default_icons(),
             "blocks": fake.blocks,
             "documentKinds": fake.document_kinds,
             "templates": ["home"],

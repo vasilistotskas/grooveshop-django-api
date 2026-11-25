@@ -27,7 +27,6 @@ from order.communications.notifications import (
     notify_order_refunded_live,
     notify_order_status_changed_live,
     notify_payment_confirmed_live,
-    notify_payment_failed_live,
 )
 from order.emails import RefundFailed
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -36,6 +35,8 @@ from order.enum.status import (
     OrderStatus,
     PaymentStatus,
 )
+from order.lifecycle.confirmation import paid_online
+from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.invoice import Invoice, MyDataStatus
 from order.models.item import OrderItem
@@ -49,13 +50,15 @@ from order.payments.payment_fees import (
     record_stripe_fee_for_intent,
 )
 from order.payments.payment_ledger import (
-    PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
+from order.payments.stripe_settlement import settle_paid_checkout_session
+from order.refunds.service import RefundService
 from order.services import OrderService
 from order.signals import (
     order_canceled,
     order_completed,
+    order_confirmed,
     order_created,
     order_delivered,
     order_paid,
@@ -66,9 +69,11 @@ from order.signals import (
     order_status_changed,
     order_stored_value_returned,
     order_stripe_payment_polled,
+    payment_without_order_found,
 )
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
+    alert_payment_without_order_task,
     generate_order_invoice,
     issue_receipt_for_pickup,
     send_admin_new_order_email,
@@ -77,12 +82,10 @@ from order.tasks import (
     send_invoice_to_mydata,
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_payment_failed_email,
     send_refund_confirmation_email,
     send_shipping_notification_email,
     settle_canceled_receipt,
 )
-from pay_way.enum.settlement import PaySettlement
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -301,33 +304,40 @@ def handle_order_paid_clear_cart(
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order creation."""
-    # Offline payments (COD, bank transfer) and already-paid orders get the
-    # confirmation email immediately. Online payments (Stripe, Viva Wallet)
-    # defer it to the payment-success webhook so the email only goes out
-    # once the payment actually succeeds. Missing pay_way (the FK was
-    # ``SET_NULL`` because someone deleted the PayWay row) is treated as
-    # offline so the customer still receives a confirmation.
-    pay_way = order.pay_way
-    is_online_pending = (
-        pay_way is not None
-        and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
-        and order.payment_status != PaymentStatus.COMPLETED
-    )
-    if not is_online_pending:
-        dispatch_on_commit(send_order_confirmation_email, [order.id])
-    dispatch_on_commit(send_admin_new_order_email, [order.id])
-    OrderHistory.log_note(order=order, note="Order created")
+    """Handle order creation.
 
-    # Live in-app notification for authenticated shoppers. The task
-    # itself drops guests silently, so there's no is_guest check here.
-    if order.user_id:
-        dispatch_on_commit(notify_order_created_live, [order.id])
+    An order with nothing left to pay online (cash or card on delivery,
+    BOX NOW pay on the go, bank transfer, an online payment already taken)
+    is confirmed now, which announces it (:func:`handle_order_confirmed`).
+    A card order is confirmed only when its payment settles: until then
+    neither the customer nor the store is told anything.
+    """
+    OrderHistory.log_note(order=order, note="Order created")
+    OrderLifecycleService.confirm(order)
 
     # Clear the cart — but NOT while the shopper still owes an online
     # payment. See ``Order.awaits_online_payment``.
     if not order.awaits_online_payment:
         transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
+
+
+@receiver(order_confirmed, dispatch_uid="order.handle_order_confirmed")
+def handle_order_confirmed(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Announce an order ``OrderLifecycleService.confirm`` just confirmed:
+    the customer's confirmation email, the staff "New order" email and one
+    in-app note, the payment going through for an order paid online and
+    the order being placed otherwise. The task drops a guest's note."""
+    dispatch_on_commit(send_order_confirmation_email, [order.id])
+    dispatch_on_commit(send_admin_new_order_email, [order.id])
+    if order.user_id:
+        dispatch_on_commit(
+            notify_payment_confirmed_live
+            if paid_online(order)
+            else notify_order_created_live,
+            [order.id],
+        )
 
 
 @receiver(
@@ -349,7 +359,7 @@ def handle_order_status_changed(
     )
 
     # Customer-notifications suppression flag (set by
-    # OrderService.suppress_customer_status_notifications for chained
+    # OrderLifecycleService.suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
     # email/toast and a second one ms later would feel like spam, e.g.
     # the DELIVERED → COMPLETED auto-advance). Gates both the email and
@@ -374,7 +384,7 @@ def handle_order_status_changed(
     # filters internally for statuses we actually want to surface in the
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
-    # one place (``order/communications/notifications.py::_ORDER_STATUS_COPY``).
+    # one place (``order.communications.notifications._ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
         dispatch_on_commit(
             notify_order_status_changed_live, [order.id, new_status]
@@ -533,7 +543,7 @@ def handle_order_shipped(
     pre_shipped = (OrderStatus.PENDING.value, OrderStatus.PROCESSING.value)
     if order.status in pre_shipped:
         logger.info("Updating order %s status to shipped", order.id)
-        OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        OrderLifecycleService.update_order_status(order, OrderStatus.SHIPPED)
     else:
         # Already at/past SHIPPED (e.g. a carrier same-poll
         # PROCESSING→DELIVERED bridge). Skipping the defensive re-bump is
@@ -837,6 +847,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
                     event_id,
                     order.id,
                 )
+                # The payment this event reports may be on an order still
+                # unconfirmed: confirm it (a no-op otherwise).
+                OrderLifecycleService.confirm(order)
                 already_processed = True
             else:
                 if not order.metadata:
@@ -876,17 +889,20 @@ def handle_stripe_charge_fee(sender, **kwargs):
 
 
 def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
-    """What follows a Stripe payment the order service actually applied:
-    the history row, the confirmation email and the live toast.
+    """What follows a Stripe payment the order service handled: the history
+    row when it applied the payment, and the order's confirmation.
 
     Shared by the webhook and by the polled-status path
     (``handle_stripe_payment_polled``), which settles
     through the same ``OrderService.handle_payment_succeeded``. A stale
-    event, a repeat, or a charge on a canceled order changes nothing to
-    confirm: no history row, no "order confirmed" email.
+    event or a repeat writes no history row, and still confirms an order
+    paid but not yet confirmed (``OrderLifecycleService.confirm``, which
+    leaves a confirmed, unpaid or canceled order as it is).
     """
-    if outcome and outcome.applied:
-        order = outcome.order
+    if outcome is None:
+        return
+    order = outcome.order
+    if outcome.applied:
         OrderHistory.log_payment_update(
             order=order,
             previous_value={"payment_status": outcome.previous_payment_status},
@@ -895,9 +911,7 @@ def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
                 "payment_id": payment_intent_id,
             },
         )
-        dispatch_on_commit(send_order_confirmation_email, [order.id])
-        if order.user_id:
-            dispatch_on_commit(notify_payment_confirmed_live, [order.id])
+    OrderLifecycleService.confirm(order)
 
 
 @receiver(
@@ -910,6 +924,25 @@ def handle_stripe_payment_polled(
     """A poll put a Stripe payment through the order service: announce it
     as the webhook announces its own."""
     announce_stripe_payment_applied(outcome, payment_intent_id)
+
+
+@receiver(
+    payment_without_order_found,
+    dispatch_uid="order.handle_payment_without_order_found",
+)
+def handle_payment_without_order_found(
+    sender: Any, payment_id: str, captured: Money, **kwargs: Any
+) -> None:
+    """Queue the alert about a payment no order carries, after the
+    webhook's transaction commits."""
+    dispatch_on_commit(
+        alert_payment_without_order_task,
+        kwargs={
+            "payment_id": payment_id,
+            "amount": str(captured.amount),
+            "currency": str(captured.currency),
+        },
+    )
 
 
 @djstripe_receiver("payment_intent.payment_failed")
@@ -987,13 +1020,6 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
-            dispatch_on_commit(send_payment_failed_email, [order.id])
-
-            # Parallel live notification — same idempotency story as
-            # the succeeded branch above (guarded by the event-level
-            # metadata flag).
-            if order.user_id:
-                dispatch_on_commit(notify_payment_failed_live, [order.id])
 
     except KeyError, TypeError:
         # Malformed payload only — see charge.refunded above. A failure in
@@ -1203,7 +1229,7 @@ def handle_stripe_refund_made(sender, **kwargs):
     cannot disagree. A refund this app made is already
     in the ledger under the same id, so its event adds nothing, and so
     does a redelivery. One nobody claimed settles the PENDING attempt that
-    matches it (``PaymentLedger.record_refund``).
+    matches it (``RefundService.book_refund``).
 
     ``Order.status`` is intentionally NOT changed: deciding whether a
     refund means the goods came back is a business call.
@@ -1276,7 +1302,7 @@ def handle_stripe_refund_made(sender, **kwargs):
                 if key
                 else None
             )
-            refund_row, created = PaymentLedger.record_refund(
+            refund_row, created = RefundService.book_refund(
                 order,
                 charge=charge,
                 amount=refunded,
@@ -1379,7 +1405,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
 
             previous_payment_status = order.payment_status
             try:
-                _row, created = PaymentLedger.record_refund_reversal(
+                _row, created = RefundService.book_refund_reversal(
                     order,
                     charge=charge,
                     amount=failed,
@@ -1773,6 +1799,9 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 event_id,
                 order.id,
             )
+            # An order its session paid may still be unconfirmed: confirm
+            # it (a no-op otherwise).
+            OrderLifecycleService.confirm(order)
             return
 
         if not order.metadata:
@@ -1780,133 +1809,12 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         order.metadata[f"webhook_processed_{event_id}"] = True
 
         if payment_status == "paid" and payment_intent_id:
-            from order.payments.payment_events import publish_payment_status
-            from shipping.services import ShippingService
-
-            order.metadata["stripe_checkout_session_id"] = session_id
-            order.metadata["stripe_payment_intent_id"] = payment_intent_id
-
-            # The money is in whatever state the order is. The
-            # ``payment_intent.succeeded`` event that follows records the
-            # same charge under the same key and changes nothing.
-            if captured is not None:
-                PaymentLedger.record_charge(
-                    order,
-                    amount=captured,
-                    provider=StripePaymentProvider.code,
-                    reference=payment_intent_id,
-                )
-
-            # Before the settled guard: a canceled order's payment is
-            # already settled, and behind the guard a real charge on it
-            # was dropped with a WARNING. Never ships (G0281).
-            if OrderService.is_payment_after_cancel(order):
-                OrderService.record_payment_after_cancel(
-                    order,
-                    payment_id=payment_intent_id,
-                    payment_method="stripe",
-                )
-                publish_payment_status(order)
-                return
-
-            # A second payment on an order another PaymentIntent already
-            # paid: booked above, and ``PaymentLedger.sync_overcharge``
-            # told staff when it took the order past what it is for. The
-            # order keeps its first ``payment_id``.
-            if (
-                order.payment_status == PaymentStatus.COMPLETED
-                and order.payment_id
-                and order.payment_id != payment_intent_id
-            ):
-                logger.error(
-                    "PaymentIntent %s is a second payment on order %s, "
-                    "already paid by %s: recorded in the ledger, order "
-                    "left as it is",
-                    payment_intent_id,
-                    order.id,
-                    order.payment_id,
-                )
-                order.save(update_fields=["metadata"])
-                return
-
-            # Settled-state guard: Stripe does not guarantee event
-            # delivery order, so a delayed checkout.session.completed
-            # must never un-refund / un-cancel an order that already
-            # reached a settled financial state. Mirrors
-            # OrderService.handle_payment_succeeded.
-            # COMPLETED is excluded on purpose: a "paid" event landing on
-            # an already-completed order is a redelivery, and processing
-            # it again is a harmless no-op rather than a regression.
-            if order.payment_status in (
-                SETTLED_PAYMENT_STATUSES - {PaymentStatus.COMPLETED}
-            ):
-                logger.warning(
-                    "Ignoring checkout.session.completed for order %s: "
-                    "payment_status already %s",
-                    order.id,
-                    order.payment_status,
-                )
-                # Persist the webhook_processed flag set above so a
-                # Stripe redelivery short-circuits on the idempotency
-                # check instead of re-running this guard (harmless, but
-                # avoids duplicate warning logs on every retry).
-                order.save(update_fields=["metadata"])
-                return
-
-            # What Stripe collected must be what the order is for: a
-            # session paid for another amount settles nothing.
-            expected = order.calculate_order_total_amount()
-            if captured is not None and (
-                captured.currency != expected.currency
-                or abs(captured.amount - expected.amount)
-                > PAYMENT_AMOUNT_TOLERANCE
-            ):
-                OrderService.flag_payment_mismatch(
-                    order,
-                    payment_id=payment_intent_id,
-                    provider=StripePaymentProvider.code,
-                    observed=captured,
-                    expected=expected,
-                )
-                publish_payment_status(order)
-                return
-
-            previous_payment_status = order.payment_status
-            order.mark_as_paid(
-                payment_id=payment_intent_id, payment_method="stripe"
+            settle_paid_checkout_session(
+                order,
+                session_id=session_id,
+                payment_intent_id=payment_intent_id,
+                captured=captured,
             )
-            order.save(update_fields=["metadata"])
-
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": previous_payment_status},
-                new_value={
-                    "payment_status": PaymentStatus.COMPLETED,
-                    "payment_id": payment_intent_id,
-                    "checkout_session_id": session_id,
-                },
-            )
-
-            if order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
-
-            # Stripe's guidance is to fulfil hosted Checkout Sessions on
-            # checkout.session.completed (not payment_intent.succeeded).
-            # Dispatch the courier task here so a Stripe-Checkout order
-            # isn't left paid-but-never-shipped when the PaymentIntent
-            # event's payment_id lookup races/misses. Idempotent on the
-            # shipment row; wrapped in on_commit by ShippingService.
-            ShippingService.dispatch_create_shipment_task(order)
-
-            publish_payment_status(order)
-
-            logger.info(
-                "Order %s marked as paid via checkout session %s",
-                order_id,
-                session_id,
-            )
-
-            dispatch_on_commit(send_order_confirmation_email, [order.id])
 
         elif payment_status == "unpaid":
             # The same settled-state guard the "paid" arm carries, and

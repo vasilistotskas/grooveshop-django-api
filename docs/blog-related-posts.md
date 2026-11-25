@@ -41,7 +41,7 @@ works as follows:
    a post that shares no word is left out.
 
 Common words («πώς», «στο») weigh little, so no stop-word list is needed. The
-choices were measured on webside's 81 posts (2026-11-09):
+choices were measured on a store's real posts:
 
 - **Titles only.** Subtitles' filler words pulled in unrelated posts.
 - **Rarity over the whole store.** Measured within a single category, filler words

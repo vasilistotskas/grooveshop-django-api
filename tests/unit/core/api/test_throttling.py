@@ -25,18 +25,20 @@ from rest_framework.test import APIRequestFactory
 from cart.agent_token import CartTokenGrant, hash_cart_token
 from cart.agent_token import _cache_key as _token_cache_key
 from cart.models import Cart
-from core.api.throttling import (
+from cart.throttles import (
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CouponApplyThrottle,
+)
+from order.factories.order import OrderFactory
+from order.models import Order
+from order.throttles import (
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
-    SearchThrottle,
 )
-from order.factories.order import OrderFactory
-from order.models import Order
+from search.throttles import SearchThrottle
 from tests.utils.redis import private_cache
 
 SECRET = "gateway-shared-secret"

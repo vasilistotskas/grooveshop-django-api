@@ -13,6 +13,7 @@ random line costs a full product graph.
 
 from __future__ import annotations
 
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
@@ -34,8 +35,13 @@ def courier_cash_pay_way() -> PayWay:
 
 
 def courier_cash_order(**kwargs):
-    """An order paid in cash on delivery, so a courier may ship it unpaid."""
+    """An order paid in cash on delivery, so a courier may ship it unpaid.
+
+    PROCESSING unless told otherwise: the factory's random status can be
+    CANCELED or REFUNDED, an order that ships nothing
+    (``Order.ships_nothing``), which the carriers refuse."""
     kwargs.setdefault("pay_way", courier_cash_pay_way())
+    kwargs.setdefault("status", OrderStatus.PROCESSING)
     kwargs.setdefault("num_order_items", 0)
     return OrderFactory(**kwargs)
 
@@ -51,7 +57,12 @@ def carrier_terminal_pay_way() -> PayWay:
 
 
 def carrier_terminal_order(**kwargs):
-    """An order paid at the BoxNow locker, so a parcel may ship it unpaid."""
+    """An order paid at the BoxNow locker, so a parcel may ship it unpaid.
+
+    PROCESSING unless told otherwise: the factory's random status can be
+    CANCELED or REFUNDED, an order that ships nothing
+    (``Order.ships_nothing``), which the carriers refuse."""
     kwargs.setdefault("pay_way", carrier_terminal_pay_way())
+    kwargs.setdefault("status", OrderStatus.PROCESSING)
     kwargs.setdefault("num_order_items", 0)
     return OrderFactory(**kwargs)

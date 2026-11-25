@@ -290,7 +290,6 @@ CART_ROUTES = [
     ("cart-detail", "get", False),
     ("cart-reserve-stock", "post", False),
     ("cart-release-reservations", "post", False),
-    ("cart-create-payment-intent", "post", False),
     ("cart-coupons", "get", False),
     ("cart-agent-token", "post", True),
     ("cart-item-list", "get", False),
@@ -396,7 +395,7 @@ def test_the_trending_searches_of_the_blog_outlive_the_catalogue():
 
 @pytest.fixture
 def staff_api():
-    from tenant.models import TenantMembershipRole
+    from tenant.enum import TenantMembershipRole
     from tests.utils.staff import (
         bind_store_tenant,
         store_staff,

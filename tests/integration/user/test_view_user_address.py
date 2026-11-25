@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
@@ -31,6 +32,8 @@ class UserAddressViewSetTestCase(APITestCase):
             num_regions=0,
         )
         self.region = RegionFactory(alpha="GRC", country=self.country)
+        # A saved address is one the store delivers to at home.
+        enable_rate(self.country)
         self.client.force_authenticate(user=self.user)
         self.address = UserAddressFactory(
             user=self.user,
@@ -77,6 +80,41 @@ class UserAddressViewSetTestCase(APITestCase):
         response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_a_saved_address_keeps_its_address_line_2(self):
+        """Saved with the flat or building, read back with it: checkout
+        prefills an order's ``addressLine2`` from it (#641)."""
+        payload = {
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "phone": "2101234567",
+            "title": "home",
+            "first_name": "Μαρία",
+            "last_name": "Παππά",
+            "street": "Ερμού",
+            "street_number": "12",
+            "address_line_2": "Διαμ. 3, 2ος όροφος",
+            "city": "Αθήνα",
+            "zipcode": "10563",
+            "is_main": False,
+        }
+
+        created = self.client.post(
+            self.get_user_address_list_url(), data=payload, format="json"
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        address = UserAddress.objects.get(pk=created.data["id"])
+        self.assertEqual(address.address_line_2, "Διαμ. 3, 2ος όροφος")
+        read = self.client.get(self.get_user_address_detail_url(address.pk))
+        self.assertEqual(read.data["address_line_2"], "Διαμ. 3, 2ος όροφος")
+
+    def test_an_address_without_line_2_reads_it_blank(self):
+        read = self.client.get(
+            self.get_user_address_detail_url(self.address.pk)
+        )
+
+        self.assertEqual(read.data["address_line_2"], "")
 
     def test_create_invalid(self):
         payload = {

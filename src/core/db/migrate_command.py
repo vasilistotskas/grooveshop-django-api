@@ -26,6 +26,28 @@ from typing import Any
 
 from django.core.management.commands import migrate
 from django.db import connections
+from django.db.backends.base.base import BaseDatabaseWrapper
+
+
+def settle_deferred_constraints(
+    connection: BaseDatabaseWrapper, action: str, *, fake: bool
+) -> None:
+    """Run the foreign-key checks a migration queued, as its commit would
+    have, when it ran inside an outer transaction.
+
+    A ``MigrationExecutor`` progress callback's body: this command calls
+    it after each migration, and so does every other driver of the
+    executor that migrates inside a transaction (the migration tests'
+    ``tests/utils/migrations.py``).
+    """
+    if (
+        action in {"apply_success", "unapply_success"}
+        and not fake
+        and connection.in_atomic_block
+    ):
+        # ``SET CONSTRAINTS ALL IMMEDIATE`` then ``ALL DEFERRED``:
+        # the queued checks run now, and fail here if the data is wrong.
+        connection.check_constraints()
 
 
 class Command(migrate.Command):
@@ -37,11 +59,6 @@ class Command(migrate.Command):
         self, action: str, migration: Any = None, fake: bool = False
     ) -> None:
         super().migration_progress_callback(action, migration, fake)
-        if (
-            action in {"apply_success", "unapply_success"}
-            and not fake
-            and self.migrating_connection.in_atomic_block
-        ):
-            # ``SET CONSTRAINTS ALL IMMEDIATE`` then ``ALL DEFERRED``:
-            # the queued checks run now, and fail here if the data is wrong.
-            self.migrating_connection.check_constraints()
+        settle_deferred_constraints(
+            self.migrating_connection, action, fake=fake
+        )

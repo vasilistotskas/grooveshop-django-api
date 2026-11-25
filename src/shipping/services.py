@@ -18,16 +18,20 @@ from functools import reduce
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from djmoney.money import Money
 
+from core.cache_backend import REDIS_UNAVAILABLE
 from shipping.enum import FreeShippingSource, ShippingKind
 from shipping.exceptions import (
+    PickupPointCheckUnavailableError,
     ShippingParcelTooLargeError,
+    ShippingRegionUnavailableError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
 from shipping.interfaces import (
+    PickupPointUnknown,
     PostalAddress,
     ShippingCarrierInterface,
     get_provider,
@@ -35,11 +39,27 @@ from shipping.interfaces import (
     registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
+from shipping.zones import (
+    carrier_offers,
+    chargeable,
+    destination_rates,
+    offered,
+    standing_destinations,
+)
 
 if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+# How long after one checkout resynced a carrier's catalogue for an
+# unknown pickup point another miss refuses at once instead of syncing
+# again: a full catalogue fetch takes seconds, so a bad or malicious id
+# must not be able to start one per request. Per store and carrier (the
+# cache key is tenant-scoped). Ten minutes: a point BOX NOW's widget
+# shows after the 02:00 sync is found by the first resync, and the next
+# chance comes soon enough for a real point added in between.
+PICKUP_POINT_RESYNC_GUARD_SECONDS = 600
 
 
 # Defensive cap on free-text notes that ride along to the courier
@@ -70,6 +90,55 @@ def sanitize_delivery_notes(value: object) -> str:
     return text[:DELIVERY_NOTES_MAX_LEN]
 
 
+# Between the address line 2 and the customer's note in one notes field.
+DELIVERY_NOTES_SEPARATOR = " | "
+
+
+@dataclass(frozen=True, slots=True)
+class CourierNotes:
+    """The notes a voucher carries: the floor, the address line 2, then
+    the customer's note, within ``DELIVERY_NOTES_MAX_LEN``.
+
+    For a courier whose recipient address field is the street alone (ACS's
+    ``Recipient_Address``: "the street without the area or place"), the
+    flat or floor rides in the free-text notes. The floor and the address
+    line are never cut (both are short: a label, and a field capped well
+    under the limit); the customer's note is cut first to make room. Each
+    part is sanitised as :func:`sanitize_delivery_notes` does.
+    """
+
+    address_line_2: str
+    customer_notes: str
+    floor: str = ""
+
+    def _parts(self) -> tuple[str, str, str]:
+        """The floor, the address line and the customer's note, each as
+        :attr:`sent` carries it."""
+        floor = sanitize_delivery_notes(self.floor)
+        line = sanitize_delivery_notes(self.address_line_2)
+        notes = sanitize_delivery_notes(self.customer_notes)
+        head = DELIVERY_NOTES_SEPARATOR.join(p for p in (floor, line) if p)
+        if head and notes:
+            room = (
+                DELIVERY_NOTES_MAX_LEN
+                - len(head)
+                - len(DELIVERY_NOTES_SEPARATOR)
+            )
+            notes = notes[:room].rstrip() if room > 0 else ""
+        return floor, line, notes
+
+    @property
+    def sent(self) -> str:
+        """The text the courier receives."""
+        return DELIVERY_NOTES_SEPARATOR.join(p for p in self._parts() if p)
+
+    @property
+    def customer_part(self) -> str:
+        """The customer's note as :attr:`sent` carries it: cut to make room
+        for the floor and the address line, not cut again on its own."""
+        return self._parts()[2]
+
+
 @dataclass(frozen=True, slots=True)
 class ShippingCharge:
     """What a shipping option costs a cart, and what made it free.
@@ -83,12 +152,183 @@ class ShippingCharge:
     waived_by: FreeShippingSource | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProductShippingEstimate:
+    """What shipping one product on its own costs, at the cheapest.
+
+    ``price`` is the cheapest delivery checkout would charge a cart
+    holding that product alone, to ``country_code``; ``free_shipping_
+    threshold`` the lowest products subtotal from which a carrier that
+    can take it ships free, ``None`` when none ever does.
+    """
+
+    country_code: str
+    price: Money
+    free_shipping_threshold: Decimal | None
+
+    @property
+    def free(self) -> bool:
+        return self.price.amount == 0
+
+
 class ShippingService:
     """Provider-agnostic dispatcher used by the rest of the codebase."""
 
     # ------------------------------------------------------------------
     # Lookup
     # ------------------------------------------------------------------
+
+    @classmethod
+    def pickup_point_address(
+        cls,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> PostalAddress:
+        """The address of the pickup point *location* names, from the
+        carrier's catalogue, resyncing it once when the point is missing.
+
+        The storefront picks a BOX NOW locker in BOX NOW's own widget
+        (live data) while the catalogue syncs daily, so a new locker can
+        be missing for up to a day; an ACS station can be missing through
+        the gateway or a stale cache. On a miss the catalogue is fetched
+        again through the scheduled sync's own path
+        (``refresh_pickup_points``), before any transaction or lock, and
+        read once more. The point must be deliverable
+        (``deliverable_pickup_point``: held, active, in the order's
+        country); a withdrawn one counts as missing. No resync runs where
+        the store does not deliver to that kind in that country
+        (``active_rate``), and at most one per store and carrier in
+        ``PICKUP_POINT_RESYNC_GUARD_SECONDS``: inside it a miss is refused
+        at once. A resync that fails or passes its deadline
+        (``_resync_within_deadline``) is logged and refused. Raises
+        ``PickupPointUnknown`` or ``PickupPointInAnotherCountry``, or
+        ``PickupPointCheckUnavailableError`` when the guard's cache is down
+        (no resync, nothing judged); never answers with any other address.
+        """
+        from django.core.cache import cache
+
+        carrier = get_provider(provider_code)
+        try:
+            return carrier.deliverable_pickup_point(
+                location, country_code=country_code
+            )
+        except PickupPointUnknown:
+            pass
+        # A store that cannot deliver to that kind in that country refuses
+        # anyway: no carrier is asked for it.
+        try:
+            cls.active_rate(
+                provider_code=provider_code,
+                kind=ShippingKind.PICKUP_POINT,
+                country_code=country_code,
+            )
+        except ShippingUnavailableError as e:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup points are not offered in "
+                f"{country_code}"
+            ) from e
+        guard = f"shipping:pickup-point-resync:{provider_code}"
+        try:
+            acquired = cache.add(
+                guard, 1, timeout=PICKUP_POINT_RESYNC_GUARD_SECONDS
+            )
+        except REDIS_UNAVAILABLE as e:
+            # ``CustomCache.add`` raises while Redis is down: without the
+            # guard nothing bounds the resyncs, so none runs.
+            logger.warning(
+                "No resync of the %s catalogue for pickup point %s: the "
+                "cache holding its guard is unavailable",
+                provider_code,
+                dict(location),
+                exc_info=True,
+            )
+            raise PickupPointCheckUnavailableError(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue cannot be resynced without the cache"
+            ) from e
+        if not acquired:
+            raise PickupPointUnknown(
+                f"{provider_code} pickup point {dict(location)} is unknown "
+                "and its catalogue was resynced in the last "
+                f"{PICKUP_POINT_RESYNC_GUARD_SECONDS} s"
+            )
+        cls._resync_within_deadline(
+            carrier, provider_code, location, country_code=country_code
+        )
+        return carrier.deliverable_pickup_point(
+            location, country_code=country_code
+        )
+
+    @staticmethod
+    def _resync_within_deadline(
+        carrier: ShippingCarrierInterface,
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        country_code: str,
+    ) -> None:
+        """Run the carrier's resync, waiting at most
+        ``PICKUP_POINT_RESYNC_TIMEOUT_SECONDS`` for it.
+
+        The sync runs in a daemon thread of its own, on the request's
+        store schema (the pattern of ``agent.outbox``'s event call),
+        because a carrier client has no deadline for a whole sync
+        (each call retries within its own timeout, so a sync can take
+        minutes) and the order call has callers that wait seconds. Past
+        the deadline the order is refused; the thread finishes the sync,
+        so the next order finds the point. A failure is logged and
+        refused alike.
+        """
+        import threading
+
+        from django.db import connection
+        from django_tenants.utils import schema_context
+
+        schema = connection.schema_name
+        failure: list[BaseException] = []
+
+        def resync() -> None:
+            # A thread of its own outlives a request that stops waiting:
+            # it sets its store's schema, logs what goes wrong (nobody may
+            # read its result), and closes the connection it opened.
+            try:
+                with schema_context(schema):
+                    carrier.refresh_pickup_points(country_code=country_code)
+            except Exception as error:
+                logger.exception(
+                    "Resync of the %s catalogue for pickup point %s failed",
+                    provider_code,
+                    dict(location),
+                )
+                failure.append(error)
+            finally:
+                connection.close()
+
+        # The guard (``pickup_point_address``) is taken before this thread
+        # starts, so requests that stop waiting never run two syncs.
+        worker = threading.Thread(
+            target=resync, name="pickup-point-resync", daemon=True
+        )
+        worker.start()
+        worker.join(settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS)
+        if worker.is_alive():
+            logger.warning(
+                "Resync of the %s catalogue for pickup point %s did not "
+                "finish within %s s; the order is refused and the sync "
+                "goes on",
+                provider_code,
+                dict(location),
+                settings.PICKUP_POINT_RESYNC_TIMEOUT_SECONDS,
+            )
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue resync passed its deadline"
+            )
+        if failure:
+            raise PickupPointUnknown(
+                f"{provider_code} catalogue could not be resynced"
+            ) from failure[0]
 
     @classmethod
     def adapter_for(cls, provider_code: str):
@@ -162,8 +402,8 @@ class ShippingService:
 
         The order MUST have ``shipping_provider`` set — orders created
         through either of the ``OrderService.create_order_from_cart*``
-        paths always go through ``_resolve_shipping_provider`` which
-        sets it. A missing provider here means the order is genuinely
+        paths always go through ``_assign_shipping_provider``, which
+        sets it from the quote. A missing provider here means the order is genuinely
         provider-less (e.g. flat-rate home delivery without a courier
         adapter) — silently return.
 
@@ -172,7 +412,7 @@ class ShippingService:
         creating transaction has committed. Without this guard the
         worker observed a "Order N not found" race (verified on prod
         order 47, 2026-04-30): the task fired inside the open
-        ``create_order_from_cart_offline`` transaction, the worker
+        ``create_order_from_cart`` transaction, the worker
         looked up the order on a different DB connection, and gave up
         permanently because Order.DoesNotExist isn't a retryable
         exception. ``on_commit`` is a no-op outside a transaction, so
@@ -363,9 +603,9 @@ class ShippingService:
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
-        ``country_code`` is required — a per-country ``ShippingRate``
-        is what makes a (provider, kind) offerable at all now, so there
-        is no destination-agnostic matrix left to return.
+        ``country_code`` is required — a ``ShippingRate`` of a zone of
+        the country is what makes a (provider, kind) offerable at all,
+        so there is no destination-agnostic matrix to return.
 
         Filters by:
         * ``ShippingProvider.is_active = True``.
@@ -385,28 +625,38 @@ class ShippingService:
         that do not fit the carrier's parcels: ``exceeds_parcel_size``,
         decided by the rule :meth:`assert_available` enforces.
 
-        ``region_id`` and ``free`` (a free-shipping promotion) are what
-        :meth:`quote` prices with, so a caller that knows them (the
-        checkout quote) gets each row at the price an order would be
-        charged, with ``waived_by`` saying what made it free.
+        ``region_id`` picks the zone a home delivery is priced by
+        (``shipping.zones``): without one, the country's base zone, the
+        rows a checkout shows before the shopper picks a region. It and
+        ``free`` (a free-shipping promotion) are what :meth:`quote` prices
+        with, so a caller that knows them (the checkout quote) gets each
+        row at the price an order would be charged, with ``waived_by``
+        saying what made it free.
         """
         items = None if items is None else list(items)
         country_code = country_code.upper()
         order_value = Money(order_value_amount, currency)
 
         options: list[dict[str, Any]] = []
-        for provider, kind, adapter, rate in cls.offered_rates(country_code):
+        for provider, kind, adapter, rate in cls.offered_rates(
+            country_code, region_id
+        ):
             exceeds_max_weight = bool(
                 weight_grams is not None
                 and rate.max_weight_grams is not None
                 and weight_grams > rate.max_weight_grams
             )
             exceeds_parcel_size = False
+            compartment_size = None
             if items is not None:
                 try:
                     adapter.assert_parcel_fits(kind=kind, items=items)
                 except ShippingParcelTooLargeError:
                     exceeds_parcel_size = True
+                else:
+                    compartment_size = adapter.parcel_size(
+                        kind=kind, items=items
+                    )
             charge = cls._priced(
                 rate,
                 country_code=country_code,
@@ -442,6 +692,7 @@ class ShippingService:
                     "max_weight_grams": rate.max_weight_grams,
                     "exceeds_max_weight": exceeds_max_weight,
                     "exceeds_parcel_size": exceeds_parcel_size,
+                    "compartment_size": compartment_size,
                     "delivery_days_min": rate.delivery_days_min,
                     "delivery_days_max": rate.delivery_days_max,
                 }
@@ -451,8 +702,79 @@ class ShippingService:
         return options
 
     @classmethod
+    def product_shipping_from(cls, product) -> ProductShippingEstimate | None:
+        """The cheapest delivery of ``product`` bought on its own.
+
+        Priced as checkout prices a cart holding one unit of it and
+        nothing else (:meth:`available_options`), for a shopper not known
+        yet: to the store's first shipping country, the one checkout
+        preselects (:meth:`initial_country_code`), at its standing
+        destinations (``shipping.zones.standing_destinations``: the base
+        zone for what it offers, each region zone for a home delivery it
+        does not, the cheapest winning); at the products value
+        every "free above X" rule is judged on, after the automatic
+        promotions such a cart gets
+        (``PromotionEngine.evaluate_single_unit``), whose free shipping
+        waives every carrier; weighed and sized with the gifts those
+        promotions add, so a delivery that cannot carry the parcel
+        (``exceeds_max_weight`` / ``exceeds_parcel_size``) does not
+        count. A carrier priced live is asked as checkout asks it.
+
+        ``None`` when the store ships nowhere, or no delivery it offers
+        to that country can take the product.
+        """
+        from order.checkout.quote import OrderQuoteService
+        from promotion.engine.benefits import gift_pairs
+        from promotion.engine.evaluation import PromotionEngine
+        from shipping.utils import compute_total_weight_grams
+
+        country_code = cls.initial_country_code()
+        if country_code is None:
+            return None
+
+        promotion = PromotionEngine.evaluate_single_unit(product)
+        items = [(product, 1), *gift_pairs(promotion)]
+        weight_grams = compute_total_weight_grams(items)
+        order_value = OrderQuoteService.threshold_value(
+            product.final_price, promotion.discount_total
+        )
+        prices = [
+            option["price"]
+            for destination in standing_destinations([country_code])[
+                country_code
+            ]
+            for option in cls.available_options(
+                country_code=country_code,
+                region_id=destination.region_code,
+                order_value_amount=order_value.amount,
+                currency=str(order_value.currency),
+                weight_grams=weight_grams,
+                items=items,
+                free=promotion.free_shipping,
+            )
+            if option["kind"] in destination.kinds
+            and not option["exceeds_max_weight"]
+            and not option["exceeds_parcel_size"]
+        ]
+        if not prices:
+            return None
+
+        free_rates = cls.free_threshold_rates(
+            country_code, weight_grams=weight_grams, items=items
+        )
+        return ProductShippingEstimate(
+            country_code=country_code,
+            price=Money(min(prices), order_value.currency),
+            free_shipping_threshold=(
+                free_rates[0].free_shipping_threshold.amount
+                if free_rates
+                else None
+            ),
+        )
+
+    @classmethod
     def offered_rates(
-        cls, country_code: str
+        cls, country_code: str, region_id: str | None = None
     ) -> Iterator[
         tuple[
             ShippingProvider,
@@ -461,7 +783,8 @@ class ShippingService:
             ShippingRate,
         ]
     ]:
-        """Every (provider, kind) this store ships to ``country_code``.
+        """Every (provider, kind) this store ships to ``country_code``
+        (and ``region_id``, for a home delivery).
 
         The one definition of "the store offers this", shared by
         :meth:`available_options` (checkout) and :meth:`shipping_policy`
@@ -475,10 +798,17 @@ class ShippingService:
           through — a provider can advertise capability via the
           ``ShippingProvider`` row but gate user-facing visibility on
           state it controls itself (ACS lockers need synced stations);
-        * an active ``ShippingRate`` exists for
-          (provider, country_code, kind) — the single source of "does
-          this store ship this way to this country".
+        * an active ``ShippingRate`` exists for (provider, kind) in the
+          zone the destination resolves to (``shipping.zones.
+          destination_rates``) — the single source of "does this store
+          ship this way there".
         """
+        rates = {
+            (rate.provider_id, rate.kind): rate
+            for rate in destination_rates(country_code, region_id)
+            .filter(is_active=True)
+            .select_related("provider")
+        }
         qs = (
             ShippingProvider.objects.filter(is_active=True)
             .filter(
@@ -507,19 +837,10 @@ class ShippingService:
                 if not adapter.is_kind_enabled(kind, country_code=country_code):
                     continue
 
-                rate = (
-                    ShippingRate.objects.filter(
-                        provider=provider,
-                        country_id=country_code,
-                        kind=kind.value,
-                        is_active=True,
-                    )
-                    .select_related("provider")
-                    .first()
-                )
+                rate = rates.get((provider.pk, kind.value))
                 if rate is None:
-                    # No rate for this country — this (provider, kind)
-                    # simply does not ship here.
+                    # No rate for this destination — this (provider,
+                    # kind) simply does not ship here.
                     continue
 
                 yield provider, kind, adapter, rate
@@ -529,13 +850,20 @@ class ShippingService:
         """The store's standing shipping policy, one row per offer.
 
         One row per (provider, kind, country) the store actually offers
-        (:meth:`offered_rates`), over :meth:`shippable_country_codes`,
+        (:meth:`offered_rates`), over :meth:`shippable_country_codes`
+        and each country's standing destinations
+        (``shipping.zones.standing_destinations``, read for every country
+        at once): the base zone, whose rows carry no ``region_codes``, and,
+        for a home delivery it does not offer, each region zone that does,
+        whose rows name its regions;
         straight from the ``ShippingRate``: no cart, weight or order
         value is involved, so the price is the rate's own, before a
         live carrier quote or a free-shipping threshold. Powers
         ``GET /api/v1/shipping/policy`` which the storefront turns into
         its Organization ``hasShippingService`` markup.
         """
+        countries = cls.shippable_country_codes()
+        standing = standing_destinations(countries)
         return [
             {
                 "country_code": country_code,
@@ -552,11 +880,14 @@ class ShippingService:
                 "delivery_days_min": rate.delivery_days_min,
                 "delivery_days_max": rate.delivery_days_max,
                 "max_weight_grams": rate.max_weight_grams,
+                "region_codes": list(destination.region_codes),
             }
-            for country_code in cls.shippable_country_codes()
+            for country_code in countries
+            for destination in standing[country_code]
             for provider, kind, _adapter, rate in cls.offered_rates(
-                country_code
+                country_code, destination.region_code
             )
+            if kind.value in destination.kinds
         ]
 
     @staticmethod
@@ -699,6 +1030,11 @@ class ShippingService:
     ) -> list[ShippingRate]:
         """The rates to ``country_code`` that ship free above a threshold.
 
+        Judged for the country with no region, as every caller here
+        knows none: at its standing destinations
+        (``shipping.zones.standing_destinations``), the base zone for
+        what it offers, each region zone for a home delivery it does not.
+
         Each passes the gate :meth:`active_rate` puts on a quote (an
         active provider with a registered adapter, supporting the kind,
         the kind enabled for the country, an active rate), and has a
@@ -711,12 +1047,23 @@ class ShippingService:
         """
         country_code = country_code.upper()
         items = None if items is None else list(items)
-        rates = ShippingRate.objects.filter(
-            provider__is_active=True,
-            country_id=country_code,
-            is_active=True,
-            free_shipping_threshold__isnull=False,
-        ).select_related("provider")
+        standing = reduce(
+            operator.or_,
+            (
+                destination_rates(country_code, destination.region_code).filter(
+                    kind__in=destination.kinds
+                )
+                for destination in standing_destinations([country_code])[
+                    country_code
+                ]
+            ),
+            ShippingRate.objects.none(),
+        )
+        rates = (
+            chargeable(standing)
+            .filter(free_shipping_threshold__isnull=False)
+            .select_related("provider")
+        )
 
         usable: list[ShippingRate] = []
         for rate in rates:
@@ -767,6 +1114,13 @@ class ShippingService:
     def shippable_country_codes(cls) -> list[str]:
         """Alpha-2 codes with at least one active rate, by ``Country.sort_order``.
 
+        A rate in any of a country's zones counts, a region zone's too:
+        the store ships somewhere in that country. Its carrier must pass
+        the gate a quote puts on it (``shipping.zones.offered``): ACS
+        without the store's credentials, or its lockers in a country with
+        no stations, makes no country shippable. That is one query for
+        the rates and one adapter answer per (carrier, kind).
+
         The ordering matches the countries API's own default (``Country``
         is itself ``ordering = ["sort_order"]``), so a caller that lists
         shippable countries and one that lists all countries agree on
@@ -775,19 +1129,9 @@ class ShippingService:
         """
         from country.models import Country
 
-        # ``.order_by()`` clears ``ShippingRate.Meta.ordering`` for this
-        # queryset — without it, Postgres' ``SELECT DISTINCT`` must
-        # include every ``ORDER BY`` column, so a country with rates
-        # under two different kinds (different ``ORDER BY`` values)
-        # would count as two "distinct" rows instead of one.
-        rated_codes = (
-            ShippingRate.objects.filter(
-                is_active=True, provider__is_active=True
-            )
-            .order_by()
-            .values_list("country_id", flat=True)
-            .distinct()
-        )
+        rated_codes = {
+            rate.zone.country_id for rate in offered(ShippingRate.objects.all())
+        }
         return list(
             Country.objects.filter(alpha_2__in=rated_codes)
             .order_by("sort_order")
@@ -796,11 +1140,16 @@ class ShippingService:
 
     @classmethod
     def resolve_home_delivery_provider(
-        cls, country_code: str | None, weight_grams: int | None = None
+        cls,
+        country_code: str | None,
+        weight_grams: int | None = None,
+        region_id: str | None = None,
     ) -> str | None:
         """Return the active home-delivery carrier's code for ``country_code``.
 
-        Lower ``ShippingProvider.priority`` wins the tie. Without a
+        Only a carrier the quote's gate takes there is a candidate
+        (:func:`~shipping.zones.carrier_offers`). Lower
+        ``ShippingProvider.priority`` wins the tie. Without a
         country, falls back to the lowest-priority active home-delivery
         provider regardless of rate coverage (there is nothing more
         specific to prefer yet). Moved from ``OrderService.
@@ -814,31 +1163,73 @@ class ShippingService:
         uncapped one behind it. When none can, it still names the
         first carrier, so the quote fails as over-weight rather than as
         unavailable for the country.
+
+        With ``region_id`` the carrier is one whose rate is in the zone
+        the region resolves to (``shipping.zones``). When none is, while
+        one delivers home elsewhere in the country, it names that one, so
+        the quote fails as not reaching the region
+        (``ShippingRegionUnavailableError``) rather than as unavailable
+        for the country.
         """
-        qs = ShippingProvider.objects.filter(
+        carriers = ShippingProvider.objects.filter(
             is_active=True, supports_home_delivery=True
         )
-        if country_code:
-            rate = Q(
-                rates__country_id=country_code.upper(),
-                rates__kind=ShippingKind.HOME_DELIVERY.value,
-                rates__is_active=True,
-            )
-            if weight_grams is not None:
-                # In the same filter() as ``rate``, so both conditions
-                # hold on ONE rate row, not on two different ones.
-                fitting = qs.filter(
-                    rate
-                    & (
-                        Q(rates__max_weight_grams__isnull=True)
-                        | Q(rates__max_weight_grams__gte=weight_grams)
-                    )
+        if not country_code:
+            picked = carriers.order_by("priority", "code").first()
+            return picked.code if picked is not None else None
+        country_code = country_code.upper()
+        # Only a carrier the quote's gate takes in the country
+        # (``carrier_offers``, as in :meth:`active_rate`): one ahead in
+        # priority that checkout refuses (ACS without the store's
+        # credentials) would otherwise be named, and the quote fail.
+        carriers = carriers.filter(
+            pk__in=[
+                carrier.pk
+                for carrier in carriers
+                if carrier_offers(
+                    carrier, ShippingKind.HOME_DELIVERY, country_code
                 )
-                picked = fitting.order_by("priority", "code").first()
-                if picked is not None:
-                    return picked.code
-            qs = qs.filter(rate)
-        picked = qs.order_by("priority", "code").first()
+            ]
+        )
+        code = cls._home_delivery_carrier(
+            carriers, destination_rates(country_code, region_id), weight_grams
+        )
+        if code is None and region_id:
+            code = cls._home_delivery_carrier(
+                carriers,
+                ShippingRate.objects.filter(zone__country_id=country_code),
+                weight_grams,
+            )
+        return code
+
+    @staticmethod
+    def _home_delivery_carrier(
+        carriers: QuerySet[ShippingProvider],
+        rates: QuerySet[ShippingRate],
+        weight_grams: int | None,
+    ) -> str | None:
+        """The first of ``carriers`` with an active home-delivery rate
+        among ``rates``, preferring one whose rate carries
+        ``weight_grams`` (:meth:`resolve_home_delivery_provider`)."""
+        rate = Q(
+            rates__in=rates,
+            rates__kind=ShippingKind.HOME_DELIVERY.value,
+            rates__is_active=True,
+        )
+        if weight_grams is not None:
+            # In the same filter() as ``rate``, so both conditions hold
+            # on ONE rate row, not on two different ones.
+            fitting = carriers.filter(
+                rate
+                & (
+                    Q(rates__max_weight_grams__isnull=True)
+                    | Q(rates__max_weight_grams__gte=weight_grams)
+                )
+            )
+            picked = fitting.order_by("priority", "code").first()
+            if picked is not None:
+                return picked.code
+        picked = carriers.filter(rate).order_by("priority", "code").first()
         return picked.code if picked is not None else None
 
     @classmethod
@@ -848,13 +1239,18 @@ class ShippingService:
         provider_code: str | None,
         kind: str | None,
         country_code: str | None,
+        region_id: str | None = None,
     ) -> ShippingRate:
         """Resolve the single active ``ShippingRate`` for this combination.
 
         The one gate every quote and every order-creation path shares:
         an active provider, a registered adapter, the provider actually
         supporting ``kind``, the kind enabled for checkout, and an
-        active rate row for ``country_code``. Raises
+        active rate in the zone ``(country_code, region_id)`` resolves
+        to (``shipping.zones``). A carrier that has the rate elsewhere in
+        the country but not in that zone raises
+        :class:`~shipping.exceptions.ShippingRegionUnavailableError`.
+        Raises
         :class:`~shipping.exceptions.ShippingUnavailableError` the
         moment any of those is not true, naming exactly which — a
         missing ``kind`` included, since ``home_delivery`` auto-
@@ -867,27 +1263,11 @@ class ShippingService:
                 kind=kind or "",
                 country_code=country_code,
             )
-        if not is_registered(provider_code):
-            raise ShippingUnavailableError(
-                provider_code=provider_code,
-                kind=kind,
-                country_code=country_code,
-            )
-
         country_code = country_code.upper()
         provider = ShippingProvider.objects.filter(
             code=provider_code, is_active=True
         ).first()
-        if provider is None or not provider.supports(kind):
-            raise ShippingUnavailableError(
-                provider_code=provider_code,
-                kind=kind,
-                country_code=country_code,
-            )
-
-        adapter = get_provider(provider_code)
-        kind_enum = ShippingKind(kind)
-        if not adapter.is_kind_enabled(kind_enum, country_code=country_code):
+        if provider is None or not carrier_offers(provider, kind, country_code):
             raise ShippingUnavailableError(
                 provider_code=provider_code,
                 kind=kind,
@@ -895,22 +1275,49 @@ class ShippingService:
             )
 
         rate = (
-            ShippingRate.objects.select_related("provider")
-            .filter(
-                provider=provider,
-                country_id=country_code,
-                kind=kind,
-                is_active=True,
-            )
+            destination_rates(country_code, region_id)
+            .select_related("provider")
+            .filter(provider=provider, kind=kind, is_active=True)
             .first()
         )
-        if rate is None:
-            raise ShippingUnavailableError(
+        if rate is not None:
+            return rate
+        if (
+            region_id
+            and ShippingRate.objects.filter(
+                provider=provider,
+                kind=kind,
+                zone__country_id=country_code,
+                is_active=True,
+            ).exists()
+        ):
+            # The carrier delivers this way in the country, only not to
+            # the region: its zone has no such rate.
+            raise ShippingRegionUnavailableError(
                 provider_code=provider_code,
                 kind=kind,
                 country_code=country_code,
+                region_code=region_id,
             )
-        return rate
+        raise ShippingUnavailableError(
+            provider_code=provider_code,
+            kind=kind,
+            country_code=country_code,
+        )
+
+    @staticmethod
+    def assert_pickup_point_fits(
+        provider_code: str,
+        location: Mapping[str, str],
+        *,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Raise ``PickupPointUnfit`` when the carrier's pickup point
+        *location* names cannot take ``items``
+        (``ShippingCarrierInterface.assert_pickup_point_fits``)."""
+        get_provider(provider_code).assert_pickup_point_fits(
+            location, items=items
+        )
 
     @classmethod
     def assert_available(
@@ -919,6 +1326,7 @@ class ShippingService:
         provider_code: str | None,
         kind: str | None,
         country_code: str | None,
+        region_id: str | None = None,
         weight_grams: int | None = None,
         items: Iterable[tuple[Any, int]] | None = None,
     ) -> ShippingRate:
@@ -935,7 +1343,10 @@ class ShippingService:
         over-weight option through just because it charges nothing.
         """
         rate = cls.active_rate(
-            provider_code=provider_code, kind=kind, country_code=country_code
+            provider_code=provider_code,
+            kind=kind,
+            country_code=country_code,
+            region_id=region_id,
         )
         if (
             weight_grams is not None
@@ -1031,6 +1442,7 @@ class ShippingService:
                 provider_code=provider_code,
                 kind=kind,
                 country_code=country_code,
+                region_id=region_id,
             )
         except ShippingUnavailableError:
             return
@@ -1077,6 +1489,7 @@ class ShippingService:
             provider_code=provider_code,
             kind=kind,
             country_code=country_code,
+            region_id=region_id,
             weight_grams=weight_grams,
             items=items,
         )

@@ -16,7 +16,7 @@ here, next to `schema.yml` and `allauth-schema.yml`.
 | `allauth-required.txt` | `true` once the storefront commits `openapi/allauth-schema.yml`: a missing allauth document then fails the check instead of being reported as not checked. |
 | `watched.txt` | The files whose change makes a pull request check run. |
 | `oasdiff-image.txt` | The oasdiff image, by tag and digest. The single pin; the deploy gate's literal image in `grooveshop-infrastructure` must equal it. |
-| `tests/` | Unit tests; `compare.sh`, which pairs the documents in `tests/fixtures/` (no network); and `replay.sh`, which replays the 2026-11-03 deadlock against the real released documents. |
+| `tests/` | Unit tests; `compare.sh`, which pairs the documents in `tests/fixtures/` (no network); and `replay.sh`, which replays a recorded deadlock (a required field and an enum value in one change) against the real released documents. |
 
 ## What is live
 
@@ -62,7 +62,7 @@ Every pairing runs oasdiff twice, and fails if either pass finds an error.
 1. **Flattened** (`--flatten-allof`), with the consumer's levels and every
    check. drf-spectacular wraps every nested serializer in an `allOf`, and
    unflattened oasdiff reports a required property removed inside one only as
-   a warning, which let Django v3.157.0 through on 2026-10-27. Flattening is
+   a warning. Flattening is
    also what lets the two sides differ in shape: the gateway's contract,
    generated from Go types, has no `allOf`, and a consumer generated before
    Django wrapped a field has a plain `$ref` where Django now has `allOf`.
@@ -70,8 +70,8 @@ Every pairing runs oasdiff twice, and fails if either pass finds an error.
 2. **Nullability, unflattened.** Flattening drops a `nullable: true` that sits
    beside an `allOf` ([oasdiff#1348](https://github.com/oasdiff/oasdiff/issues/1348)),
    and that is how drf-spectacular declares a nullable nested serializer. A
-   required response object made nullable came out of the first pass as "No
-   changes detected" (#710). This pass runs only the `*-became-nullable` /
+   required response object made nullable comes out of the first pass as "No
+   changes detected". This pass runs only the `*-became-nullable` /
    `*-became-not-nullable` checks whose level for this consumer is ERR (its
    levels file, else oasdiff's default), written out as `err` so oasdiff does
    not lower one to a warning for sitting inside an `allOf`. The levels come
@@ -96,7 +96,7 @@ Only a break with no safe order is accepted, in one of the two cases below.
 Add the line oasdiff printed to `ignore.txt` in the pull request that makes
 the change:
 
-```
+```text
 <date> until <service> <vX.Y.Z> | <reason and who decided> | <oasdiff line>
 ```
 
@@ -133,7 +133,7 @@ The storefront's document is generated from this schema, so it declares
 the field optional until Django requires it, and no order of releases
 satisfies the check. The pull request must show, with file and line, that
 the storefront and the gateway live in production and in staging send the
-field on every request to the route (#635 release 3 did it for
+field on every request to the route (as for a required
 `expectedTotal`). `until` names the storefront's next release, which
 regenerates from this document.
 
@@ -150,7 +150,7 @@ document can.
 ```bash
 python3 -I -m unittest discover -s api-contract/tests   # unit tests
 bash api-contract/tests/compare.sh                      # fixture pairings (docker, no network)
-bash api-contract/tests/replay.sh                       # #442 / #347 replay (docker, network)
+bash api-contract/tests/replay.sh                       # recorded deadlock replay (docker, network)
 ```
 
 Two documents by hand, in the pinned image (the consumer's first):

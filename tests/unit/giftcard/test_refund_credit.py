@@ -4,7 +4,7 @@
 the order, once, when the order was REFUNDED: a EUR 100 order settled with
 a EUR 60 card, a EUR 10 item returned and EUR 10 refunded by card put the
 whole EUR 60 back. Staff now refund in the VALUE of what came back
-(``OrderService.refund_order``): the provider's money first, then the cards,
+(``RefundService.refund_order``): the provider's money first, then the cards,
 in parts, so a card gets back exactly the part of the value that is beyond
 the provider's share. This module is the card's side of that; the
 order's side is ``tests/integration/order/test_value_based_refunds.py``.
@@ -30,7 +30,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.models.order import Order
 from order.payments.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.signals import order_canceled, order_refunded
 from order.views.viva_webhook import _process_event_in_tenant
 from pay_way.factories import PayWayFactory
@@ -164,7 +164,7 @@ class TestAProviderRefundLeavesTheCardAlone:
         assert _credited(order) == Decimal(0)
         assert PaymentLedger.refundable_value(order) == Decimal("60.00")
 
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED

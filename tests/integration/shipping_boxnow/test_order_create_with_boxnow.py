@@ -5,10 +5,9 @@ These tests POST to the order-list endpoint and assert that:
 - COD pay_way is rejected.
 - Missing boxnow_locker_id is rejected.
 
-The order-create endpoint is payment-first: it expects a Stripe
-payment-intent to already exist. We mock the payment provider + cart and
-shipping-address validators per the pattern in
-``tests/integration/order/test_payment_first_order_creation.py``.
+The order is created before any payment, so no provider is mocked; the
+cart and shipping-address validators are, to keep each test about the
+BoxNow leg.
 """
 
 from __future__ import annotations
@@ -17,13 +16,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
+from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from country.factories import CountryFactory
-from order.enum.status import PaymentStatus
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -35,10 +34,14 @@ from tests.utils.checkout import UNQUOTED, quoted_body
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
-pytestmark = [
-    pytest.mark.usefixtures("trust_intent_binding"),
-    pytest.mark.usefixtures("checkout_legal_documents"),
-]
+pytestmark = pytest.mark.usefixtures("checkout_legal_documents")
+
+
+def _default_size(size: int) -> None:
+    Setting.objects.update_or_create(
+        name="BOXNOW_DEFAULT_COMPARTMENT_SIZE",
+        defaults={"value_type": "int", "value_int": size},
+    )
 
 
 @pytest.mark.django_db
@@ -96,13 +99,14 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.product = ProductFactory(
             active=True, stock=20, num_images=0, num_reviews=0
         )
-        self.locker = BoxNowLockerFactory(external_id="4")
+        self.locker = BoxNowLockerFactory(
+            external_id="4", country_code=self.country.alpha_2
+        )
 
         self.cart = CartFactory(user=self.user)
         CartItemFactory(cart=self.cart, product=self.product, quantity=1)
 
         self.create_url = reverse("order-list")
-        self.payment_intent_id = "pi_test_boxnow_123"
 
     def _build_payload(
         self,
@@ -112,7 +116,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
         locker_id: str = "4",
     ) -> dict:
         payload = {
-            "payment_intent_id": self.payment_intent_id,
             "pay_way_id": pay_way_id,
             "terms_accepted": True,
             "first_name": "BoxNow",
@@ -128,7 +131,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "shipping_price": "2.50",
             # Registry-driven dispatch — the order serializer resolves
             # the carrier adapter from this explicit ``(provider, kind)``
-            # pair (see ``order/services._resolve_shipping_provider``).
+            # pair (see ``order/services._assign_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
         }
@@ -147,15 +150,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             self.create_url, payload, format="json", **headers
         )
 
-    def _mock_payment_success(self, mock_get_payment_provider):
-        provider = MagicMock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_payment_provider.return_value = provider
-
-    def _bind_boxnow_tenant(self):
+    def _bind_boxnow_tenant(self, *, live=False):
         """Same shape as the ``boxnow_configured_tenant`` fixture in
         ``tests/conftest.py``, inlined: pytest fixture injection by
         extra parameter name does not reach ``APITestCase`` methods
@@ -163,7 +158,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         so this class binds it manually instead.
 
         ``BoxNowCarrier.is_kind_enabled()`` gates on tenant credentials
-        (``shipping_boxnow/services.py::is_configured``) — since
+        (``src/shipping_boxnow/services.py::is_configured``) — since
         ``OrderQuoteService.shipping_cost`` now resolves the rate through
         the real carrier adapter, a BoxNow pickup_point order needs one
         bound, same as the live checkout flow does.
@@ -181,17 +176,18 @@ class TestOrderCreateWithBoxNow(APITestCase):
             box_now_warehouse_id="2",
             box_now_notify_phone="+302100000000",
             box_now_webhook_secret="TEST_BOXNOW_WHS",
+            # BOX NOW's live network, the only one whose lockers have
+            # sizes (``shipping_boxnow.catalogue.sizes_exist``).
+            box_now_live_mode=live,
         )
         self.addCleanup(setattr, connection, "tenant", previous)
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_creates_shipment_row(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         self._bind_boxnow_tenant()
         mock_validate_cart.return_value = {
@@ -200,7 +196,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
         response = self._create(
@@ -223,14 +218,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         assert shipment.locker_external_id == "4"
         assert shipment.compartment_size == 1
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_accepts_cod_payway(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         self._bind_boxnow_tenant()
         # BoxNow PAY ON THE GO is collected at the locker: the
@@ -246,7 +239,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
         response = self._create(
@@ -264,14 +256,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         shipment = BoxNowShipment.objects.get(order=order)
         assert shipment.payment_mode == BoxNowPaymentMode.COD.value
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_rejects_courier_cod_payway(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         """The combination that mis-charged real customers.
 
@@ -293,7 +283,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_get_payment_provider)
 
         courier_cod = PayWayFactory(
             provider_code="cash_on_delivery",
@@ -315,14 +304,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "A rejected order must not leave a shipment row behind"
         )
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_with_boxnow_method_requires_locker_id(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         mock_validate_cart.return_value = {
             "valid": True,
@@ -330,7 +317,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
         response = self._create(
@@ -345,14 +331,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         body_str = str(response.json()).lower()
         assert "locker" in body_str or "boxnow" in body_str
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_create_order_rejected_when_boxnow_disabled_globally(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         """When the admin flips ``ShippingProvider.is_active`` to
         False the API must reject ``box_now_locker`` orders even if
@@ -369,7 +353,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_get_payment_provider)
 
         self.client.force_authenticate(user=self.user)
         response = self._create(
@@ -394,7 +377,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_pp,
         *,
         expected_total=None,
         **extra,
@@ -406,7 +388,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "warnings": [],
         }
         mock_validate_address.return_value = None
-        self._mock_payment_success(mock_pp)
         self.client.force_authenticate(user=self.user)
         return self._create(
             {
@@ -416,21 +397,18 @@ class TestOrderCreateWithBoxNow(APITestCase):
             expected_total=expected_total,
         )
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_client_sent_compartment_size_is_ignored(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         """The server owns the parcel size: the storefront's old
         ``boxnowCompartmentSize`` input is dropped, not rejected."""
         response = self._place_order(
             mock_validate_address,
             mock_validate_cart,
-            mock_get_payment_provider,
             boxnow_compartment_size=3,
         )
 
@@ -440,14 +418,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         shipment = BoxNowShipment.objects.get()
         assert shipment.compartment_size == 1
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_compartment_size_is_derived_and_sent_to_boxnow(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         # 3 x 5 cm stacked = 15 cm: Medium, though the checkout sent 1.
         self._measure_product(30, 20, 5)
@@ -455,13 +431,12 @@ class TestOrderCreateWithBoxNow(APITestCase):
         item.quantity = 3
         item.save()
 
-        response = self._place_order(
-            mock_validate_address, mock_validate_cart, mock_get_payment_provider
-        )
+        response = self._place_order(mock_validate_address, mock_validate_cart)
 
         assert response.status_code == status.HTTP_201_CREATED, (
             f"Unexpected response: {response.json()}"
         )
+        from order.enum.status import PaymentStatus
         from order.models.order import Order
         from shipping_boxnow.enum import BoxNowCompartmentSize
         from shipping_boxnow.services import BoxNowService
@@ -469,6 +444,13 @@ class TestOrderCreateWithBoxNow(APITestCase):
         order = Order.objects.latest("id")
         shipment = BoxNowShipment.objects.get(order=order)
         assert shipment.compartment_size == BoxNowCompartmentSize.MEDIUM
+
+        # The voucher is minted once the card payment is confirmed: the
+        # state the payment webhook leaves the order in.
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED
+        )
+        order.refresh_from_db()
 
         client = MagicMock()
         client.return_value.create_delivery_request.return_value = {
@@ -482,21 +464,18 @@ class TestOrderCreateWithBoxNow(APITestCase):
             sent["items"][0]["compartmentSize"] == BoxNowCompartmentSize.MEDIUM
         )
 
-    @patch("order.payments.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
     def test_cart_that_fits_no_compartment_is_refused_at_checkout(
         self,
         mock_validate_address,
         mock_validate_cart,
-        mock_get_payment_provider,
     ):
         self._measure_product(80, 50, 40)
 
         response = self._place_order(
             mock_validate_address,
             mock_validate_cart,
-            mock_get_payment_provider,
             # The quote refuses a parcel no compartment holds too.
             expected_total=UNQUOTED,
         )
@@ -506,3 +485,116 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
         assert "shippingProviderCode" in response.json()["fieldErrors"]
         assert not BoxNowShipment.objects.exists()
+
+    def _place(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        locker,
+        *,
+        refused=False,
+        live=True,
+    ):
+        self._bind_boxnow_tenant(live=live)
+        mock_validate_cart.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        mock_validate_address.return_value = None
+        self.client.force_authenticate(user=self.user)
+        return self._create(
+            self._build_payload(
+                pay_way_id=self.online_pay_way.id,
+                locker_id=locker.external_id,
+            ),
+            # A refused locker has no quote to send: creation refuses the
+            # order before it compares a total.
+            expected_total=UNQUOTED if refused else None,
+        )
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_without_the_orders_size_is_refused(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        from order.models.order import Order
+
+        # The cart carries no dimensions: the store's default size, medium.
+        _default_size(2)
+        small_and_large = BoxNowLockerFactory(
+            external_id="sz-1-3",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[1, 3],
+        )
+        before = Order.objects.count()
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            small_and_large,
+            refused=True,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert body["code"] == "pickup_point_too_small"
+        assert "boxnowLockerId" in body["fields"]
+        assert Order.objects.count() == before
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_with_no_known_sizes_is_refused_as_unknown(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        unsynced = BoxNowLockerFactory(
+            external_id="sz-none",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[],
+        )
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            unsynced,
+            refused=True,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "pickup_point_size_unknown"
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_locker_with_every_size_takes_the_order(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        _default_size(2)
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            self.locker,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_a_stage_store_checks_no_size(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        """A stage locker's sizes are never known: the order goes."""
+        unsized = BoxNowLockerFactory(
+            external_id="sz-stage",
+            country_code=self.country.alpha_2,
+            compartment_sizes=[],
+        )
+
+        response = self._place(
+            mock_validate_address,
+            mock_validate_cart,
+            unsized,
+            live=False,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()

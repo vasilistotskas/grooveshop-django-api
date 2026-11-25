@@ -40,11 +40,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import (
-    AnonIpRateThrottle,
-    RecommendationEventThrottle,
-    UserBudgetThrottle,
-)
+from core.api.throttling import AnonIpRateThrottle, UserBudgetThrottle
 from core.cart_id import cart_uuid_from_request
 from core.sessions import persisted_session_key
 from recommendation.engine import SuggestionContext, suggest
@@ -55,6 +51,7 @@ from recommendation.serializers import (
     RecommendationQuerySerializer,
     RecommendationResponseSerializer,
 )
+from recommendation.throttles import RecommendationEventThrottle
 from tenant.celery import publish_or_drop
 from tenant.permissions import (
     IsCatalogueEnabled,

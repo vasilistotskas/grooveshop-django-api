@@ -55,9 +55,9 @@ from agent.staff_serializers import (
     StaffReviewSerializer,
     StaffSalesReportSerializer,
 )
+from agent.throttles import StaffAgentThrottle
 from contact.models import Contact
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import StaffAgentThrottle
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from order.reporting import profit, turnover
@@ -65,8 +65,8 @@ from product.enum.review import ReviewStatus
 from product.enum.stock import RESTOCK_STATES
 from product.models.product import Product
 from product.models.review import ProductReview
+from tenant.enum import TenantMembershipRole
 from tenant.membership import get_current_tenant, get_membership
-from tenant.models import TenantMembershipRole
 from tenant.permissions import IsStaffAiAccessEnabled
 from user.models import UserAccount
 

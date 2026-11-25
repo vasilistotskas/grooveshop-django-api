@@ -9,8 +9,6 @@ real tenant schemas, which ``tests/`` (public schema only) cannot.
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 from django.contrib import admin as django_admin
 from django.db.models import ProtectedError
@@ -56,16 +54,10 @@ def _make_address(country, region):
     return UserAddressFactory(country=country, region=region)
 
 
-def _make_rate(country, region):
-    from shipping.factories import ShippingProviderFactory
-    from shipping.models import ShippingRate
+def _make_zone(country, region):
+    from shipping.factories import ShippingZoneFactory
 
-    return ShippingRate.objects.create(
-        provider=ShippingProviderFactory(code="guard_probe"),
-        country=country,
-        kind="home_delivery",
-        price=Decimal("3.00"),
-    )
+    return ShippingZoneFactory(country=country)
 
 
 def _make_exclusion(country, region):
@@ -83,7 +75,7 @@ def _discard(row) -> None:
 COUNTRY_REFERENCES = {
     "order": _make_order,
     "address": _make_address,
-    "rate": _make_rate,
+    "shipping zone": _make_zone,
     "pay way exclusion": _make_exclusion,
 }
 
@@ -154,6 +146,19 @@ def test_a_region_a_store_uses_refuses_its_region_and_its_country(
     finally:
         with schema_context(mt_tenant.schema_name):
             address.delete()
+
+
+def test_a_region_a_shipping_zone_covers_refuses_its_region(mt_tenant, country):
+    from shipping.factories import ShippingZoneFactory
+
+    region = _public_region(country, "ZQ")
+    with schema_context(mt_tenant.schema_name):
+        zone = ShippingZoneFactory(country=country, regions=[region])
+    try:
+        assert [r.store for r in references_to([region])] == [mt_tenant.name]
+    finally:
+        with schema_context(mt_tenant.schema_name):
+            zone.delete()
 
 
 def test_another_stores_use_refuses_a_delete_issued_from_this_store(

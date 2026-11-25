@@ -84,12 +84,13 @@ deployment settings.
 | The nightly reconciliation | recomputes every product, writes only what differs | `src/product/tasks.py: reevaluate_price_episodes` |
 
 A price field must never be changed with `queryset.update()`: it skips all of
-the above (nothing in the code base does today). The nightly sweep exists for
-what no path can see: a promotion running when this shipped, a product saved
-by a release that predates the records. Switching promotions off or on (the
-store's `PROMOTIONS_ENABLED`, the plan's `promotions_enabled`) runs the same
-sweep for that store at once (`src/promotion/signals.py`). A promotion's start is recorded when the queue or sweep notices it
-(seconds to five minutes), not at its `starts_at`.
+the above (nothing in the code base does). The nightly sweep exists for what no
+path can see, such as a promotion that was already running when the records
+were first written. Switching promotions off or on (the store's
+`PROMOTIONS_ENABLED`, the plan's `promotions_enabled`) runs the same sweep for
+that store at once (`src/promotion/signals.py`). A promotion's start is
+recorded when the queue or sweep notices it (seconds to five minutes), not at
+its `starts_at`.
 
 Those price columns move through `bulk_update`, which sends no `post_save`,
 so `sync_product_prices` queues the `products` cache-surface purge itself
@@ -109,9 +110,9 @@ tables, and nothing deletes a spell.
 
 `product` migration `0050_backfill_price_spells` replays `HistoricalProduct`
 (at most 365 days) through the same evaluation function, per schema, so a
-product whose markdown started last week has its reference immediately. It is
-idempotent (a product with spells is skipped) and loads no live model code.
-What it cannot know:
+product whose markdown started before the records existed has its reference
+immediately when its history still shows the earlier price. It is idempotent (a product with spells is skipped) and loads no
+live model code. What it cannot know:
 
 - prices older than the oldest surviving history row: a product with no
   history gets one spell from `created_at`, and any long-running markdown on
@@ -120,9 +121,6 @@ What it cannot know:
   rate is applied;
 - automatic promotions (`Promotion` has no history): one already running is
   picked up by the next nightly sweep, with its start recorded then.
-- anything the previous release saves while it still serves after the
-  migration: it does not write the derived columns, so the nightly sweep
-  reconciles them.
 
 ## API
 
@@ -132,7 +130,7 @@ What it cannot know:
 | `reductionStartedAt` | `ProductSerializer`, `ProductVariantSerializer`, `AgentFavouriteSerializer` (one field, `AnnouncedReductionStartField`, in `EffectivePriceFieldsSerializer`) | when the reduction in force began; null exactly when `priorPrice` is, because `Product.reduction_started_at` is also set for a reduction that announces nothing. Not in search hits: they are index documents, and the field would need a Meilisearch attribute and a reindex |
 | `effectivePrice` | `ProductSerializer`, search hits | what the customer pays now, promotions included |
 | `announcedDiscountPercent` | `ProductSerializer`, search hits, Meilisearch `announced_discount_percent` | integer percent from `priorPrice` to `effectivePrice`, null with no announcement |
-| `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `AgentFavouriteSerializer` (`/api/v1/agent/me/favourites`) | the same three fields, one definition (`EffectivePriceFieldsSerializer`) shared with `ProductSerializer`; the row's `finalPrice` is **deprecated** there, to go once the agent gateway reads `effectivePrice` |
+| `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `AgentFavouriteSerializer` (`/api/v1/agent/me/favourites`) | the same three fields, one definition (`EffectivePriceFieldsSerializer`) shared with `ProductSerializer`; the row's `finalPrice` is **deprecated** there (`deprecate_fields` in the OpenAPI schema), in favour of `effectivePrice` |
 | `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `ProductVariantSerializer` (`/api/v1/product/{id}/variants`) | each sibling's own three fields, the same `EffectivePriceFieldsSerializer`, so a variant swatch or an agent's variant list shows the price and announcement its product card shows |
 | `?minAnnouncedDiscountPercent=` / `?ordering=-announcedDiscountPercent` | `ProductFilter`, `ProductViewSet.ordering_fields` | list filter and sort on the same percent (`with_announced_discount_percent()`); the discounted rail uses both |
 | `?minEffectivePrice=` / `?maxEffectivePrice=` / `?ordering=effectivePrice` | `ProductFilter`, `ProductViewSet.ordering_fields` | list price filter and sort on `effective_price`, a stored column |
@@ -143,22 +141,18 @@ price: a product under a 20% automatic category promotion is found by a price
 filter at its promoted price and sorts there, while a conditional promotion
 (minimum quantity or subtotal, first order, per-customer limit) changes neither,
 because the cart only honours it for a basket that meets the condition. B2B
-group prices are not in the index or the filter either (see above).
+group prices are not in the index or the filter either.
 
-The price before promotions (`finalPrice`) is still a field of the product and of
+The price before promotions (`finalPrice`) is a field of the product and of
 every search hit: the cart and orders read it, and the storefront's product card
-falls back to it for a hit whose `effectivePrice` is not recorded yet. Its
-filter, facet and sort surfaces are gone: `minFinalPrice` / `maxFinalPrice`, the
-`final_price` search facet (and `facetStats.finalPrice`), the search
-`sort=finalPrice` / `-finalPrice` and the Meilisearch `final_price` filterable
-and sortable attributes were removed once the storefront and the agent gateway
-filtered, ranged and sorted on the effective price (expand/contract for API
-contracts, `docs/migrations.md`). An unknown `facets` or `sort` value is
-ignored by the search view, so an old client asking for `final_price` gets no
-stats, or the default order, rather than an error. The Meilisearch
-`final_price` document field and displayed attribute stay for as long as a hit's
-`finalPrice` is read. The search `price_min` / `price_max` parameters keep
-their names and compare with `effective_price`.
+falls back to it for a hit whose `effectivePrice` is not recorded yet. It has no
+filter, facet or sort surface: price filters, the price-range facet and price
+sorts all use the effective price (`price_min` / `price_max` compare with
+`effective_price`; expand/contract for API contracts, `docs/migrations.md`). An
+unknown `facets` or `sort` value is ignored by the search view, so a client
+asking for `final_price` gets no stats, or the default order, rather than an
+error. The Meilisearch `final_price` document field and displayed attribute
+stay for as long as a hit's `finalPrice` is read.
 
 **Known recording lag.** The price is recorded when the offer queue or the
 5-minute window sweep notices a promotion, then the product is reindexed, so a
@@ -170,14 +164,13 @@ and sorts last until the nightly reconciliation fills it.
 
 Every price field above reads a stored column, so a list costs no query per row.
 `discountPercent`, `discountValue` and `priceSavePercent` are the merchant's
-markdown, not an announcement, and are gone from the product and search-hit
-payloads (and `discount_percent` from the Meilisearch displayed attributes):
-a client that struck a price through must use the fields above. The
-merchant's input (`Product.discount_percent`, the admin form, the product
-write API, the `minDiscountPercent` / `maxDiscountPercent` filters, the
-`discountPercent` ordering, and the indexed `discount_percent` that the
-`stock:desc, discount_percent:desc` ranking rule and the on-offer flag use) is
-unchanged.
+markdown, not an announcement, so they are not in the product and search-hit
+payloads (nor `discount_percent` in the Meilisearch displayed attributes): a
+client that strikes a price through must use the fields above. The merchant's
+input is `Product.discount_percent` (the admin form, the product write API, the
+`minDiscountPercent` / `maxDiscountPercent` filters, the `discountPercent`
+ordering, and the indexed `discount_percent` that the
+`stock:desc, discount_percent:desc` ranking rule and the on-offer flag use).
 
 The deploy's PreSync hook applies the new displayed, filterable and sortable fields
 (`prior_price`, `announced_discount_percent`, `effective_price`) with
@@ -186,8 +179,8 @@ field existed only gain it when they are rebuilt, so a release that adds one
 is followed by
 `manage.py meilisearch_sync_index product.ProductTranslation --all-tenants`;
 without `--all-tenants` the command runs in the public schema, which holds no
-products. Taking an attribute out of the filterable list (as `final_price` was)
-needs only the settings step: the documents keep the field, so no reindex.
+products. Taking an attribute out of the filterable list needs only the settings step:
+the documents keep the field, so no reindex.
 
 ## The demo store's price history
 
@@ -207,9 +200,7 @@ history is already what the seed writes.
 The nightly demo reset (`src/devtools/demo_account.py: reset_demo_account`) runs
 the same step, so a history that a price change broke, or one that was never
 seeded, is repaired by the next night, and the store's caches are purged when
-anything was rebuilt. Until 2026-10-16 the step ran only from
-`seed_demo_store`, which production's demo never got: all its markdowns were
-unannounced. To repair one at once, run
+anything was rebuilt. To repair one at once, run
 `manage.py seed_demo_store --schema demo --only price-history` followed by
 `manage.py seed_demo_store --schema demo --only cache-purge`.
 
@@ -221,18 +212,13 @@ what the shopper pays (30.00 net at 24% VAT: 37.20 list, 33.48 with 10% off).
 `Product.discount_value` is the markdown on the net price, `Product.vat_value`
 is the VAT of the price actually charged, and
 `final_price == price - discount_value + vat_value`. The SQL twins in
-`src/product/managers/product.py` follow the same definition. Before migration
-`0051` the VAT was taken on the undiscounted net, which made a 10% markdown
-worth about 8%.
-
-`0051_reprice_discounted_products` records that change as an ordinary price
-drop: for every marked-down product whose current spell still holds the old
-formula's price, the spell is closed, a new one opens at the new price and the
-episode is re-evaluated by `evaluate_reduction` (a drop inside an episode keeps
-its reference within 60 days of the start; later it is a new reduction measured
-against the last 30 days). Products carrying a promotion are left to the nightly
-sweep, which re-prices them the same way. Spells written before the change keep
-the prices customers were actually charged.
+`src/product/managers/product.py` follow the same definition. Spells keep the
+prices customers were actually charged: `0051_reprice_discounted_products`
+recorded the move to this formula as an ordinary price drop (the spell closed, a
+new one opened at the new price, the episode re-evaluated by
+`evaluate_reduction`). A product whose current spell did not hold the old
+formula's price carries a promotion; the migration left it to the nightly
+sweep, which re-prices it the same way.
 
 ## A product always has a VAT rate
 
@@ -243,12 +229,11 @@ write path and its rate cannot be deleted:
 - **Deleting a `Vat` row in use is refused** (`on_delete=PROTECT`): the model
   raises `ProtectedError`, and the admin's delete page and its "delete
   selected" action list the products and offer no confirm button. Move the
-  products to another rate first. There is no API that deletes a rate. This
-  replaced `SET_NULL` and the signal that re-priced the products it orphaned.
+  products to another rate first. There is no API that deletes a rate.
 - **Both product serializers require `vat`** (`ProductSerializer` and
   `ProductWriteSerializer`; a PATCH may leave it out, never clear it) and the
   admin form requires it (`blank=False`). The schema's `vat` is required on
-  write and no longer nullable on read.
+  write and not nullable on read.
 - **The standard rate** is `vat.constants.STANDARD_VAT_RATE` (24%, myDATA
   category 1): a `Vat` row has only a `value`, so the value is what names the
   standard row. The demo-store seed uses it and refuses to run without it;
@@ -258,19 +243,13 @@ write path and its rate cannot be deleted:
   products and no standard row. The products' gross price rises by the rate;
   the rows are updated in place, so the price records and search documents
   catch up in the nightly `reevaluate_price_episodes` sweep.
-
-Both releases have shipped. Release 1 (v3.234.0: `product` 0068 backfill,
-0069 `PROTECT` and required on every write path) ran in production before
-release 2 tightened the column, because a NOT NULL tightening is safe only once
-no pod of the previous release can INSERT without a rate.
-
 - **`Product.vat` is NOT NULL in the database** (`product` 0070, the contract
   step of 0069: `contract_of = [("product", "0069_product_vat_required")]`). It
   REFUSES to run while any product in the schema (soft-deleted ones included)
   holds a NULL, with an error naming the schema and the count, before it
   alters anything; it never fills or guesses a rate. So `Product.vat_percent`
   is `self.vat.value`, `with_vat_value_annotation` has no NULL case, and
-  `mydata_readiness` no longer counts NULLs: no code path handles a product
+  `mydata_readiness` does not count NULLs: no code path handles a product
   without a rate, because none can exist.
 - **`Vat.value` is unique** (`vat` 0010, `vat_value_unique`). A store holding
   two rows of one rate makes the migration abort with an `IntegrityError`

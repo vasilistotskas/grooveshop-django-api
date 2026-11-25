@@ -5,7 +5,7 @@ through the REAL service and ledger paths, in any order:
 
   dup           a second payment (a duplicate the customer made)
   receipt       the order ships and its receipt is issued and submitted
-  refund        ``OrderService.refund_order`` for part of what can be
+  refund        ``RefundService.refund_order`` for part of what can be
                 refunded; Stripe answers, times out (a claim left PENDING)
                 or loses its answer (made, but nobody knows)
   refund_full   ``refund_order`` for everything
@@ -131,7 +131,7 @@ from order.refunds.refund_lines import (
     held_values,
     pending_request,
 )
-from order.services import OrderService
+from order.refunds.service import RefundService
 from order.tasks import (
     allocate_credit_sources,
     generate_order_invoice,
@@ -662,7 +662,7 @@ class State:
             self.fake.lose_answer = ev == "refund_lost"
             try:
                 try:
-                    res = OrderService.refund_order(
+                    res = RefundService.refund_order(
                         order, amount=None if amt is None else _money(amt)
                     )
                 finally:
@@ -702,7 +702,7 @@ class State:
                 return
             c, left = options[int(b * len(options)) % len(options)]
             amt = _frac(left, a)
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=c,
                 amount=_money(amt),
@@ -737,7 +737,7 @@ class State:
                 .exists()
             )
             self.stands.setdefault(r.provider_reference, []).append(had_credit)
-            PaymentLedger.record_refund_reversal(
+            RefundService.book_refund_reversal(
                 order,
                 charge=r.charge,
                 amount=_money(amt),
@@ -942,7 +942,7 @@ class State:
                 if pending is None:
                     self.log.append("retry_lines skipped (none pending)")
                     return
-                OrderService.refund_order(
+                RefundService.refund_order(
                     order, retry_request_id=pending.request_id
                 )
                 self.log.append(f"retry_lines {pending.request_id}")
@@ -979,7 +979,7 @@ class State:
                 include,
                 self.expect_lines(order, chosen, include),
             )
-            res = OrderService.refund_order(
+            res = RefundService.refund_order(
                 order, lines=chosen, include_shipping=include
             )
             self.log.append(
@@ -1007,11 +1007,11 @@ class State:
     def resolve(self, att, how):
         order = self.o()
         if how == "settle_rec":
-            OrderService.book_share(
+            RefundService.book_share(
                 order, att, att.amount, f"re_rec_{next(_ref)}", att.reason
             )
         elif how == "settle_wh":
-            PaymentLedger.record_refund(
+            RefundService.book_refund(
                 order,
                 charge=att.charge,
                 amount=att.amount,
@@ -1347,7 +1347,7 @@ def test_a_goods_refund_before_a_duplicate_is_not_credited_again():
         from tests.integration.order.test_mydata_lifecycle import _receipt
 
         _receipt(order)
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_goods"
         )
         dup, _created = PaymentLedger.record_charge(
@@ -1357,7 +1357,7 @@ def test_a_goods_refund_before_a_duplicate_is_not_credited_again():
         assert PaymentLedger.excess_held(order) == Decimal("100.00")
         assert order.overcharged_at is not None
 
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("100.00"), reference="re_dup"
         )
         order.refresh_from_db()
@@ -1386,16 +1386,16 @@ def test_a_claim_waits_while_an_older_claim_holds_the_duplicate():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d3"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("100.00"))
+        RefundService.refund_order(order, amount=_eur("100.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
 
         with pytest.raises(PaymentError, match="waiting for the payment pro"):
-            OrderService.refund_order(order, amount=_eur("99.00"))
+            RefundService.refund_order(order, amount=_eur("99.00"))
         assert RefundAttempt.objects.filter(order=order).count() == 1
 
         refund_reconciliation._decline(claim, "declined")
-        result = OrderService.refund_order(order, amount=_eur("99.00"))
+        result = RefundService.refund_order(order, amount=_eur("99.00"))
         allocate_credit_sources()
         create_pending_credits(order.id)
 
@@ -1415,9 +1415,9 @@ def test_resuming_the_claim_that_holds_the_duplicate_is_allowed():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d4"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("100.00"))
+        RefundService.refund_order(order, amount=_eur("100.00"))
         f.fail_with = None
-        result = OrderService.refund_order(order, amount=_eur("100.00"))
+        result = RefundService.refund_order(order, amount=_eur("100.00"))
 
     assert result.refunded.amount == Decimal("100.00")
     assert RefundAttempt.objects.filter(order=order).count() == 1
@@ -1431,11 +1431,11 @@ def _receipt_netted_then_reversed():
 
     order, charge = _paid_order()
     with mydata_enabled(auto_submit=False), FakeAade():
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("40.00"), reference="re_40"
         )
         _receipt(order)
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=charge, amount=_eur("40.00"), reference="re_40"
         )
         allocate_credit_sources()
@@ -1495,11 +1495,11 @@ def test_a_reversal_inside_the_duplicate_leaves_the_receipt_alone():
         dup, _created = PaymentLedger.record_charge(
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d5"
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("100.00"), reference="re_d5"
         )
         _receipt(order)
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=dup, amount=_eur("100.00"), reference="re_d5"
         )
 
@@ -1523,19 +1523,19 @@ def test_a_claim_made_before_the_duplicate_leaves_the_duplicate_whole():
         FakeStripeRefunds() as f,
     ):
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         dup, _created = PaymentLedger.record_charge(
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d6"
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("80.00"), reference="re_dash"
         )
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=dup, amount=_eur("70.00"), reference="re_dash"
         )
         assert not credit_allocation.undecided(order)
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("40.00"), reference="re_claim"
         )
 
@@ -1565,17 +1565,17 @@ def test_a_reversal_comes_off_the_duplicate_part_of_a_refund_first():
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d6b"
         )
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("80.00"), reference="re_dash"
         )
-        PaymentLedger.record_refund_reversal(
+        RefundService.book_refund_reversal(
             order, charge=dup, amount=_eur("70.00"), reference="re_dash"
         )
         assert credit_allocation.undecided(order)
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order,
             charge=claim.charge,
             amount=_eur("40.00"),
@@ -1597,7 +1597,7 @@ def test_the_excess_is_at_most_what_the_provider_still_holds():
     no refund can pay back more than 10 of the duplicate."""
     order, charge = _paid_order()
     with mydata_enabled(auto_submit=False), FakeAade():
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=charge, amount=_eur("100.00"), reference="re_all"
         )
         dup, _created = PaymentLedger.record_charge(
@@ -1650,7 +1650,7 @@ def test_the_settlement_never_credits_a_chargeback_staff_did_not_decide(
             amount=_eur("107.63"),
             reference="dp_settle",
         )
-        OrderService.refund_order(order)
+        RefundService.refund_order(order)
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
         invoice = _receipt(order)
@@ -1702,7 +1702,7 @@ def test_an_open_or_late_chargeback_never_eats_the_duplicate_payment(
         dup, _created = PaymentLedger.record_charge(
             order, amount=_eur("100.00"), provider="stripe", reference="pi_d7"
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("100.00"), reference="re_d7"
         )
         decide_chargebacks(order.id, goods_returned=returned, user=staff)
@@ -1739,16 +1739,16 @@ def test_a_refund_nobody_claimed_is_judged_without_netting_a_claim_in_flight():
         FakeStripeRefunds() as f,
     ):
         f.fail_with = stripe.APIConnectionError("x")
-        OrderService.refund_order(order, amount=_eur("40.00"))
+        RefundService.refund_order(order, amount=_eur("40.00"))
         f.fail_with = None
         claim = RefundAttempt.objects.live().get(order=order)
         dup, _created = PaymentLedger.record_charge(
             order, amount=_eur("20.00"), provider="stripe", reference="pi_d8"
         )
-        PaymentLedger.record_refund(
+        RefundService.book_refund(
             order, charge=dup, amount=_eur("20.00"), reference="re_d8"
         )
-        OrderService.book_share(
+        RefundService.book_share(
             order, claim, claim.amount, "re_c8", claim.reason
         )
         allocate_credit_sources()

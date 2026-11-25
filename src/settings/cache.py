@@ -35,7 +35,7 @@ CACHES = {
         # the clear_cache command operate on the same tenant-keyed
         # connection as every cache.get/set — no parallel raw client
         # that bypasses make_tenant_key.
-        "BACKEND": "core.caches.CustomCache",
+        "BACKEND": "core.cache_backend.CustomCache",
         "LOCATION": REDIS_URL,
         "KEY_PREFIX": DEFAULT_CACHE_KEY_PREFIX,
         "VERSION": DEFAULT_CACHE_VERSION,
@@ -74,7 +74,7 @@ CLOUDFLARE_PLATFORM_API_TOKEN = getenv("CLOUDFLARE_PLATFORM_API_TOKEN", "")
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {
-            "BACKEND": "core.caches.CustomCache",
+            "BACKEND": "core.cache_backend.CustomCache",
             "LOCATION": "redis://127.0.0.1:6379/0",
             "KEY_PREFIX": "redis",
             # KEY_FUNCTION must match production — dropping it here

@@ -208,11 +208,10 @@ class CartService:
 
         Both materialization methods below route through here, so EVERY
         instance a view receives — retrieve/update/destroy, coupon
-        apply/remove, ``create_payment_intent`` — carries the same
-        bound prices, and the preview totals always match the amount
-        the payment provider is asked to charge. (The views' own
-        ``for_detail`` reloads transplant the context off these
-        instances rather than re-resolving.) No-op for guests,
+        apply/remove, the quote — carries the same bound prices, and the
+        preview totals always match the amount the order is created
+        at. (The views' own ``for_detail`` reloads transplant the context
+        off these instances rather than re-resolving.) No-op for guests,
         non-approved users and disabled tenants.
         """
         if cart is not None:

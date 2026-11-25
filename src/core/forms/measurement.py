@@ -15,7 +15,7 @@ from unfold.widgets import (
     UnfoldAdminTextInputWidget,
 )
 
-from core.utils.measurement import get_measurement
+from core.measurement import get_measurement
 
 
 class MeasurementWidget(forms.MultiWidget):

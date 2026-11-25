@@ -3,7 +3,7 @@
 A store changes the wording of its own storefront, per language, from one
 editor page in the store admin. Source: `src/texts/` (`models.py`,
 `storefront.py`, `validation.py`, `services.py`, `editor.py`, `admin.py`,
-`views.py`), `src/core/cache/surfaces.py` (`store_texts`),
+`views.py`), `src/texts/cache_surfaces.py` (`store_texts`),
 `src/tenant/signals.py` (`bump_generation_on_text_override_change`). The code
 wins over this page.
 
@@ -14,8 +14,8 @@ in each store's own schema (`texts` is in `TENANT_APPS`), unique on
 `(surface, namespace, key, language)`, with django-simple-history. It is
 sparse: a text the store never edited has no row, and the storefront's
 default applies. `namespace` and `key` are the storefront's own ids, so
-nothing here is a foreign key. `surface` is `storefront` today; emails join
-later.
+nothing here is a foreign key. `surface` is `storefront`, the only
+value (`TextSurface`).
 
 The staff member is a platform-public identity, so it is a plain id read
 through `updated_by_staff` (`src/tenant/staff_actors.py`), like every other

@@ -227,7 +227,7 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         choices=ShippingKind.choices,
     )
     # Cross-schema FK to the public ``country.Country`` row, same shape
-    # as ``ShippingRate.country``: no reverse accessor into every tenant
+    # as ``ShippingZone.country``: no reverse accessor into every tenant
     # schema, PROTECT so a referenced country cannot vanish silently.
     country = models.ForeignKey(
         "country.Country",

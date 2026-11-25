@@ -91,7 +91,7 @@ class PromotionEngine:
         # merchant explicitly opts in (B2B_ALLOW_PROMOTIONS) — a
         # negotiated B2B price plus a retail promo double-discounts
         # silently. One gate here covers every caller (cart preview,
-        # payment intent, order create), because pricing always binds
+        # quote, order create), because pricing always binds
         # before evaluation on those paths. Attached codes surface as
         # COMBINATION_DISALLOWED (non-blocking, ACP vocabulary): a new
         # apply_coupon gets a clear refusal instead of silently

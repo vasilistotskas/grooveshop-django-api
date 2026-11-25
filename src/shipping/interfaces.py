@@ -593,7 +593,7 @@ class ShippingCarrierInterface(ABC):
         """The fields a checkout body takes for this carrier, by name, new
         instances on every call: its pickup point (the
         :attr:`location_keys`, on every body that names a delivery: the
-        quote, the payment intent, the order) and its options for the
+        quote and the order) and its options for the
         order alone (order creation's body). Order creation hands the
         values to :meth:`create_shipment` and
         :meth:`validate_order_payload` as the payload.

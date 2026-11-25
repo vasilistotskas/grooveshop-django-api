@@ -640,8 +640,9 @@ class OrderViewSet(BaseModelViewSet):
         call or a stale client can name one the shopper was never shown.
         It is accepted exactly when the quote lists it for this delivery:
         ``OrderQuoteService.offered_pay_ways`` is the one rule behind
-        the quote's ``payWays``, the pay way a quote or a payment intent
-        accepts, and this check, so the three never disagree. That rule
+        the quote's ``payWays``, the pay way a quote accepts
+        (``CartViewSet._offered_pay_way``), and this check, so the three
+        never disagree. That rule
         is: active; through a provider the store holds credentials for
         (``StripePaymentProvider``/``VivaWalletPaymentProvider`` would
         otherwise raise ``ImproperlyConfigured`` deep inside order
@@ -1298,7 +1299,7 @@ class OrderViewSet(BaseModelViewSet):
         meta_context = _meta_context_from(request, validated_data.get("meta"))
 
         # The legal texts the buyer accepts, resolved before anything is
-        # created or a payment is looked up: a text the store cannot show
+        # created: a text the store cannot show
         # refuses the checkout here (``LegalDocumentUnavailableError``).
         legal_acceptance = OrderLegalAcceptanceService.accept(request)
 

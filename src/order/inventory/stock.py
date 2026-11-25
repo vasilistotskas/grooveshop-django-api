@@ -248,6 +248,10 @@ class StockManager:
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
 
+        Units the cart's own unpaid order already took are not held again
+        (``order.checkout.resume.units_held_for_cart``): the same checkout
+        made again resumes that order, which has them.
+
         The first statement locks the ``Cart`` row (``select_for_update``),
         the lock checkout takes first, so the order is cart, then products,
         the same as checkout. This call, a checkout of the cart and the
@@ -266,7 +270,8 @@ class StockManager:
             quantities: product id -> units wanted, every one positive
 
         Returns:
-            The new reservations, in ascending product id order.
+            The new reservations, in ascending product id order; none for
+            a product whose every unit the cart's unpaid order holds.
 
         Raises:
             Cart.DoesNotExist: The cart was deleted meanwhile
@@ -280,6 +285,7 @@ class StockManager:
             raise ValueError("Quantity must be positive")
 
         from cart.models import Cart
+        from order.checkout.resume import units_held_for_cart
 
         locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
         session_id = str(locked_cart.uuid)
@@ -301,9 +307,13 @@ class StockManager:
         ):
             cls.release_reservation(reservation_id)
 
+        held = units_held_for_cart(locked_cart) if quantities else {}
         reservations: list[StockReservation] = []
         shortfalls: list[InsufficientStockError] = []
-        for product_id, quantity in sorted(quantities.items()):
+        for product_id, wanted in sorted(quantities.items()):
+            quantity = wanted - held.get(product_id, 0)
+            if quantity <= 0:
+                continue
             try:
                 reservations.append(
                     cls.reserve_stock(

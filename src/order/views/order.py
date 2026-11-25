@@ -1322,7 +1322,7 @@ class OrderViewSet(BaseModelViewSet):
         )
 
         logger.info(
-            "Order %s created successfully (order-first, %s) for user %s",
+            "Order %s answers the checkout (order-first, %s) for user %s",
             order.id,
             pay_way.provider_code or "offline",
             user.id if user else "guest",

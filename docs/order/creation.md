@@ -331,17 +331,11 @@ caller:
   what is reserved.
 
 ### 3.2 Repeats: the storefront's, and one agent checkout, one order
-- **Not idempotent for the storefront.** A hosted-payment order (Viva,
-  Stripe) keeps the cart, so a repeat submit creates a second PENDING order that takes its
-  own stock until its payment hold ends ([§7.1.0](cancel.md)). Reusing the open order needs a
-  key over
-  the whole request (cart lines and prices, pay way, address, loyalty points,
-  gift-card codes) and has to run before BOTH stock validations (the view's and
-  the service's: the open order already took the stock), and what the first
-  creation consumed (the coupon, the gift-card balance, the loyalty points) is
-  not recoverable from the inputs. It is a separate change, not a lookup.
-  The agent gateway names its checkout instead, and is answered by it
-  (below).
+- **The storefront names no checkout.** A hosted-payment order (Viva, Stripe)
+  keeps the cart, so the same cart can be submitted again: the same checkout
+  resumes its order (below), a changed one places a new order that takes its
+  own stock until its payment hold ends ([§7.1.0](cancel.md)). The agent
+  gateway names its checkout instead, and is answered by it (next).
 - **One agent checkout, one order** (`Order.agent_checkout`, #637). The
   agent gateway sends its checkout session's id as `agentCheckout` and,
   when an order call goes unanswered, asks again with the same id. A
@@ -396,7 +390,7 @@ caller:
 - **An agent order is refused while its cart's earlier order awaits its
   online payment** (`OrderService._refuse_agent_order_on_unpaid_cart`, #692).
   The repeat submit above is a person's own act on the storefront ("Back,
-  then order again") and stays as it is. Through the agent gateway it is a
+  then order again"). Through the agent gateway it is a
   platform that lost its checkout or sent it twice: a second order for the
   same goods, with its own stock decrement, that the buyer never asked for.
   - **Which new order.** One the gateway places: `AttributionInput.from_agent`,
@@ -432,23 +426,36 @@ caller:
     shopper chose: the quote's `cart_digest` (lines, promotions, delivery),
     `amount_due`, the pay way, the loyalty points and gift cards redeemed, and
     every field of the shipping address. An online order stores it as
-    `metadata["checkout_fingerprint"]`, which is personal
-    (`Order.PERSONAL_METADATA`).
-  - **The order resumed.** `unpaid_order_of_cart`: the cart's latest order
-    with the same pay way that holds its stock for an online payment, is not
-    an agent's (the gateway's are answered by their agent checkout or refused,
-    above), and whose payment window still fits a link of its provider
-    (`payment_hold.window_closed` with `min_hosted_session`).
+    `metadata["checkout_fingerprint"]`, with an HMAC of its own row's address
+    beside it (`address_fingerprint`), so an order edited since (its owner, or
+    staff) is not the same. Both are personal (`Order.PERSONAL_METADATA`).
+  - **The order resumed.** `order_to_resume`: the one this checkout made, the
+    latest if there are two, whichever was placed last, among
+    `payable_orders_of_cart`: it holds its stock for an online payment that is
+    pending or failed (not one processing, or flagged for another amount), is
+    not an agent's (the gateway's are answered by their agent checkout or
+    refused, above), and its payment window still fits a link of its provider
+    (`payment_hold.window_closed` with `min_hosted_session`). Its row is
+    locked.
   - **When.** Under the cart row lock, before the cart is validated, since the
-    order holds the cart's stock, the last units included. The quote is priced
-    only when the cart has such an order. A quote that refuses is a changed
-    checkout, answered by the creation that follows. Two identical checkouts
-    racing end with one order.
-  - **The answer.** The order, `201`, as for a repeat of an agent checkout.
-    The storefront then asks for its payment link and gets the live one
-    ([§4](payments.md)).
-  - **A changed checkout** places a new order, as before. Cancelling the
-    earlier one in the same step (supersede) waits for a verified way to
+    order holds the cart's stock. The quote is priced only when the cart has
+    such an order. A quote that refuses, another total or other contents are a
+    changed checkout, answered by the creation that follows. Two identical
+    checkouts racing end with one order.
+  - **The stock.** The storefront reserves before every order
+    (`StockManager.reserve_cart_stock`), which does not hold again the units
+    the cart's payable unpaid order already took (`units_held_for_cart`), so a
+    repeat of the last units is not refused there; a resume releases any hold
+    left. The storefront still marks a line whose product has no stock left, so
+    that shopper's way back is the order's own "Pay now".
+  - **The answer.** The order, `201`, as for a repeat of an agent checkout,
+    with the repeat's own ads consent and browser data, language and newly
+    accepted legal texts. The storefront then asks for its payment link and
+    gets the live one ([§4](payments.md)).
+  - **A changed checkout** places a new order, as before. That includes one
+    that spent something the first order took (a gift card's balance, a
+    single-use coupon): its second quote is another total. Cancelling the
+    earlier order in the same step (supersede) waits for a verified way to
     close its payment link first.
 - For **COD/offline**: dispatches courier task via
   `_dispatch_shipment_creation_task` immediately. The

@@ -22,6 +22,11 @@ viewer's and passes no cache, and its own session, cart and customer are
 what the impression is recorded with, so an ``attach`` matched through
 the id is the viewer's own. The id is a random UUID Django minted, so an
 id a client made up matches no impression it could attach to.
+
+Transitional: an impression that names an id of its own, as a storefront
+that still reads the body's id does, is recorded under that id, so neither
+statement holds for it. The release that stops accepting one (#794) deletes
+this paragraph.
 """
 
 from __future__ import annotations

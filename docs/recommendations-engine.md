@@ -478,7 +478,9 @@ The strip posts the impression from its own `onMounted`, which under
 "served" — with no `impressionId`: `recommendation_event` mints one, records
 the impression with that request's own session, cart and customer, and
 answers with it. The `impressionId` in the suggestions body is shared by
-every viewer of a cached copy and is not the showing's. The strip sends
+every viewer of a cached copy and is not the showing's. (Until the storefront
+that posts no `impressionId` is live, the beacon records an impression that
+names one under it.) The strip sends
 the minted id on its clicks through
 `server/api/analytics/recommendation-event.post.ts`,
 carrying the cart's identity headers so an `attach` can later be

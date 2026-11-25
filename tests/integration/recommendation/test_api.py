@@ -128,7 +128,7 @@ class TestRecommendations:
         assert {item["reason"]["strategy"] for item in items} == {
             StrategyCode.POPULAR
         }
-        uuid.UUID(str(response.data["impression_id"]))
+        uuid.UUID(str(response.json()["impressionId"]))
 
     def test_exclusions_are_honoured(self, client, curated_seed):
         seed, curated = curated_seed
@@ -237,7 +237,7 @@ class TestEvents:
 
         assert response.status_code == status.HTTP_202_ACCEPTED
         row = RecommendationEvent.objects.get()
-        assert row.impression_id == response.data["impression_id"]
+        assert str(row.impression_id) == response.json()["impressionId"]
 
     def test_two_showings_get_two_ids_each_with_its_own_cart(self, client):
         product = _product()
@@ -263,7 +263,7 @@ class TestEvents:
 
         response = client.post(self.url, payload, format="json")
 
-        assert str(response.data["impression_id"]) == payload["impressionId"]
+        assert str(response.json()["impressionId"]) == payload["impressionId"]
         row = RecommendationEvent.objects.get()
         assert str(row.impression_id) == payload["impressionId"]
 

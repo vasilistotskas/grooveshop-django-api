@@ -23,12 +23,11 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
     ``OrderService.handle_payment_failed`` only flips ``payment_status``
     to FAILED — it deliberately does NOT touch stock.
 
-    Stock is consumed at order-creation time (``_consume_stock_for_order``,
-    both the payment-first and offline paths), not on webhook receipt, so
-    by the time a ``payment_intent.payment_failed`` webhook arrives the
-    stock is already "sold". It must stay that way through a retry grace
-    window: Stripe allows retrying a failed PaymentIntent with a new
-    card, this storefront's back-to-form retry flow is live, and
+    Stock is consumed at order-creation time (``_consume_stock_for_order``),
+    not on webhook receipt, so by the time a ``payment_intent.payment_failed``
+    webhook arrives the stock is already "sold". It must stay that way
+    while the order can still be paid: the shopper may try another card on
+    the hosted page or open a new link (Pay now), and
     ``handle_payment_succeeded`` never re-consumes stock on a later
     success. Releasing stock the moment a payment fails would let a
     retried, successful payment ship an order against inventory that was

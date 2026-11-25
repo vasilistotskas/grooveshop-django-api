@@ -1093,18 +1093,17 @@ class OrderDetailSerializer(OrderSerializer):
 
 class OrderCreateFromCartSerializer(PickupPointSerializer):
     """
-    Serializer for creating orders from cart (dual-flow payment architecture).
+    Serializer for creating orders from cart.
 
-    The flow follows the pay way's ``settlement``:
-    1. ``online``: the shopper pays at checkout. A client-confirmed
-       provider (Stripe) takes ``payment_intent_id`` for the balance
-       left after deductions (gift cards, promotions, loyalty points);
-       without one the order is created order-first, which succeeds only
-       when the deductions cover the whole total, so no provider charge
-       is made. A hosted-checkout provider (Viva) creates the order
-       first and redirects.
+    Every pay way creates the order before any payment, whatever its
+    ``settlement``:
+    1. ``online``: the shopper pays the balance left after deductions
+       (gift cards, promotions, loyalty points) afterwards, on the
+       provider's hosted page (Viva Wallet, Stripe). Deductions that
+       cover the whole total settle the order at once, with no provider
+       charge.
     2. Any other settlement (courier cash, carrier terminal, offline
-       transfer): money is collected later, no ``payment_intent_id``.
+       transfer): money is collected later.
 
     The order is created from an existing cart identified via X-Cart-Id header.
     Cart is NOT sent in request body - it's retrieved from the header using CartService.
@@ -1113,16 +1112,6 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
     # Payment method (required for all flows)
     pay_way_id = serializers.IntegerField(
         required=True, help_text=_("Payment method ID")
-    )
-
-    # Payment intent (required only for online payments)
-    payment_intent_id = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        allow_null=True,
-        help_text=_(
-            "Payment intent ID from payment provider (required for online payments)"
-        ),
     )
 
     # Shipping address fields (required for all flows)
@@ -1324,8 +1313,8 @@ class OrderCreateFromCartSerializer(PickupPointSerializer):
         max_length=3,
         help_text=_(
             "Gift card codes to redeem against this order (max 3). "
-            "When they cover the full total, omit payment_intent_id — "
-            "no provider charge happens at all."
+            "When they cover the full total, the order is settled at "
+            "once and no provider charge happens at all."
         ),
     )
 
@@ -2031,93 +2020,6 @@ class UpdateStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=OrderStatus.choices)
 
 
-class CreatePaymentIntentRequestSerializer(serializers.Serializer):
-    """Request body for ``create_payment_intent`` and ``retry_payment``.
-
-    The three named fields are declared because both views read them off
-    ``validated_data`` — undeclared, DRF dropped them and the branches
-    that copy them into ``payment_data`` could never fire.
-    """
-
-    payment_data = serializers.DictField(
-        required=False,
-        default=dict,
-        child=serializers.CharField(max_length=500),
-        help_text=_("Additional payment data required by the payment provider"),
-    )
-    payment_method_id = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=255,
-        help_text=_("Provider payment-method id to charge"),
-    )
-    customer_id = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=255,
-        help_text=_("Provider customer id to attach the payment to"),
-    )
-    return_url = WebURLField(
-        required=False,
-        allow_blank=True,
-        max_length=500,
-        help_text=_("Where the provider should send the shopper back to"),
-    )
-
-    # ``payment_data`` is splatted into PayWayService.process_payment as
-    # keyword arguments, so a key that collides with one of the call's own
-    # parameters raised TypeError and surfaced as a 500 on a payment
-    # endpoint. Reject those by name instead.
-    RESERVED_PAYMENT_DATA_KEYS = frozenset(
-        {"pay_way", "order", "amount", "order_id"}
-    )
-
-    def validate_payment_data(self, value):
-        clashes = sorted(self.RESERVED_PAYMENT_DATA_KEYS & set(value))
-        if clashes:
-            raise serializers.ValidationError(
-                _("These keys are reserved and cannot be sent: %(keys)s")
-                % {"keys": ", ".join(clashes)},
-                code="reserved_payment_data_keys",
-            )
-        return value
-
-
-class CreatePaymentIntentResponseSerializer(serializers.Serializer):
-    payment_id = serializers.CharField(
-        help_text=_("Payment intent ID from the payment provider")
-    )
-
-    status = serializers.CharField(help_text=_("Payment status"))
-
-    amount = serializers.CharField(help_text=_("Payment amount"))
-
-    currency = serializers.CharField(help_text=_("Payment currency"))
-
-    provider = serializers.CharField(help_text=_("Payment provider name"))
-
-    client_secret = serializers.CharField(
-        required=False,
-        help_text=_(
-            "Stripe PaymentIntent client secret for frontend confirmation"
-        ),
-    )
-
-    requires_action = serializers.BooleanField(
-        required=False,
-        default=False,
-        help_text=_(
-            "Whether the payment requires additional action (3D Secure, etc.)"
-        ),
-    )
-
-    next_action = serializers.DictField(
-        required=False,
-        allow_null=True,
-        help_text=_("Next action required for payment completion"),
-    )
-
-
 class CreateCheckoutSessionRequestSerializer(serializers.Serializer):
     success_url = WebURLField(required=True)
     cancel_url = WebURLField(required=True)
@@ -2262,8 +2164,8 @@ class PaymentProviderErrorSerializer(serializers.Serializer):
     detail = serializers.CharField()
     code = serializers.CharField(
         help_text=_(
-            "Stable error code: ``payment_intent_failed``, "
-            "``checkout_session_failed`` or ``delegated_charge_failed``."
+            "Stable error code: ``checkout_session_failed`` or "
+            "``delegated_charge_failed``."
         ),
     )
     error = serializers.DictField(

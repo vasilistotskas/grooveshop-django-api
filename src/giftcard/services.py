@@ -293,9 +293,9 @@ class GiftCardService:
 
         Smallest balance first (drains near-empty cards), respecting
         the provider minimum-charge floor on partial coverage. The
-        SAME math runs at payment-intent creation, at the order-create
-        verification and at the actual redemption — parity or
-        ``PaymentAmountMismatchError``.
+        SAME math runs in the checkout quote and, locked, at order
+        creation, which records this plan — so the order is created at
+        the total the shopper was quoted.
         """
         currency = amount_due.currency
         empty = RedemptionPlan(Money(0, currency), [])

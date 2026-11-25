@@ -1,8 +1,9 @@
 from datetime import timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from djmoney.money import Money
 
@@ -10,11 +11,7 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from order.checkout.quote import ExpectedTotal
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import (
-    CartNotReadyError,
-    InvalidOrderDataError,
-    PaymentVerificationError,
-)
+from order.exceptions import CartNotReadyError, InvalidOrderDataError
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
@@ -27,23 +24,16 @@ from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from user.factories.account import UserAccountFactory
 
-pytestmark = [
-    pytest.mark.assert_english,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.assert_english
 
 
 def _eur(amount: str) -> Money:
     return Money(amount, settings.DEFAULT_CURRENCY)
 
 
-def _provider_reporting(status: PaymentStatus) -> Mock:
-    provider = Mock()
-    provider.get_payment_status.return_value = (status, {"status": "x"})
-    return provider
-
-
-def _pending_stripe_order(pay_way, payment_id: str, **overrides) -> Order:
+def _pending_stripe_order(
+    pay_way, payment_id: str | None, **overrides
+) -> Order:
     fields = {
         "user": None,
         "pay_way": pay_way,
@@ -72,7 +62,7 @@ class TestCreateOrderFromCart:
         from tests.utils.shipping import enable_rate
 
         self.user = UserAccountFactory.create(num_addresses=0)
-        self.pay_way = PayWayFactory.create(provider_code="stripe")
+        self.pay_way = PayWayFactory.create_online_payment()
         self.country = CountryFactory.create()
         # A ShippingRate is per-country — this ad-hoc country has none
         # until this call, and ``shipping_cost`` would refuse the order.
@@ -104,13 +94,11 @@ class TestCreateOrderFromCart:
             "phone": "+306900000000",
             "shipping_kind": "home_delivery",
         }
-        self.payment_intent_id = "pi_test123abc"
 
     def _create(self, **overrides):
         kwargs = {
             "cart": self.cart,
             "shipping_address": self.shipping_address,
-            "payment_intent_id": self.payment_intent_id,
             "pay_way": self.pay_way,
             "user": self.user,
         }
@@ -119,16 +107,16 @@ class TestCreateOrderFromCart:
             **priced(legal_acceptance=checkout_acceptance(), **kwargs)
         )
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_creates_a_pending_order_from_the_cart(self, mock_get_provider):
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.COMPLETED
-        )
+    def test_creates_a_pending_order_from_the_cart(self):
+        """The order comes first: no provider is asked anything and no
+        payment exists until the shopper opens one on the hosted page."""
+        with patch("order.payments.payment.get_payment_provider") as provider:
+            order = self._create()
 
-        order = self._create()
-
+        provider.assert_not_called()
         assert order.status == OrderStatus.PENDING
-        assert order.payment_id == self.payment_intent_id
+        assert order.payment_status == PaymentStatus.PENDING
+        assert not order.payment_id
         assert order.user == self.user
         assert order.pay_way == self.pay_way
         assert (order.first_name, order.email, order.city) == (
@@ -140,28 +128,8 @@ class TestCreateOrderFromCart:
             self.product1.id: 2,
             self.product2.id: 1,
         }
-        mock_get_provider.return_value.get_payment_status.assert_called_once_with(
-            self.payment_intent_id
-        )
 
-    @pytest.mark.parametrize("payment_intent_id", [None, ""])
-    def test_missing_payment_intent_id_is_refused(self, payment_intent_id):
-        with pytest.raises(
-            InvalidOrderDataError, match="Payment intent ID is required"
-        ):
-            self._create(payment_intent_id=payment_intent_id)
-
-        assert not Order.objects.filter(user=self.user).exists()
-
-    @patch("order.payments.payment.get_payment_provider")
-    def test_incomplete_shipping_address_is_refused(self, mock_get_provider):
-        # The provider is asked about the intent BEFORE the order
-        # transaction opens (no PSP call under the cart lock), so it must
-        # answer for the address check to be reached.
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.PENDING
-        )
-
+    def test_incomplete_shipping_address_is_refused(self):
         with pytest.raises(InvalidOrderDataError, match="last_name"):
             # An address the quote cannot price either: no total to send.
             self._create(
@@ -171,27 +139,7 @@ class TestCreateOrderFromCart:
 
         assert not Order.objects.filter(user=self.user).exists()
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_failed_payment_intent_is_refused(self, mock_get_provider):
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.FAILED
-        )
-
-        with pytest.raises(PaymentVerificationError) as exc_info:
-            self._create(payment_intent_id="pi_invalid123")
-
-        assert "invalid state" in str(exc_info.value).lower()
-        assert "FAILED" in str(exc_info.value)
-
-    @patch("order.payments.payment.get_payment_provider")
-    def test_insufficient_stock_is_refused_and_moves_no_stock(
-        self, mock_get_provider
-    ):
-        # The intent is read first, outside the transaction: a cart that
-        # cannot be checked out costs one provider read and no lock.
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.PENDING
-        )
+    def test_insufficient_stock_is_refused_and_moves_no_stock(self):
         scarce = ProductFactory.create(
             price=_eur("10.00"), stock=1, active=True
         )
@@ -210,13 +158,7 @@ class TestCreateOrderFromCart:
             product.refresh_from_db()
             assert product.stock == stock
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_converts_the_carts_reservations_into_the_sale(
-        self, mock_get_provider
-    ):
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.COMPLETED
-        )
+    def test_converts_the_carts_reservations_into_the_sale(self):
         reservations = [
             StockReservation.objects.create(
                 product=product,
@@ -243,14 +185,7 @@ class TestCreateOrderFromCart:
         self.product2.refresh_from_db()
         assert (self.product1.stock, self.product2.stock) == (18, 14)
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_without_reservations_decrements_stock_directly(
-        self, mock_get_provider
-    ):
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.COMPLETED
-        )
-
+    def test_without_reservations_decrements_stock_directly(self):
         order = self._create()
 
         assert order.metadata.get("stock_reservation_ids", []) == []
@@ -258,16 +193,10 @@ class TestCreateOrderFromCart:
         self.product2.refresh_from_db()
         assert (self.product1.stock, self.product2.stock) == (18, 14)
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_cart_clears_at_creation_for_an_offline_pay_way(
-        self, mock_get_provider
-    ):
+    def test_cart_clears_at_creation_for_an_offline_pay_way(self):
         """Pins ``settlement``: the factory randomises it, and cart
         clearing depends on whether the shopper still owes money online
         (hosted flows keep the cart until ``order_paid``)."""
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.COMPLETED
-        )
         offline_pay_way = PayWayFactory.create(
             provider_code="cash_on_delivery",
             settlement=PaySettlement.COURIER_CASH,
@@ -278,10 +207,7 @@ class TestCreateOrderFromCart:
         assert self.cart.items.count() == 0
         assert order.items.count() == 2
 
-    @patch("order.payments.payment.get_payment_provider")
-    def test_cart_survives_until_a_hosted_payment_completes(
-        self, mock_get_provider
-    ):
+    def test_cart_survives_until_a_hosted_payment_completes(self):
         """Viva and Stripe mint the Order first and then redirect
         off-site. Clearing at creation meant abandoning that page — or
         pressing Back — silently emptied the shopper's basket and
@@ -290,9 +216,6 @@ class TestCreateOrderFromCart:
         ``order_paid`` is what clears it."""
         from order.signals import order_paid
 
-        mock_get_provider.return_value = _provider_reporting(
-            PaymentStatus.PENDING
-        )
         hosted_pay_way = PayWayFactory.create(
             provider_code="viva_wallet", settlement=PaySettlement.ONLINE
         )
@@ -307,6 +230,28 @@ class TestCreateOrderFromCart:
         order_paid.send(sender=type(order), order=order)
 
         assert self.cart.items.count() == 0
+
+
+@pytest.mark.django_db
+class TestPaymentIdIsUniqueInTheDatabase:
+    """One provider payment, one order (``order_payment_id_unique``),
+    while "no payment yet" (``''`` and NULL) stays repeatable."""
+
+    def setup_method(self):
+        self.pay_way = PayWayFactory.create_online_payment()
+
+    def test_a_second_order_on_one_payment_id_is_refused(self):
+        _pending_stripe_order(self.pay_way, "pi_dup_123")
+
+        with pytest.raises(IntegrityError), transaction.atomic():
+            _pending_stripe_order(self.pay_way, "pi_dup_123")
+
+    @pytest.mark.parametrize("no_payment_yet", ["", None])
+    def test_orders_with_no_payment_yet_may_repeat(self, no_payment_yet):
+        _pending_stripe_order(self.pay_way, no_payment_yet)
+        _pending_stripe_order(self.pay_way, no_payment_yet)
+
+        assert Order.objects.filter(payment_id=no_payment_yet).count() == 2
 
 
 @pytest.mark.django_db

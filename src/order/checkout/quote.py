@@ -3,9 +3,9 @@
 The value every "free above X" rule is judged on (``threshold_value``),
 the shopper's distance to free shipping, the shipping price, the
 pay-way fee, and the total they add up to (``quote``). Order creation,
-the payment-intent endpoint, ``POST /cart/quote`` and the cart
-serializer all take these from ``OrderQuoteService``, so the cart
-preview, the quote, the intent amount and the order cannot disagree.
+``POST /cart/quote`` and the cart serializer all take these from
+``OrderQuoteService``, so the cart preview, the quote and the order
+cannot disagree.
 """
 
 from __future__ import annotations
@@ -307,9 +307,8 @@ class OrderQuoteService:
     ) -> CheckoutQuote:
         """What checkout charges for ``cart`` with these choices.
 
-        The one computation of the total: ``POST /cart/quote``, the
-        payment-intent amount and both order-creation paths call it, so
-        a rule added here reaches all of them. ``cart`` carries its
+        The one computation of the total: ``POST /cart/quote`` and
+        order creation call it, so a rule added here reaches both. ``cart`` carries its
         wholesale prices already (``B2BPricingService.bind_cart``).
 
         ``shipping`` and ``pay_way`` are ``None`` while the shopper
@@ -381,7 +380,7 @@ class OrderQuoteService:
 
         # Wholesale carts sit outside the loyalty program unless the
         # merchant opts in. Dropped here, before any total, so the
-        # quote, the intent amount, the order and ``redeem_points`` agree.
+        # quote, the order and ``redeem_points`` agree.
         if B2BService.suppresses_loyalty(cart):
             loyalty_points = 0
         loyalty_points = cls._redeemable_points(user, loyalty_points)
@@ -931,10 +930,9 @@ class OrderQuoteService:
 
         Raises :class:`~order.exceptions.ShippingRefusedError`, an
         ``InvalidOrderDataError`` that names which refusal it is (never
-        the raw ``shipping.exceptions`` types), so every caller of
-        :meth:`quote` — order creation, the create-payment-intent and
-        quote endpoints — gets the same field-scoped 400 shape it
-        already handles for every other checkout-time rejection.
+        the raw ``shipping.exceptions`` types): order creation answers it
+        with the field-scoped 400 it gives every other checkout-time
+        rejection, and the quote endpoint with the refusal's own code.
         """
         from shipping.exceptions import (
             ShippingLivePriceUnresolvedError,

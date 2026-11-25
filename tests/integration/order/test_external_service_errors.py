@@ -11,6 +11,14 @@ from stripe._error import (
 from order.payments.payment import StripePaymentProvider
 from order.payments.payment_binding import PaymentPurpose
 
+#: What the gift-card purchase, ``process_payment``'s one caller, passes.
+GIFT_CARD_INTENT = {
+    "order_uuid": "giftcard_purchase-uuid",
+    "customer_email": "buyer@example.com",
+    "purpose": PaymentPurpose.GIFT_CARD,
+    "subject": "purchase-uuid",
+}
+
 
 @pytest.mark.django_db
 class TestExternalServiceErrorsAreLogged:
@@ -44,9 +52,8 @@ class TestExternalServiceErrorsAreLogged:
                 "process_payment",
                 {
                     "amount": Money("100.00", "USD"),
-                    "order_id": "order_123",
-                    "purpose": PaymentPurpose.ORDER,
-                    "subject": "order-uuid",
+                    "order_id": "giftcard_purchase-uuid",
+                    **GIFT_CARD_INTENT,
                 },
             ),
             # Stripe refund
@@ -162,9 +169,8 @@ class TestExternalServiceErrorsAreLogged:
                 "process_payment",
                 {
                     "amount": Money("100.00", "USD"),
-                    "order_id": "order_123",
-                    "purpose": PaymentPurpose.ORDER,
-                    "subject": "order-uuid",
+                    "order_id": "giftcard_purchase-uuid",
+                    **GIFT_CARD_INTENT,
                 },
             ),
             (
@@ -236,8 +242,7 @@ class TestExternalServiceErrorsAreLogged:
             success, error_data = provider.process_payment(
                 Money("100.00", "USD"),
                 "order_test",
-                purpose=PaymentPurpose.ORDER,
-                subject="order-uuid",
+                **GIFT_CARD_INTENT,
             )
 
             # Verify: Returns failure
@@ -272,8 +277,7 @@ class TestExternalServiceErrorsAreLogged:
             stripe_provider.process_payment(
                 Money("100.00", "USD"),
                 "order_1",
-                purpose=PaymentPurpose.ORDER,
-                subject="order-uuid",
+                **GIFT_CARD_INTENT,
             )
 
         # Test Stripe refund

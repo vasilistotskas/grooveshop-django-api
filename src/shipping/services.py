@@ -404,7 +404,7 @@ class ShippingService:
         creating transaction has committed. Without this guard the
         worker observed a "Order N not found" race (verified on prod
         order 47, 2026-04-30): the task fired inside the open
-        ``create_order_from_cart_offline`` transaction, the worker
+        ``create_order_from_cart`` transaction, the worker
         looked up the order on a different DB connection, and gave up
         permanently because Order.DoesNotExist isn't a retryable
         exception. ``on_commit`` is a no-op outside a transaction, so

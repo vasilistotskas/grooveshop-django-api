@@ -40,7 +40,7 @@ in [`payment-ledger.md`](payment-ledger.md) (§7.3) and the tax documents in
   An unpaid online order holds its stock until then, so how many one customer
   can have waiting is bounded per store: `ORDER_MAX_UNPAID_ONLINE_ORDERS`
   (default 5, `0` = off; `OrderService._enforce_unpaid_order_limit`, checked in
-  `create_order_from_cart_offline` for online methods only). The customer is
+  `create_order_from_cart` for online methods only). The customer is
   the account, or the email (case-insensitive) for a guest. Every PENDING order
   still awaiting its online payment counts
   (`Order.objects.awaiting_online_payment()`: payment pending, processing or
@@ -168,11 +168,9 @@ locks stock.
   (per store, default 30; the validator accepts 30 to 1092) is passed as the
   expiry of the payment link or session on every path that opens a payment:
   `OrderViewSet.create_checkout_session` (hosted Stripe Checkout Session and
-  Viva payment order), and `PayWayService.process_payment`, which the
-  `create_payment_intent` and `retry-payment` endpoints use.
-  `confirm_agent_payment` (UCP/ACP delegated payment) charges at once and opens
-  nothing that waits. The payment-first Stripe path ([§3.1](creation.md))
-  creates no order until the money has moved, so it holds nothing.
+  Viva payment order), the one way a shopper pays an order
+  ([§3.1](creation.md)). `confirm_agent_payment` (UCP/ACP delegated payment)
+  charges at once and opens nothing that waits.
 - **What each provider does with it.**
   - Viva Smart Checkout: `paymentTimeout` on `POST /checkout/v2/orders`,
     **seconds**, default 1800, `65535` = never expires. After it expires the
@@ -186,18 +184,16 @@ locks stock.
     minutes; the default 30 minute hold therefore lasts 31 minutes on Stripe.
     An expired session sends `checkout.session.expired`, and a customer opening
     it sees an expired message.
-  - Stripe PaymentIntent (the order-first `create_payment_intent` /
-    `retry-payment` flow): a PaymentIntent has no expiry, so the sweep cancels
-    it (`StripePaymentProvider.close_payment`, reason `abandoned`) before it
-    releases the stock. A succeeded intent is settled first (the sweep reads it
-    before it cancels anything); one Stripe will not cancel (processing)
-    leaves the order open for its webhook, and the sweep reports
-    `skipped_open`. A retry closes the intent it replaces the same way before
-    it opens the new one (`PayWayService.process_payment`): otherwise the old
-    intent's client secret could still be confirmed after the sweep released
-    the stock. An intent past the point of no return refuses the retry
-    (`previous_payment_in_progress`), and a provider outage refuses it too
-    (`previous_payment_not_closed`).
+  - Stripe PaymentIntent the order holds (an agent's delegated card still
+    awaiting its confirmation, or an order placed before #818 removed the
+    client-confirmed intent): a PaymentIntent has no expiry, so the sweep
+    cancels it (`StripePaymentProvider.close_payment`, reason `abandoned`)
+    before it releases the stock. A succeeded intent is settled first (the
+    sweep reads it before it cancels anything); one Stripe will not cancel
+    (processing) leaves the order open for its webhook, and the sweep reports
+    `skipped_open`. A hosted link opened for such an order closes the intent
+    first the same way (`OrderViewSet._close_open_intent`), so the two are
+    never payable together.
 - **The expiry actually applied is the one stored.** The provider returns
   `expires_at` (Stripe's own value; for Viva, the reply time plus the timeout,
   never earlier than Viva's clock) and the caller stores it in
@@ -209,8 +205,8 @@ locks stock.
   asks for `min(now + hold, created_at + max)` (Viva is told the remaining
   seconds), so retries cannot chain the stock lock. When no link fits any more
   the endpoint answers 400 `payment_window_expired` before the provider is
-  called: for every start (`create_payment_intent`, `create_checkout_session`,
-  `retry-payment`, `confirm_agent_payment`) once the limit has passed, and for
+  called: for every start (`create_checkout_session`,
+  `confirm_agent_payment`) once the limit has passed, and for
   a hosted session also when less than the provider's `min_hosted_session` is
   left (Stripe: 31 minutes, because a shorter session cannot be opened and a
   longer one would outlive the limit). A retry inside the window works as

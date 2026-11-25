@@ -12,8 +12,6 @@ What is pinned here:
 * an order the gateway places (a believed ``agentProtocol``) on such a cart
   is refused with ``cart_has_unpaid_order``, whatever its own pay way, and
   changes nothing;
-* an agent order on a verified payment intent is placed all the same: its
-  payment is already taken, and a refusal would keep money for no order;
 * the same call without a believed agent protocol places the second order;
 * the earlier order counts only while it is this cart's and still awaits
   its online payment;
@@ -24,7 +22,7 @@ What is pinned here:
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.test import override_settings
@@ -109,8 +107,8 @@ class _Cart:
         }
 
     def order(self, *, pay_way=None, attribution=None) -> Order:
-        """Place an order the order-first way (Viva unless told)."""
-        return OrderService.create_order_from_cart_offline(
+        """Place an order (Viva unless told)."""
+        return OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=self.cart,
@@ -119,27 +117,6 @@ class _Cart:
                 attribution=attribution,
             )
         )
-
-    def pay_first(self, *, attribution=None) -> Order:
-        """Place an order the payment-first way, on a Stripe intent."""
-        provider = Mock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        with patch(
-            "order.payments.payment.get_payment_provider", return_value=provider
-        ):
-            return OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=self.cart,
-                    shipping_address=self.address(),
-                    payment_intent_id="pi_agent_second_order",
-                    pay_way=PayWayFactory.create_online_payment("stripe"),
-                    attribution=attribution,
-                )
-            )
 
     def stock(self) -> int:
         self.product.refresh_from_db()
@@ -181,6 +158,21 @@ class TestAnAgentOrderIsRefused:
             checkout.order(attribution=AGENT)
 
         assert Order.objects.count() == 1
+
+    def test_a_stripe_order_is_refused_too(self):
+        """Stripe is paid after the order like Viva, so an agent's Stripe
+        order is judged before any payment exists."""
+        checkout = _Cart()
+        checkout.order()
+
+        with pytest.raises(CartHasUnpaidOrderError):
+            checkout.order(
+                pay_way=PayWayFactory.create_online_payment("stripe"),
+                attribution=AGENT,
+            )
+
+        assert Order.objects.count() == 1
+        assert checkout.stock() == STOCK - 1
 
     def test_a_cash_on_delivery_order_is_refused_too(self):
         checkout = _Cart()
@@ -277,23 +269,6 @@ class TestAnAgentOrderGoesThrough:
         checkout.order(attribution=AGENT)
 
         assert Order.objects.count() == 2
-
-    @pytest.mark.usefixtures("trust_intent_binding")
-    def test_on_a_verified_intent_whose_payment_is_already_taken(self):
-        """The payment-first path is not checked: the intent is paid when
-        the order is created, so a refusal would keep money for no order,
-        and the order placed is a paid one."""
-        checkout = _Cart()
-        earlier = checkout.order()
-
-        order = checkout.pay_first(attribution=AGENT)
-
-        assert order.pk != earlier.pk
-        assert order.attribution.source_type == OrderSourceType.AGENT
-        assert order.payment_status == PaymentStatus.COMPLETED
-        assert order.payment_id == "pi_agent_second_order"
-        assert Order.objects.count() == 2
-        assert checkout.stock() == STOCK - 2
 
     def test_when_the_unpaid_order_is_another_carts(self):
         other = _Cart()
@@ -424,7 +399,7 @@ class TestTwoAgentOrdersRacingForOneCart:
         acceptance = checkout_acceptance()
         placed, raised = race(
             lambda: (
-                OrderService.create_order_from_cart_offline(
+                OrderService.create_order_from_cart(
                     **priced(
                         legal_acceptance=acceptance,
                         cart=checkout.cart,

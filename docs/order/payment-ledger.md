@@ -91,13 +91,11 @@ never flags; a charge on a canceled order is `ops.payment_after_cancel`'s case
 (it equals the amount due). Staff see it as the "Orders paid twice" dashboard
 row, the order list filter `?overcharged=yes` and the read-only
 `Overcharged at` field. `payment_intent.succeeded` finds the order by
-`payment_id`; an intent the order no longer names (a second tab, or an older
-one paid after a retry opened a newer intent) is found by the binding metadata
+`payment_id`; an intent the order does not name (a second payment, made
+through a link the order no longer records) is found by the binding metadata
 the server wrote on it (`OrderService._bound_order_uuid`: purpose `order`, this
 order's uuid, this tenant, checked by `binding_mismatch`), so it is booked and
-flagged like any second payment, and the first `payment_id` is kept. A
-payment-first intent is bound to a cart (its order may not exist yet) and "not
-found" stays the answer for it. The refund, failed-refund and dispute events
+flagged like any second payment, and the first `payment_id` is kept. The refund, failed-refund and dispute events
 (`charge.refunded`, `refund.failed`, `charge.dispute.created`,
 `charge.dispute.closed`) find the order through the ledger's Stripe CHARGE row
 for the intent (`_locked_order_for_stripe_intent`), not `payment_id`, so an

@@ -81,11 +81,10 @@ class OpenPayment:
     opens a new one: the state, the client-confirmed payment
     (``payment_id``) and the hosted session (``recorded_checkout_session``).
 
-    Every write of a newly opened payment, a hosted session
-    (``create_checkout_session``) or a client-confirmed intent
-    (``PayWayService.process_payment``), goes through :meth:`lock_unchanged`,
-    so an order has one payable instrument: a request that finds another
-    opened, paid or canceled since it read the order records nothing (#643).
+    Every write of a newly opened hosted session
+    (``create_checkout_session``) goes through :meth:`lock_unchanged`, so an
+    order has one payable instrument: a request that finds another opened,
+    paid or canceled since it read the order records nothing (#643).
     """
 
     status: str
@@ -148,14 +147,15 @@ class PaymentProvider(ABC):
     #: end sooner than this cannot be created, so the caller refuses.
     min_hosted_session: ClassVar[timedelta] = timedelta(0)
 
-    #: Intent-first: an intent is minted before the order exists and the
-    #: shopper confirms it client-side. The order-creation path can then
-    #: demand a ``payment_intent_id``.
+    #: The PSP mints a client-confirmed intent the shopper confirms in the
+    #: browser (``process_payment``): how a gift-card purchase is paid. An
+    #: order's open intent of this kind (an agent's delegated card) is
+    #: closed before a hosted link opens. Only providers declaring this
+    #: implement ``process_payment``.
     supports_payment_intent: ClassVar[bool] = False
 
-    #: Order-first: the shopper is redirected to a page the PSP hosts,
-    #: so the order must exist before any money moves and a partial
-    #: deduction is not a client error the way it is for intent-first.
+    #: The shopper is redirected to a page the PSP hosts, for an order
+    #: that already exists: how every order is paid online.
     supports_hosted_checkout: ClassVar[bool] = False
 
     #: The PSP can confirm a payment the buyer authorised elsewhere and
@@ -264,12 +264,6 @@ class PaymentProvider(ABC):
         return payment_hold.hold_ended(order)
 
     @abstractmethod
-    def process_payment(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        pass
-
-    @abstractmethod
     def refund_payment(
         self, payment_id: str, amount: Money, *, idempotency_key: str
     ) -> tuple[bool, dict[str, Any]]:
@@ -360,8 +354,8 @@ class StripePaymentProvider(PaymentProvider):
     min_hosted_session: ClassVar[timedelta] = (
         MIN_SESSION_LIFETIME + SESSION_MARGIN
     )
-    # Both: PaymentIntents for the intent-first checkout, and hosted
-    # Checkout Sessions for the pay-later/retry links.
+    # Hosted Checkout Sessions pay every order; a client-confirmed
+    # PaymentIntent pays a gift-card purchase.
     supports_payment_intent: ClassVar[bool] = True
     supports_hosted_checkout: ClassVar[bool] = True
     supports_delegated_payment: ClassVar[bool] = True
@@ -475,7 +469,8 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        # Outside the try, as in ``process_payment``.
+        # Outside the try: a caller that forgets to say what the session
+        # is for is a bug to see, not a payment failure to report.
         binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
         try:
             logger.info(
@@ -657,9 +652,10 @@ class StripePaymentProvider(PaymentProvider):
 
         A hosted Checkout Session ends at its ``expires_at`` (the stored
         hold) and records no ``payment_id`` on the order, so it has nothing
-        to cancel here and waits for the hold like any link. An
-        intent opened by ``process_payment`` stays confirmable until
-        canceled, so it is canceled here before the stock is released.
+        to cancel here and waits for the hold like any link. An intent
+        the order records (an agent's delegated card awaiting its
+        confirmation) stays confirmable until canceled, so it is canceled
+        here before the stock is released.
         Stripe refuses once the intent is processing or succeeded (or
         belongs to a Checkout Session, which can only be expired); the
         intent is then read back and the order stays open unless it is
@@ -756,11 +752,23 @@ class StripePaymentProvider(PaymentProvider):
             return False, {"error": str(e), "stripe_error": True}
 
     def process_payment(
-        self, amount: Money, order_id: str, **kwargs
+        self,
+        amount: Money,
+        order_id: str,
+        *,
+        order_uuid: str,
+        customer_email: str,
+        purpose: PaymentPurpose,
+        subject: str,
     ) -> tuple[bool, dict[str, Any]]:
-        # Outside the try: a caller that forgets to say what the intent is
-        # for is a bug to see, not a payment failure to report.
-        binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
+        """Mint a client-confirmed PaymentIntent for *amount*.
+
+        Bound to what it pays for (``purpose``/``subject``, the binding
+        metadata), and idempotent on ``order_uuid``: the same purchase
+        asked again gets the same intent back. Its ``client_secret`` is a
+        bearer credential and is never logged.
+        """
+        binding = binding_metadata(purpose, subject)
         try:
             logger.info(
                 "Processing Stripe payment",
@@ -800,19 +808,6 @@ class StripePaymentProvider(PaymentProvider):
             if tenant_connect_id:
                 metadata["tenant_stripe_account"] = tenant_connect_id
 
-            # Add cart_item_ids if provided
-            cart_item_ids = kwargs.get("cart_item_ids")
-            if cart_item_ids is not None:
-                # Convert list to comma-separated string for Stripe metadata
-                if isinstance(cart_item_ids, list):
-                    metadata["cart_item_ids"] = ",".join(
-                        str(item_id) for item_id in cart_item_ids
-                    )
-                else:
-                    metadata["cart_item_ids"] = str(cart_item_ids)
-
-            # Add customer_email if provided
-            customer_email = kwargs.get("customer_email")
             if customer_email:
                 metadata["customer_email"] = customer_email
 
@@ -825,34 +820,11 @@ class StripePaymentProvider(PaymentProvider):
                 },
             }
 
-            # Add idempotency key using order_uuid if provided
-            order_uuid = kwargs.get("order_uuid")
-            idempotency_key = None
-            if order_uuid:
-                idempotency_key = f"order_{order_uuid}"
-                logger.info(
-                    "Using idempotency key for payment intent",
-                    extra={
-                        "idempotency_key": idempotency_key,
-                        "order_id": order_id,
-                    },
-                )
-
-            customer_id = kwargs.get("customer_id")
-            if customer_id:
-                payment_intent_data["customer"] = customer_id
-
-            # Create payment intent with idempotency key if provided
-            if idempotency_key:
-                stripe_pi = stripe.PaymentIntent.create(
-                    **payment_intent_data,
-                    idempotency_key=idempotency_key,
-                    api_key=self.api_key,
-                )
-            else:
-                stripe_pi = stripe.PaymentIntent.create(
-                    **payment_intent_data, api_key=self.api_key
-                )
+            stripe_pi = stripe.PaymentIntent.create(
+                **payment_intent_data,
+                idempotency_key=f"order_{order_uuid}",
+                api_key=self.api_key,
+            )
             logger.info("Stripe PaymentIntent created: %s", stripe_pi.id)
 
             try:
@@ -1329,9 +1301,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
     TIME_ZONE: ClassVar[ZoneInfo] = ZoneInfo("Europe/Athens")
     #: A read made while a shopper waits for their payment link.
     READ_TIMEOUT_SECONDS: ClassVar[int] = 15
-    # Hosted redirect only. ``process_payment`` below delegates straight
-    # to ``create_checkout_session`` — there is no intent to confirm, so
-    # an order using Viva is created BEFORE any money moves.
+    # Hosted redirect only: there is no intent to confirm, and the order
+    # is paid through ``create_checkout_session``.
     supports_payment_intent: ClassVar[bool] = False
     supports_hosted_checkout: ClassVar[bool] = True
 
@@ -1848,11 +1819,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 extra={"order_id": order_id},
             )
             return False, {"error": str(e)}
-
-    def process_payment(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        return self.create_checkout_session(amount, order_id, **kwargs)
 
     def refund_payment(
         self, payment_id: str, amount: Money, *, idempotency_key: str

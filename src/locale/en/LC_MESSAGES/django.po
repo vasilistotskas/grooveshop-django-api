@@ -1519,9 +1519,6 @@ msgstr "Additional Information"
 msgid "Additional origins allowed by the storefront CSP (connect-src, img-src, script-src, frame-src). Each entry must start with https://, http://localhost, or wss://."
 msgstr "Additional origins allowed by the storefront CSP (connect-src, img-src, script-src, frame-src). Each entry must start with https://, http://localhost, or wss://."
 
-msgid "Additional payment data required by the payment provider"
-msgstr "Additional payment data required by the payment provider"
-
 msgid "Additional subscription preferences or data"
 msgstr "Additional subscription preferences or data"
 
@@ -3255,8 +3252,8 @@ msgstr "Checkout consent"
 msgid "Checkout email — used for guest per-customer limits"
 msgstr "Checkout email — used for guest per-customer limits"
 
-msgid "Checkout email. Lets promotion eligibility checks that depend on customer identity (first-order-only, per-customer limits) run against the same identity the order-create verification will use, keeping the PaymentIntent amount in lockstep."
-msgstr "Checkout email. Lets promotion eligibility checks that depend on customer identity (first-order-only, per-customer limits) run against the same identity the order-create verification will use, keeping the PaymentIntent amount in lockstep."
+msgid "Checkout email. Lets promotion eligibility checks that depend on customer identity (first-order-only, per-customer limits) run against the same identity order creation will use, so the quote is the total the order is created at."
+msgstr "Checkout email. Lets promotion eligibility checks that depend on customer identity (first-order-only, per-customer limits) run against the same identity order creation will use, so the quote is the total the order is created at."
 
 msgid "Checkout funnel"
 msgstr "Checkout funnel"
@@ -3841,9 +3838,6 @@ msgstr "Create BoxNow parcel now"
 msgid "Create a %(name)s"
 msgstr "Create a %(name)s"
 
-msgid "Create a Stripe payment intent based on cart total before order creation. This is required for online payment methods (Stripe) in the payment-first flow. Returns client_secret for frontend payment confirmation and payment_intent_id to be included in order creation request."
-msgstr "Create a Stripe payment intent based on cart total before order creation. This is required for online payment methods (Stripe) in the payment-first flow. Returns client_secret for frontend payment confirmation and payment_intent_id to be included in order creation request."
-
 msgid "Create a cart item"
 msgstr "Create a cart item"
 
@@ -3852,9 +3846,6 @@ msgstr "Create a contact message"
 
 msgid "Create a feedback submission"
 msgstr "Create a feedback submission"
-
-msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
-msgstr "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
 
 msgid "Create a hosted checkout session for an order"
 msgstr "Create a hosted checkout session for an order"
@@ -3866,20 +3857,11 @@ msgstr "Create a new %(name)s. Requires authentication."
 msgid "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
 msgstr "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
 
-msgid "Create a payment intent for Stripe payments on an existing order"
-msgstr "Create a payment intent for Stripe payments on an existing order"
-
-msgid "Create a payment intent for an order"
-msgstr "Create a payment intent for an order"
-
 msgid "Create an account"
 msgstr "Create an account"
 
 msgid "Create cart"
 msgstr "Create cart"
-
-msgid "Create payment intent from cart"
-msgstr "Create payment intent from cart"
 
 msgid "Create the BOX NOW parcel"
 msgstr "Create the BOX NOW parcel"
@@ -5204,9 +5186,6 @@ msgstr "Failed to create checkout session."
 #, python-brace-format
 msgid "Failed to create order: {error}"
 msgstr "Failed to create order: {error}"
-
-msgid "Failed to create payment intent."
-msgstr "Failed to create payment intent."
 
 #, python-format
 msgid "Failed to fetch %(carrier)s voucher for order #%(order_id)s. The carrier API responded with an error — see backend logs for the full traceback."
@@ -6627,9 +6606,6 @@ msgstr "From now on, your wholesale prices apply automatically while you are sig
 msgid "From product"
 msgstr "From product"
 
-msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
-msgstr "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
-
 msgid "Fulfilment kind of the chosen delivery; omit while none is chosen."
 msgstr "Fulfilment kind of the chosen delivery; omit while none is chosen."
 
@@ -7001,11 +6977,11 @@ msgstr "Gift card code"
 msgid "Gift card code (case-insensitive)"
 msgstr "Gift card code (case-insensitive)"
 
-msgid "Gift card codes the shopper wants to redeem — the intent is created for the REMAINDER after their balances. Pass the same codes in the order-create body."
-msgstr "Gift card codes the shopper wants to redeem — the intent is created for the REMAINDER after their balances. Pass the same codes in the order-create body."
+msgid "Gift card codes the shopper wants to redeem; the amount due is what remains after their balances. Pass the same codes in the order-create body."
+msgstr "Gift card codes the shopper wants to redeem; the amount due is what remains after their balances. Pass the same codes in the order-create body."
 
-msgid "Gift card codes to redeem against this order (max 3). When they cover the full total, omit payment_intent_id — no provider charge happens at all."
-msgstr "Gift card codes to redeem against this order (max 3). When they cover the full total, omit payment_intent_id — no provider charge happens at all."
+msgid "Gift card codes to redeem against this order (max 3). When they cover the full total, the order is settled at once and no provider charge happens at all."
+msgstr "Gift card codes to redeem against this order (max 3). When they cover the full total, the order is settled at once and no provider charge happens at all."
 
 msgid "Gift card delivery"
 msgstr "Gift card delivery"
@@ -7498,9 +7474,6 @@ msgstr "I have saved them, continue"
 msgid "ID of the chosen PayWay; omit while none is chosen."
 msgstr "ID of the chosen PayWay; omit while none is chosen."
 
-msgid "ID of the selected PayWay (must be online Stripe)."
-msgstr "ID of the selected PayWay (must be online Stripe)."
-
 msgid "ID of the tag to assign"
 msgstr "ID of the tag to assign"
 
@@ -7534,9 +7507,6 @@ msgstr "ISO 3166-1 alpha-2 country code for the buyer's tax identity. Defaults t
 msgid "ISO 3166-1 alpha-2 country code of the buyer for tax purposes. Pairs with ``billing_vat_id``; determines which AADE invoice type (1.1 domestic, 1.2 intra-EU, 1.3 third-country) applies."
 msgstr "ISO 3166-1 alpha-2 country code of the buyer for tax purposes. Pairs with ``billing_vat_id``; determines which AADE invoice type (1.1 domestic, 1.2 intra-EU, 1.3 third-country) applies."
 
-msgid "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` is per-country, so there is no priceable shipping option without a destination. Match what the order-create body will carry."
-msgstr "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` is per-country, so there is no priceable shipping option without a destination. Match what the order-create body will carry."
-
 msgid "ISO 3166-1 alpha-2 country code."
 msgstr "ISO 3166-1 alpha-2 country code."
 
@@ -7551,9 +7521,6 @@ msgstr "ISO 3166-1 alpha-2 delivery country. Needed to price a delivery and to l
 
 msgid "ISO 3166-1 alpha-2 destination country."
 msgstr "ISO 3166-1 alpha-2 destination country."
-
-msgid "ISO 4217 currency code (e.g. EUR)"
-msgstr "ISO 4217 currency code (e.g. EUR)"
 
 msgid "ISO 4217 currency code for all monetary values in this cart"
 msgstr "ISO 4217 currency code for all monetary values in this cart"
@@ -8587,15 +8554,12 @@ msgstr "Loyalty discount (%(discount)s %(currency)s) exceeds the maximum allowed
 msgid "Loyalty off from %(start)s"
 msgstr "Loyalty off from %(start)s"
 
-msgid "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
-msgstr "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
+msgid "Loyalty points the shopper will redeem at order creation; the amount due subtracts the resulting discount. Pass the same value in the order-create body. Requires an authenticated request."
+msgstr "Loyalty points the shopper will redeem at order creation; the amount due subtracts the resulting discount. Pass the same value in the order-create body. Requires an authenticated request."
 
 #, python-brace-format
 msgid "Loyalty redemption cannot be applied: {reason}"
 msgstr "Loyalty redemption cannot be applied: {reason}"
-
-msgid "Loyalty redemption failed after payment verification."
-msgstr "Loyalty redemption failed after payment verification."
 
 msgid "Loyalty redemption failed."
 msgstr "Loyalty redemption failed."
@@ -9237,9 +9201,6 @@ msgstr "Next"
 
 msgid "Next Number"
 msgstr "Next Number"
-
-msgid "Next action required for payment completion"
-msgstr "Next action required for payment completion"
 
 msgid "Next attempt at"
 msgstr "Next attempt at"
@@ -10724,12 +10685,6 @@ msgstr "Payment Update"
 msgid "Payment amount"
 msgstr "Payment amount"
 
-msgid "Payment amount does not match order total."
-msgstr "Payment amount does not match order total."
-
-msgid "Payment amount mismatch"
-msgstr "Payment amount mismatch"
-
 msgid "Payment confirmed"
 msgstr "Payment confirmed"
 
@@ -10739,12 +10694,6 @@ msgstr "Payment confirmed for order #{order_id}"
 
 msgid "Payment currency"
 msgstr "Payment currency"
-
-msgid "Payment currency does not match order currency."
-msgstr "Payment currency does not match order currency."
-
-msgid "Payment currency mismatch"
-msgstr "Payment currency mismatch"
 
 msgid "Payment does not match its order"
 msgstr "Payment does not match its order"
@@ -10768,18 +10717,6 @@ msgstr "Payment fees"
 msgid "Payment fees are what the card providers reported for each payment, in the period of the payment; fee coverage is the share of card payments, by value, with a reported fee. Delivery costs and other expenses are the expenses you entered, by their date."
 msgstr "Payment fees are what the card providers reported for each payment, in the period of the payment; fee coverage is the share of card payments, by value, with a reported fee. Delivery costs and other expenses are the expenses you entered, by their date."
 
-msgid "Payment intent ID from payment provider (required for online payments)"
-msgstr "Payment intent ID from payment provider (required for online payments)"
-
-msgid "Payment intent ID from the payment provider"
-msgstr "Payment intent ID from the payment provider"
-
-msgid "Payment intent ID is required for online payment methods"
-msgstr "Payment intent ID is required for online payment methods"
-
-msgid "Payment intent ID is required for order creation"
-msgstr "Payment intent ID is required for order creation"
-
 msgid "Payment method"
 msgstr "Payment method"
 
@@ -10793,17 +10730,11 @@ msgstr "Payment method with ID {pay_way_id} not found"
 msgid "Payment methods"
 msgstr "Payment methods"
 
-msgid "Payment not found"
-msgstr "Payment not found"
-
 msgid "Payment provider"
 msgstr "Payment provider"
 
 msgid "Payment provider name"
 msgstr "Payment provider name"
-
-msgid "Payment provider not available"
-msgstr "Payment provider not available"
 
 msgid "Payment rails"
 msgstr "Payment rails"
@@ -10829,9 +10760,6 @@ msgstr "Payment that does not match its order"
 
 msgid "Payment that no order accounts for"
 msgstr "Payment that no order accounts for"
-
-msgid "Payment verification failed"
-msgstr "Payment verification failed"
 
 msgid "Payment-method exclusion"
 msgstr "Payment-method exclusion"
@@ -11644,9 +11572,6 @@ msgstr "Provider Code"
 msgid "Provider Transaction ID"
 msgstr "Provider Transaction ID"
 
-msgid "Provider customer id to attach the payment to"
-msgstr "Provider customer id to attach the payment to"
-
 msgid "Provider event id"
 msgstr "Provider event id"
 
@@ -11655,9 +11580,6 @@ msgstr "Provider fee"
 
 msgid "Provider message id"
 msgstr "Provider message id"
-
-msgid "Provider payment-method id to charge"
-msgstr "Provider payment-method id to charge"
 
 msgid "Provider reference"
 msgstr "Provider reference"
@@ -12656,12 +12578,6 @@ msgstr "Retrieve every anonymously readable store setting in one call, keyed by 
 
 msgid "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 msgstr "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
-
-msgid "Retry is only supported for Stripe payments."
-msgstr "Retry is only supported for Stripe payments."
-
-msgid "Retry payment for a failed or pending order"
-msgstr "Retry payment for a failed or pending order"
 
 msgid "Retry the pending refund"
 msgstr "Retry the pending refund"
@@ -13909,8 +13825,8 @@ msgstr "Stable code for why the order was refused. Branch on this, never on ``de
 msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 
-msgid "Stable error code: ``payment_intent_failed``, ``checkout_session_failed`` or ``delegated_charge_failed``."
-msgstr "Stable error code: ``payment_intent_failed``, ``checkout_session_failed`` or ``delegated_charge_failed``."
+msgid "Stable error code: ``checkout_session_failed`` or ``delegated_charge_failed``."
+msgstr "Stable error code: ``checkout_session_failed`` or ``delegated_charge_failed``."
 
 msgid "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 msgstr "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
@@ -14208,14 +14124,8 @@ msgstr "Stripe Events"
 msgid "Stripe PaymentIntent ID that charged the token"
 msgstr "Stripe PaymentIntent ID that charged the token"
 
-msgid "Stripe PaymentIntent ID to be stored on the order"
-msgstr "Stripe PaymentIntent ID to be stored on the order"
-
 msgid "Stripe PaymentIntent client secret (stripe only)"
 msgstr "Stripe PaymentIntent client secret (stripe only)"
-
-msgid "Stripe PaymentIntent client secret for frontend confirmation"
-msgstr "Stripe PaymentIntent client secret for frontend confirmation"
 
 msgid "Stripe PaymentIntent id (stripe only)"
 msgstr "Stripe PaymentIntent id (stripe only)"
@@ -14807,9 +14717,6 @@ msgstr "The agent gateway's checkout that placed this order. A checkout places o
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "The amount due in minor units (cents): 1999 for 19.99."
 
-msgid "The applied discounts and gift cards cover the full total; no payment intent is needed."
-msgstr "The applied discounts and gift cards cover the full total; no payment intent is needed."
-
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr "The bank's id for the transfer. One transfer cannot pay two orders."
 
@@ -15241,12 +15148,6 @@ msgstr "The platform's emails are failing"
 msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 msgstr "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 
-msgid "The previous payment could not be closed."
-msgstr "The previous payment could not be closed."
-
-msgid "The previous payment is still in progress."
-msgstr "The previous payment is still in progress."
-
 msgid "The price per unit the shopper pays, before promotions."
 msgstr "The price per unit the shopper pays, before promotions."
 
@@ -15406,9 +15307,6 @@ msgstr "The same value as ``reason``."
 
 msgid "The scheduled database backup failed with this error:"
 msgstr "The scheduled database backup failed with this error:"
-
-msgid "The selected payment method cannot be paid with a card on this page."
-msgstr "The selected payment method cannot be paid with a card on this page."
 
 msgid "The selected payment method is not available for this order."
 msgstr "The selected payment method is not available for this order."
@@ -15601,10 +15499,6 @@ msgstr "There is no such version."
 msgid "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
 msgstr "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
 
-#, python-format
-msgid "These keys are reserved and cannot be sent: %(keys)s"
-msgstr "These keys are reserved and cannot be sent: %(keys)s"
-
 msgid "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
 msgstr "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
 
@@ -15783,9 +15677,6 @@ msgstr "This order link is not valid or has expired."
 
 msgid "This order was not paid through a payment provider, so there is nothing to refund here."
 msgstr "This order was not paid through a payment provider, so there is nothing to refund here."
-
-msgid "This order's payment status does not allow a retry."
-msgstr "This order's payment status does not allow a retry."
 
 #, python-format
 msgid "This page is linked from %(documents)s."
@@ -16112,9 +16003,6 @@ msgstr "Total cart weight in grams. ACS uses it to bucket the live quote against
 
 msgid "Total cart weight in grams. Forwarded to /api/v1/shipping/options at checkout so ACS live pricing quotes against the actual weight bracket the voucher mint will charge."
 msgstr "Total cart weight in grams. Forwarded to /api/v1/shipping/options at checkout so ACS live pricing quotes against the actual weight bracket the voucher mint will charge."
-
-msgid "Total charge amount (cart + shipping + payment fee)"
-msgstr "Total charge amount (cart + shipping + payment fee)"
 
 msgid "Total discount granted by promotions/coupons, snapshotted at order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption rows. Deducted by calculate_order_total_amount()."
 msgstr "Total discount granted by promotions/coupons, snapshotted at order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption rows. Deducted by calculate_order_total_amount()."
@@ -17183,8 +17071,8 @@ msgstr "What a person decided for this store in this run, as the decisions file 
 msgid "What became of the goods?"
 msgstr "What became of the goods?"
 
-msgid "What checkout charges for the cart with the choices made so far, computed by the function order creation and the payment intent use: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
-msgstr "What checkout charges for the cart with the choices made so far, computed by the function order creation and the payment intent use: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
+msgid "What checkout charges for the cart with the choices made so far, computed by the function order creation uses: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
+msgstr "What checkout charges for the cart with the choices made so far, computed by the function order creation uses: the products, the promotions, the delivery, the pay-way fee, the loyalty discount and the gift cards, and the amount due. A row that depends on a choice the request did not make is null. Also lists every delivery and pay way on offer at the price this cart would be charged. Send ``expectedTotal`` back when creating the order: it is then created only at this total. A quote asked with ``X-Cart-Token`` is the cart owner's price."
 
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
@@ -17369,9 +17257,6 @@ msgstr "When true, the facets answer a filter sidebar in this one request. The c
 msgid "Where orders come from"
 msgstr "Where orders come from"
 
-msgid "Where the provider should send the shopper back to"
-msgstr "Where the provider should send the shopper back to"
-
 msgid "Where the strip is rendered; selects the slot."
 msgstr "Where the strip is rendered; selects the slot."
 
@@ -17413,9 +17298,6 @@ msgstr "Whether the newsletter form can be offered"
 
 msgid "Whether the operation was successful"
 msgstr "Whether the operation was successful"
-
-msgid "Whether the payment requires additional action (3D Secure, etc.)"
-msgstr "Whether the payment requires additional action (3D Secure, etc.)"
 
 msgid "Whether the product is currently in stock"
 msgstr "Whether the product is currently in stock"
@@ -18309,10 +18191,6 @@ msgstr "paid by the customer"
 msgid "paid by the store"
 msgstr "paid by the store"
 
-#, python-brace-format
-msgid "payment intent is in an invalid state: {status}"
-msgstr "payment intent is in an invalid state: {status}"
-
 msgid "payment provider"
 msgstr "payment provider"
 
@@ -18491,6 +18369,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Active products with fewer than %(count)s left"
 #~ msgstr "Active products with fewer than %(count)s left"
 
+#~ msgid "Additional payment data required by the payment provider"
+#~ msgstr "Additional payment data required by the payment provider"
+
 #~ msgid "Admin display name for this layout."
 #~ msgstr "Admin display name for this layout."
 
@@ -18612,8 +18493,23 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Courier receipts cannot be sent: no dispatch point"
 #~ msgstr "Courier receipts cannot be sent: no dispatch point"
 
+#~ msgid "Create a Stripe payment intent based on cart total before order creation. This is required for online payment methods (Stripe) in the payment-first flow. Returns client_secret for frontend payment confirmation and payment_intent_id to be included in order creation request."
+#~ msgstr "Create a Stripe payment intent based on cart total before order creation. This is required for online payment methods (Stripe) in the payment-first flow. Returns client_secret for frontend payment confirmation and payment_intent_id to be included in order creation request."
+
+#~ msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
+#~ msgstr "Create a fresh Stripe PaymentIntent for an order whose previous payment failed or was never completed, so the customer can try again without starting a new order."
+
 #~ msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
 #~ msgstr "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
+
+#~ msgid "Create a payment intent for Stripe payments on an existing order"
+#~ msgstr "Create a payment intent for Stripe payments on an existing order"
+
+#~ msgid "Create a payment intent for an order"
+#~ msgstr "Create a payment intent for an order"
+
+#~ msgid "Create payment intent from cart"
+#~ msgstr "Create payment intent from cart"
 
 #~ msgid "Critical Stock (1-5)"
 #~ msgstr "Critical Stock (1-5)"
@@ -18687,6 +18583,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "FAQ Accordion"
 #~ msgstr "FAQ Accordion"
 
+#~ msgid "Failed to create payment intent."
+#~ msgstr "Failed to create payment intent."
+
 #~ msgid "False"
 #~ msgstr "False"
 
@@ -18710,6 +18609,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Footer links belong to a column."
 #~ msgstr "Footer links belong to a column."
+
+#~ msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
+#~ msgstr "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
 
 #~ msgid "Fully Refunded"
 #~ msgstr "Fully Refunded"
@@ -18735,6 +18637,15 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "High Stock (>50)"
 #~ msgstr "High Stock (>50)"
+
+#~ msgid "ID of the selected PayWay (must be online Stripe)."
+#~ msgstr "ID of the selected PayWay (must be online Stripe)."
+
+#~ msgid "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` is per-country, so there is no priceable shipping option without a destination. Match what the order-create body will carry."
+#~ msgstr "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` is per-country, so there is no priceable shipping option without a destination. Match what the order-create body will carry."
+
+#~ msgid "ISO 4217 currency code (e.g. EUR)"
+#~ msgstr "ISO 4217 currency code (e.g. EUR)"
 
 #~ msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
 #~ msgstr "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
@@ -18832,6 +18743,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Loyalty program"
 #~ msgstr "Loyalty program"
 
+#~ msgid "Loyalty redemption failed after payment verification."
+#~ msgstr "Loyalty redemption failed after payment verification."
+
 #~ msgid "Maximum total number of results to return"
 #~ msgstr "Maximum total number of results to return"
 
@@ -18897,6 +18811,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Newsletter Signup"
 #~ msgstr "Newsletter Signup"
+
+#~ msgid "Next action required for payment completion"
+#~ msgstr "Next action required for payment completion"
 
 #~ msgid "No ACS shipment or voucher found for this order."
 #~ msgstr "No ACS shipment or voucher found for this order."
@@ -18990,9 +18907,42 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Payment Failed - Order #{order_id}"
 #~ msgstr "Payment Failed - Order #{order_id}"
 
+#~ msgid "Payment amount does not match order total."
+#~ msgstr "Payment amount does not match order total."
+
+#~ msgid "Payment amount mismatch"
+#~ msgstr "Payment amount mismatch"
+
+#~ msgid "Payment currency does not match order currency."
+#~ msgstr "Payment currency does not match order currency."
+
+#~ msgid "Payment currency mismatch"
+#~ msgstr "Payment currency mismatch"
+
 #, python-brace-format
 #~ msgid "Payment failed for order #{order_id}"
 #~ msgstr "Payment failed for order #{order_id}"
+
+#~ msgid "Payment intent ID from payment provider (required for online payments)"
+#~ msgstr "Payment intent ID from payment provider (required for online payments)"
+
+#~ msgid "Payment intent ID from the payment provider"
+#~ msgstr "Payment intent ID from the payment provider"
+
+#~ msgid "Payment intent ID is required for online payment methods"
+#~ msgstr "Payment intent ID is required for online payment methods"
+
+#~ msgid "Payment intent ID is required for order creation"
+#~ msgstr "Payment intent ID is required for order creation"
+
+#~ msgid "Payment not found"
+#~ msgstr "Payment not found"
+
+#~ msgid "Payment provider not available"
+#~ msgstr "Payment provider not available"
+
+#~ msgid "Payment verification failed"
+#~ msgstr "Payment verification failed"
 
 #~ msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
 #~ msgstr "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
@@ -19026,6 +18976,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Props"
 #~ msgstr "Props"
+
+#~ msgid "Provider customer id to attach the payment to"
+#~ msgstr "Provider customer id to attach the payment to"
+
+#~ msgid "Provider payment-method id to charge"
+#~ msgstr "Provider payment-method id to charge"
 
 #~ msgid "Pull Quote"
 #~ msgstr "Pull Quote"
@@ -19076,6 +19032,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Retry Payment"
 #~ msgstr "Retry Payment"
+
+#~ msgid "Retry is only supported for Stripe payments."
+#~ msgstr "Retry is only supported for Stripe payments."
+
+#~ msgid "Retry payment for a failed or pending order"
+#~ msgstr "Retry payment for a failed or pending order"
 
 #~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 #~ msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
@@ -19166,6 +19128,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Street, street number, and city are required."
 #~ msgstr "Street, street number, and city are required."
 
+#~ msgid "Stripe PaymentIntent ID to be stored on the order"
+#~ msgstr "Stripe PaymentIntent ID to be stored on the order"
+
+#~ msgid "Stripe PaymentIntent client secret for frontend confirmation"
+#~ msgstr "Stripe PaymentIntent client secret for frontend confirmation"
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
@@ -19197,8 +19165,20 @@ msgstr "…and {count} more lines with errors."
 #~ "Thank you for using %(site_name)s!\n"
 #~ "%(site_domain)s"
 
+#~ msgid "The applied discounts and gift cards cover the full total; no payment intent is needed."
+#~ msgstr "The applied discounts and gift cards cover the full total; no payment intent is needed."
+
+#~ msgid "The previous payment could not be closed."
+#~ msgstr "The previous payment could not be closed."
+
+#~ msgid "The previous payment is still in progress."
+#~ msgstr "The previous payment is still in progress."
+
 #~ msgid "The selected locker is not in the delivery country."
 #~ msgstr "The selected locker is not in the delivery country."
+
+#~ msgid "The selected payment method cannot be paid with a card on this page."
+#~ msgstr "The selected payment method cannot be paid with a card on this page."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
@@ -19218,6 +19198,10 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "There is a release after the first: someone published."
 #~ msgstr "There is a release after the first: someone published."
 
+#, python-format
+#~ msgid "These keys are reserved and cannot be sent: %(keys)s"
+#~ msgstr "These keys are reserved and cannot be sent: %(keys)s"
+
 #~ msgid "This download link has expired."
 #~ msgstr "This download link has expired."
 
@@ -19226,6 +19210,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "This order does not have an ACS shipment."
 #~ msgstr "This order does not have an ACS shipment."
+
+#~ msgid "This order's payment status does not allow a retry."
+#~ msgstr "This order's payment status does not allow a retry."
 
 #~ msgid "This store already has page builder data."
 #~ msgstr "This store already has page builder data."
@@ -19248,6 +19235,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Total Posts"
 #~ msgstr "Total"
+
+#~ msgid "Total charge amount (cart + shipping + payment fee)"
+#~ msgstr "Total charge amount (cart + shipping + payment fee)"
 
 #~ msgid "Translations (parler)"
 #~ msgstr "Translations (parler)"
@@ -19307,6 +19297,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "When the download link stops working."
 #~ msgstr "When the download link stops working."
 
+#~ msgid "Where the provider should send the shopper back to"
+#~ msgstr "Where the provider should send the shopper back to"
+
+#~ msgid "Whether the payment requires additional action (3D Secure, etc.)"
+#~ msgstr "Whether the payment requires additional action (3D Secure, etc.)"
+
 #~ msgid "Why Microlearning"
 #~ msgstr "Why Microlearning"
 
@@ -19322,3 +19318,7 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "admin/email-templates/"
 #~ msgstr "admin/email-templates/"
+
+#, python-brace-format
+#~ msgid "payment intent is in an invalid state: {status}"
+#~ msgstr "payment intent is in an invalid state: {status}"

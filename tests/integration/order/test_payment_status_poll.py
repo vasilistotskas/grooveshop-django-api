@@ -10,12 +10,12 @@ Two answers were recorded wrongly:
   30 minutes after its payment FAILED: a shopper still paying could lose the
   order. Now nothing is written and the caller hears "unknown".
 - A canceled attempt (#697). A provider that reports the payment canceled
-  (a Stripe intent closed by a retry whose new intent then failed to open,
-  a Viva ``X``) was stored as CANCELED, the payment state of a CLOSED order.
+  (a Stripe intent closed before a hosted session replaced it, a Viva
+  ``X``) was stored as CANCELED, the payment state of a CLOSED order.
   On a PENDING order that state is settled, so neither sweep bucket selected
   it and its stock stayed reserved for good. The attempt is over, not the
-  order: it is recorded as FAILED, which keeps the order payable (retry
-  accepts FAILED) and lets the sweep release its stock through
+  order: it is recorded as FAILED, which keeps the order payable (a new
+  hosted session may be opened) and lets the sweep release its stock through
   ``cancel_order``.
 """
 
@@ -35,10 +35,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import (
-    PaymentStatusUnavailableError,
-    PaymentVerificationError,
-)
+from order.exceptions import PaymentStatusUnavailableError
 from order.factories.order import OrderFactory
 from order.inventory.stock import StockManager
 from order.models.order import Order
@@ -213,26 +210,6 @@ class TestAProviderThatCannotBeAskedIsNotAnOutcome:
         assert response.data["code"] == "payment_provider_unavailable"
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING
-
-    def test_payment_first_checkout_still_refuses_an_unverified_intent(self):
-        """Order creation cannot verify the intent, so it refuses it, as it
-        did when the error came back as FAILED."""
-        pay_way = PayWayFactory(
-            provider_code="stripe", settlement=PaySettlement.ONLINE
-        )
-        provider = Mock()
-        provider.get_payment_status.side_effect = PaymentStatusUnavailableError(
-            PAYMENT_ID
-        )
-
-        with (
-            patch(
-                "order.payments.payment.get_payment_provider",
-                return_value=provider,
-            ),
-            pytest.raises(PaymentVerificationError),
-        ):
-            OrderService._retrieve_payment_intent(PAYMENT_ID, pay_way)
 
     def test_the_ledger_records_no_charge_it_could_not_read(self):
         order = _order(payment_status=PaymentStatus.COMPLETED)

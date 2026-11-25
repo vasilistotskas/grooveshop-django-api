@@ -1,5 +1,4 @@
 import logging
-from datetime import timedelta
 from typing import Any
 
 from django.db import connection, transaction
@@ -12,7 +11,6 @@ from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
 from agent.outbox import record_order_changed
-from core.store_settings import store_setting
 from emails.send import send_email
 from order.accounting.credit_documents import request_credit_documents
 from order.accounting.invoicing import (
@@ -91,9 +89,6 @@ from order.tasks import (
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
-
-#: The store setting behind ``handle_payment_without_order_found``'s countdown.
-PAYMENT_WITHOUT_ORDER_GRACE = "PAYMENT_WITHOUT_ORDER_GRACE_MINUTES"
 
 
 @receiver(post_save, sender=Order, dispatch_uid="order.handle_order_post_save")
@@ -936,15 +931,10 @@ def handle_stripe_payment_polled(
     dispatch_uid="order.handle_payment_without_order_found",
 )
 def handle_payment_without_order_found(
-    sender: Any, payment_id: str, captured: Money, grace: bool, **kwargs: Any
+    sender: Any, payment_id: str, captured: Money, **kwargs: Any
 ) -> None:
     """Queue the alert about a payment no order carries, after the
-    webhook's transaction commits. A payment-first intent waits
-    ``PAYMENT_WITHOUT_ORDER_GRACE_MINUTES`` first; the wait goes with that
-    path (#818, R3)."""
-    wait = timedelta(
-        minutes=int(store_setting(PAYMENT_WITHOUT_ORDER_GRACE)) if grace else 0
-    )
+    webhook's transaction commits."""
     dispatch_on_commit(
         alert_payment_without_order_task,
         kwargs={
@@ -952,7 +942,6 @@ def handle_payment_without_order_found(
             "amount": str(captured.amount),
             "currency": str(captured.currency),
         },
-        countdown=int(wait.total_seconds()),
     )
 
 

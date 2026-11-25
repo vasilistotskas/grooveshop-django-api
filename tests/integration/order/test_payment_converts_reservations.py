@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -15,38 +15,16 @@ from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
-
 
 @pytest.mark.django_db
-class TestPaymentConfirmationConvertsReservations:
+class TestOrderCreationConvertsReservations:
     """
-    Payment Confirmation Converts Reservations.
+    Order Creation Converts Reservations.
 
-    This test suite validates that when payment is confirmed and an order is
-    created from a cart with stock reservations, the reservations are properly
-    converted to stock decrements.
+    This test suite validates that when an order is created from a cart
+    with stock reservations, the reservations are properly converted to
+    stock decrements.
     """
-
-    @pytest.fixture
-    def mock_payment_validation(self):
-        """Mock payment provider validation to avoid external API calls.
-
-        Omits ``amount``/``currency`` from the payload so OrderService's
-        amount-vs-total cross-check is skipped — these tests exercise the
-        reservation → stock-decrement conversion, not payment amount
-        validation (covered elsewhere).
-        """
-        with patch(
-            "order.payments.payment.get_payment_provider"
-        ) as mock_provider:
-            mock_instance = Mock()
-            mock_instance.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {"status": "succeeded"},
-            )
-            mock_provider.return_value = mock_instance
-            yield mock_provider
 
     @pytest.fixture
     def country(self):
@@ -77,9 +55,8 @@ class TestPaymentConfirmationConvertsReservations:
             (3, [1, 1, 1], [10, 10, 10], "Three products, minimal quantities"),
         ],
     )
-    def test_payment_success_converts_reservations_to_stock_decrements(
+    def test_order_creation_converts_reservations_to_stock_decrements(
         self,
-        mock_payment_validation,
         country,
         num_products,
         quantities,
@@ -87,10 +64,10 @@ class TestPaymentConfirmationConvertsReservations:
         description,
     ):
         """
-        Test that payment confirmation converts reservations to stock decrements.
+        Test that order creation converts reservations to stock decrements.
 
         This test verifies that when an order is created from a cart with stock
-        reservations (simulating payment confirmation), the reservations are:
+        reservations, the reservations are:
         1. Marked as consumed
         2. Linked to the order
         3. Converted to actual stock decrements
@@ -102,7 +79,7 @@ class TestPaymentConfirmationConvertsReservations:
             description: Human-readable description of the test case
 
         Test Requirements:
-        - Test: Payment success converts reservations to stock decrements
+        - Test: Order creation converts reservations to stock decrements
         - Use @pytest.mark.parametrize with various order/reservation scenarios
         - Verify: Reservations marked consumed
         - Verify: Stock decremented correctly
@@ -149,13 +126,8 @@ class TestPaymentConfirmationConvertsReservations:
                 f"Product {i} should have initial stock {initial_stocks[i]} for {description}"
             )
 
-        # Create payment intent ID (simulating successful payment)
-        payment_intent_id = (
-            f"pi_test_{description.replace(' ', '_').replace(',', '')}"
-        )
-
         # Create pay way with stripe provider
-        pay_way = PayWayFactory(provider_code="stripe")
+        pay_way = PayWayFactory.create_online_payment()
 
         # Prepare shipping address with valid country
         shipping_address = {
@@ -171,14 +143,13 @@ class TestPaymentConfirmationConvertsReservations:
             "shipping_kind": "home_delivery",
         }
 
-        # Execute: Create order from cart (this simulates payment confirmation)
+        # Execute: Create order from cart
         # This should convert reservations to stock decrements
         order = OrderService.create_order_from_cart(
             **priced(
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=shipping_address,
-                payment_intent_id=payment_intent_id,
                 pay_way=pay_way,
                 user=user,
             )
@@ -186,7 +157,7 @@ class TestPaymentConfirmationConvertsReservations:
 
         # Verify: Order was created successfully
         assert order is not None, f"Order should be created for {description}"
-        assert order.payment_id == payment_intent_id
+        assert order.payment_status == PaymentStatus.PENDING
         assert order.status == OrderStatus.PENDING
 
         # Verify: All reservations are now marked as consumed
@@ -252,9 +223,7 @@ class TestPaymentConfirmationConvertsReservations:
                 f"Reservation {reservation.id} should be in order metadata for {description}"
             )
 
-    def test_duplicate_reservations_decrement_stock_only_once(
-        self, mock_payment_validation, country
-    ):
+    def test_duplicate_reservations_decrement_stock_only_once(self, country):
         """Duplicate session reservations must not double-decrement stock.
 
         Regression for the checkout reconciliation bug: reserve_stock was
@@ -282,7 +251,7 @@ class TestPaymentConfirmationConvertsReservations:
             user_id=user.id,
         )
 
-        pay_way = PayWayFactory(provider_code="stripe")
+        pay_way = PayWayFactory.create_online_payment()
         shipping_address = {
             "first_name": "Test",
             "last_name": "User",
@@ -301,7 +270,6 @@ class TestPaymentConfirmationConvertsReservations:
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=shipping_address,
-                payment_intent_id="pi_test_dup_reservations",
                 pay_way=pay_way,
                 user=user,
             )
@@ -326,9 +294,7 @@ class TestPaymentConfirmationConvertsReservations:
             session_id=str(cart.uuid), consumed=False
         ).exists()
 
-    def test_expired_reservation_falls_back_to_decrement(
-        self, mock_payment_validation, country
-    ):
+    def test_expired_reservation_falls_back_to_decrement(self, country):
         """An expired (unconsumed) reservation must not fail checkout.
 
         Regression: convert_reservation_to_sale rejects expired reservations,
@@ -360,7 +326,7 @@ class TestPaymentConfirmationConvertsReservations:
         reservation.refresh_from_db()
         assert reservation.is_expired
 
-        pay_way = PayWayFactory(provider_code="stripe")
+        pay_way = PayWayFactory.create_online_payment()
         shipping_address = {
             "first_name": "Test",
             "last_name": "User",
@@ -379,7 +345,6 @@ class TestPaymentConfirmationConvertsReservations:
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=shipping_address,
-                payment_intent_id="pi_expired_reservation",
                 pay_way=pay_way,
                 user=user,
             )
@@ -390,9 +355,7 @@ class TestPaymentConfirmationConvertsReservations:
         # Decremented by the cart quantity despite the expired reservation.
         assert product.stock == 95
 
-    def test_reservation_conversion_is_atomic(
-        self, mock_payment_validation, country
-    ):
+    def test_reservation_conversion_is_atomic(self, country):
         """
         Test that reservation conversion is atomic - all or nothing.
 
@@ -440,7 +403,7 @@ class TestPaymentConfirmationConvertsReservations:
             return original_convert(reservation_id, order_id)
 
         # Attempt to create order - should fail during conversion
-        pay_way = PayWayFactory(provider_code="stripe")
+        pay_way = PayWayFactory.create_online_payment()
         shipping_address = {
             "first_name": "Test",
             "last_name": "User",
@@ -469,7 +432,6 @@ class TestPaymentConfirmationConvertsReservations:
                     legal_acceptance=checkout_acceptance(),
                     cart=cart,
                     shipping_address=shipping_address,
-                    payment_intent_id="pi_test_atomic",
                     pay_way=pay_way,
                     user=user,
                 )
@@ -486,7 +448,7 @@ class TestPaymentConfirmationConvertsReservations:
         )
 
         # Verify: No order was created
-        orders = Order.objects.filter(payment_id="pi_test_atomic")
+        orders = Order.objects.filter(user=user)
         assert orders.count() == 0, (
             "No order should be created after failed conversion"
         )
@@ -501,9 +463,7 @@ class TestPaymentConfirmationConvertsReservations:
             "Product 2 stock should be unchanged after rollback"
         )
 
-    def test_reservation_conversion_creates_correct_audit_logs(
-        self, mock_payment_validation, country
-    ):
+    def test_reservation_conversion_creates_correct_audit_logs(self, country):
         """
         Test that reservation conversion creates correct StockLog audit entries.
         """
@@ -523,7 +483,7 @@ class TestPaymentConfirmationConvertsReservations:
         )
 
         # Create order
-        pay_way = PayWayFactory(provider_code="stripe")
+        pay_way = PayWayFactory.create_online_payment()
         shipping_address = {
             "first_name": "Test",
             "last_name": "User",
@@ -542,7 +502,6 @@ class TestPaymentConfirmationConvertsReservations:
                 legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=shipping_address,
-                payment_intent_id="pi_test_audit_logs",
                 pay_way=pay_way,
                 user=user,
             )

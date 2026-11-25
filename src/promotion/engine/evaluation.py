@@ -75,9 +75,9 @@ class PromotionEngine:
         ``lock=True`` takes ``select_for_update`` on the candidate
         Promotion rows — use it ONLY inside the order-create
         transaction so usage-limit enforcement is race-free. The
-        preview surfaces (cart read, payment-intent create) evaluate
-        without locks; the order-create verification recomputes with
-        the lock held and is the source of truth.
+        preview surfaces (cart read, the checkout quote) evaluate
+        without locks; order creation recomputes with the lock held
+        and is the source of truth.
 
         ``items`` are the cart's lines as the caller already read them:
         the checkout quote prices the lines it evaluated, from one read.

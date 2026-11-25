@@ -36,7 +36,6 @@ from order.payments.viva_settlement import handle_payment_created
 from order.tasks import auto_cancel_stuck_pending_orders
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
-from pay_way.services import PayWayService
 from product.factories import ProductFactory
 from tests.utils.viva import FakeVivaApi, verified_payment
 from user.factories.account import UserAccountFactory
@@ -208,7 +207,8 @@ class TestTheExpiryReachesTheProvider:
 
 
 class TestEveryCreationPathCarriesTheExpiry:
-    """Hosted checkout, the PaymentIntent endpoint and retry-payment."""
+    """Every order is paid through its hosted checkout session (Stripe or
+    Viva), which carries the hold's end as its expiry."""
 
     @staticmethod
     def _client(user):
@@ -223,11 +223,8 @@ class TestEveryCreationPathCarriesTheExpiry:
             return_value=True,
         )
 
-    @pytest.mark.parametrize("provider_code", ["stripe", "viva_wallet"])
-    def test_hosted_checkout_session(self, provider_code):
-        user = UserAccountFactory(num_addresses=0)
-        order = _unpaid(user=user, provider=provider_code)
-        applied = timezone.now() + timedelta(minutes=31)
+    @staticmethod
+    def _provider(provider_code: str, applied):
         provider = Mock()
         provider.create_checkout_session.return_value = (
             True,
@@ -246,14 +243,16 @@ class TestEveryCreationPathCarriesTheExpiry:
         provider.live_checkout_session.return_value = None
         provider.recorded_checkout_session.return_value = None
         provider.min_hosted_session = timedelta(0)
+        return provider
 
+    def _ask(self, order, user, provider):
         with (
             self._configured(),
             patch(
                 "order.views.order.get_payment_provider", return_value=provider
             ),
         ):
-            response = self._client(user).post(
+            return self._client(user).post(
                 reverse(
                     "order-create-checkout-session", kwargs={"pk": order.pk}
                 ),
@@ -264,6 +263,15 @@ class TestEveryCreationPathCarriesTheExpiry:
                 format="json",
             )
 
+    @pytest.mark.parametrize("provider_code", ["stripe", "viva_wallet"])
+    def test_hosted_checkout_session(self, provider_code):
+        user = UserAccountFactory(num_addresses=0)
+        order = _unpaid(user=user, provider=provider_code)
+        applied = timezone.now() + timedelta(minutes=31)
+        provider = self._provider(provider_code, applied)
+
+        response = self._ask(order, user, provider)
+
         assert response.status_code == 200, response.data
         asked = provider.create_checkout_session.call_args.kwargs["expires_at"]
         assert (
@@ -272,91 +280,22 @@ class TestEveryCreationPathCarriesTheExpiry:
             <= timedelta(minutes=30)
         )
         order.refresh_from_db()
-        assert order.payment_hold_expires_at == applied
-
-    @pytest.mark.parametrize(
-        "route", ["order-create-payment-intent", "order-retry-payment"]
-    )
-    def test_payment_intent_routes(self, route):
-        user = UserAccountFactory(num_addresses=0)
-        order = _unpaid(
-            user=user,
-            provider="stripe",
-            payment_status=(
-                PaymentStatus.FAILED
-                if route == "order-retry-payment"
-                else PaymentStatus.PENDING
-            ),
-            payment_id="pi_old" if route == "order-retry-payment" else "",
-        )
-        provider = Mock()
-        provider.process_payment.return_value = (
-            True,
-            {
-                "payment_id": "pi_new",
-                "status": PaymentStatus.PENDING,
-                "client_secret": "secret",
-                "amount": "10.00",
-                "currency": "EUR",
-                "provider": "stripe",
-            },
-        )
-
-        with (
-            self._configured(),
-            patch(
-                "pay_way.services.PayWayService.get_provider_for_pay_way",
-                return_value=provider,
-            ),
-        ):
-            response = self._client(user).post(
-                reverse(route, kwargs={"pk": order.pk}), {}, format="json"
-            )
-
-        assert response.status_code == 200, response.data
-        asked = provider.process_payment.call_args.kwargs["expires_at"]
-        assert (
-            timedelta(minutes=29)
-            < asked - timezone.now()
-            <= timedelta(minutes=30)
-        )
-        order.refresh_from_db()
-        # A PaymentIntent has no expiry of its own: the deadline asked for
-        # is the one stored, and the sweep cancels the intent at it.
-        assert order.payment_hold_expires_at == asked
-
-    def test_the_stored_expiry_is_the_one_the_provider_applied(self):
-        order = _unpaid(provider="viva_wallet")
-        applied = timezone.now() + timedelta(minutes=45)
-        provider = Mock()
-        provider.process_payment.return_value = (
-            True,
-            {"payment_id": "VC1", "expires_at": applied},
-        )
-
-        with patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
-        ):
-            PayWayService.process_payment(order.pay_way, order)
-
-        order.refresh_from_db()
+        # The expiry the provider applied is the one stored.
         assert order.payment_hold_expires_at == applied
 
     def test_the_per_store_hold_is_respected(self):
         _set(HOLD, 120)
         _set(MAX_HOLD, 240)
-        order = _unpaid(provider="stripe")
-        provider = Mock()
-        provider.process_payment.return_value = (True, {"payment_id": "pi_1"})
+        user = UserAccountFactory(num_addresses=0)
+        order = _unpaid(user=user, provider="stripe")
+        provider = self._provider(
+            "stripe", timezone.now() + timedelta(minutes=120)
+        )
 
-        with patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
-        ):
-            PayWayService.process_payment(order.pay_way, order)
+        response = self._ask(order, user, provider)
 
-        asked = provider.process_payment.call_args.kwargs["expires_at"]
+        assert response.status_code == 200, response.data
+        asked = provider.create_checkout_session.call_args.kwargs["expires_at"]
         assert (
             timedelta(minutes=119)
             < asked - timezone.now()
@@ -399,7 +338,7 @@ class TestTheSweepWaitsForTheLinkToExpire:
         order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
 
-    def test_a_retry_that_extends_the_link_extends_the_hold(self):
+    def test_a_new_link_that_extends_the_hold_keeps_the_order(self):
         """Created long ago, but a fresh link is still payable."""
         order = _unpaid()
         _age(
@@ -604,7 +543,7 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         assert order.status == OrderStatus.CANCELED
 
     def test_an_intent_that_succeeded_meanwhile_settles_the_order(self):
-        """The shopper's retry went through before the sweep and its
+        """The shopper paid again before the sweep and its
         ``payment_intent.succeeded`` has not landed: the sweep settles the
         order through that handler instead of canceling it."""
         order = self._failed("stripe", payment_id="pi_paid_late")
@@ -727,91 +666,6 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         assert order.status == OrderStatus.CANCELED
 
 
-class TestARetryClosesThePaymentItReplaces:
-    """A PaymentIntent has no expiry, so the one a retry replaces would
-    stay confirmable from an old tab after the new one was swept."""
-
-    @staticmethod
-    def _retry(order, *, cancel=None, retrieve=None):
-        opened = (
-            True,
-            {
-                "payment_id": "pi_new",
-                "status": PaymentStatus.PENDING,
-                "client_secret": "s",
-            },
-        )
-        with (
-            _provider_with_stripe_key(),
-            patch(
-                "order.payments.payment.stripe.PaymentIntent.cancel",
-                **(cancel or {}),
-            ) as cancelled,
-            patch(
-                "order.payments.payment.stripe.PaymentIntent.retrieve",
-                **(retrieve or {}),
-            ),
-            patch.object(
-                StripePaymentProvider, "process_payment", return_value=opened
-            ) as process,
-        ):
-            result = PayWayService.process_payment(order.pay_way, order)
-        return result, cancelled, process
-
-    def test_the_replaced_intent_is_canceled_first(self):
-        order = _unpaid(
-            provider="stripe",
-            payment_id="pi_old",
-            payment_status=PaymentStatus.FAILED,
-        )
-
-        (ok, _data), cancelled, process = self._retry(
-            order, cancel={"return_value": Mock(status="canceled")}
-        )
-
-        assert ok
-        assert cancelled.call_args.args == ("pi_old",)
-        process.assert_called_once()
-        order.refresh_from_db()
-        assert order.payment_id == "pi_new"
-
-    def test_a_payment_already_in_flight_refuses_the_retry(self):
-        order = _unpaid(provider="stripe", payment_id="pi_busy")
-
-        (ok, data), _cancelled, process = self._retry(
-            order,
-            cancel={"side_effect": stripe.InvalidRequestError("busy", "id")},
-            retrieve={"return_value": Mock(status="processing")},
-        )
-
-        assert not ok
-        assert data["code"] == "previous_payment_in_progress"
-        process.assert_not_called()
-        order.refresh_from_db()
-        assert order.payment_id == "pi_busy"
-
-    def test_a_provider_outage_refuses_the_retry(self):
-        order = _unpaid(provider="stripe", payment_id="pi_old")
-
-        (ok, data), _cancelled, process = self._retry(
-            order, cancel={"side_effect": stripe.APIConnectionError("down")}
-        )
-
-        assert not ok
-        assert data["code"] == "previous_payment_not_closed"
-        process.assert_not_called()
-        order.refresh_from_db()
-        assert order.payment_id == "pi_old"
-
-    def test_the_first_payment_has_nothing_to_close(self):
-        order = _unpaid(provider="stripe", payment_id="")
-
-        (ok, _data), cancelled, _process = self._retry(order)
-
-        assert ok
-        cancelled.assert_not_called()
-
-
 class TestALatePaymentAfterTheHoldIsBookedSafely:
     def test_a_viva_charge_after_the_sweep_is_booked_for_refund(self):
         order = _unpaid(
@@ -926,12 +780,6 @@ class TestAnUnpaidPileUpIsLogged:
 class TestTheTotalHoldIsBounded:
     """A new payment link never moves the hold past created_at + max."""
 
-    ROUTES = [
-        "order-create-payment-intent",
-        "order-retry-payment",
-        "order-create-checkout-session",
-    ]
-
     @staticmethod
     def _client(user):
         client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
@@ -939,15 +787,14 @@ class TestTheTotalHoldIsBounded:
         return client
 
     @staticmethod
-    def _post(client, route, order):
-        body = {}
-        if route == "order-create-checkout-session":
-            body = {
+    def _post(client, order):
+        return client.post(
+            reverse("order-create-checkout-session", kwargs={"pk": order.pk}),
+            {
                 "successUrl": "https://shop.example/ok",
                 "cancelUrl": "https://shop.example/no",
-            }
-        return client.post(
-            reverse(route, kwargs={"pk": order.pk}), body, format="json"
+            },
+            format="json",
         )
 
     @staticmethod
@@ -958,50 +805,13 @@ class TestTheTotalHoldIsBounded:
                 return_value=True,
             ),
             patch(
-                "pay_way.services.PayWayService.get_provider_for_pay_way",
-                return_value=provider,
-            ),
-            patch(
                 "order.views.order.get_payment_provider",
                 return_value=provider,
             ),
         )
 
-    def test_chained_links_stop_at_the_limit(self):
-        order = _unpaid(provider="viva_wallet")
-        created = timezone.now() - timedelta(minutes=50)
-        _age(order, created=created)
-        provider = Mock()
-        provider.process_payment.return_value = (True, {"payment_id": "VC1"})
-
-        with patch(
-            "pay_way.services.PayWayService.get_provider_for_pay_way",
-            return_value=provider,
-        ):
-            PayWayService.process_payment(order.pay_way, order)
-
-        asked = provider.process_payment.call_args.kwargs["expires_at"]
-        assert asked == created + timedelta(minutes=60)
-        order.refresh_from_db()
-        assert order.payment_hold_expires_at == created + timedelta(minutes=60)
-
-    def test_a_link_inside_the_window_gets_the_full_hold(self):
-        order = _unpaid(provider="viva_wallet")
-        _age(order, created=timezone.now() - timedelta(minutes=10))
-
-        asked = payment_hold.deadline(order)
-
-        assert (
-            timedelta(minutes=29)
-            < asked - timezone.now()
-            <= timedelta(minutes=30)
-        )
-
-    @pytest.mark.parametrize("route", ROUTES)
-    def test_a_retry_inside_the_window_works(self, route):
-        user = UserAccountFactory(num_addresses=0)
-        order = _unpaid(user=user, provider="stripe")
-        _age(order, created=timezone.now() - timedelta(minutes=10))
+    @staticmethod
+    def _opening_provider(provider_code: str, expires_at):
         provider = Mock()
         provider.min_hosted_session = timedelta(0)
         provider.checkout_session_params.return_value = {}
@@ -1016,42 +826,68 @@ class TestTheTotalHoldIsBounded:
                 "status": "created",
                 "amount": "10.00",
                 "currency": "EUR",
-                "provider": "stripe",
-                "expires_at": timezone.now() + timedelta(minutes=30),
+                "provider": provider_code,
+                "expires_at": expires_at,
             },
         )
-        provider.process_payment.return_value = (
-            True,
-            {
-                "payment_id": "pi_2",
-                "status": PaymentStatus.PENDING,
-                "client_secret": "s",
-                "amount": "10.00",
-                "currency": "EUR",
-                "provider": "stripe",
-            },
+        return provider
+
+    def test_chained_links_stop_at_the_limit(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = _unpaid(user=user, provider="viva_wallet")
+        created = timezone.now() - timedelta(minutes=50)
+        _age(order, created=created)
+        limit = created + timedelta(minutes=60)
+        provider = self._opening_provider("viva_wallet", limit)
+
+        first, second = self._providers(provider)
+        with first, second:
+            response = self._post(self._client(user), order)
+
+        assert response.status_code == 200, response.data
+        asked = provider.create_checkout_session.call_args.kwargs["expires_at"]
+        assert asked == limit
+        order.refresh_from_db()
+        assert order.payment_hold_expires_at == limit
+
+    def test_a_link_inside_the_window_gets_the_full_hold(self):
+        order = _unpaid(provider="viva_wallet")
+        _age(order, created=timezone.now() - timedelta(minutes=10))
+
+        asked = payment_hold.deadline(order)
+
+        assert (
+            timedelta(minutes=29)
+            < asked - timezone.now()
+            <= timedelta(minutes=30)
         )
 
-        first, second, third = self._providers(provider)
-        with first, second, third:
-            response = self._post(self._client(user), route, order)
+    def test_a_new_link_inside_the_window_works(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = _unpaid(user=user, provider="stripe")
+        _age(order, created=timezone.now() - timedelta(minutes=10))
+        provider = self._opening_provider(
+            "stripe", timezone.now() + timedelta(minutes=30)
+        )
+
+        first, second = self._providers(provider)
+        with first, second:
+            response = self._post(self._client(user), order)
 
         assert response.status_code == 200, response.data
 
-    @pytest.mark.parametrize("route", ROUTES)
-    def test_a_retry_past_the_window_is_refused(self, route):
+    def test_a_new_link_past_the_window_is_refused(self):
         user = UserAccountFactory(num_addresses=0)
         order = _unpaid(user=user, provider="stripe")
         _age(order, created=timezone.now() - timedelta(minutes=61))
         provider = Mock()
 
-        first, second, third = self._providers(provider)
-        with first, second, third:
-            response = self._post(self._client(user), route, order)
+        first, second = self._providers(provider)
+        with first, second:
+            response = self._post(self._client(user), order)
 
         assert response.status_code == 400
         assert response.json()["code"] == "payment_window_expired"
-        provider.process_payment.assert_not_called()
         provider.create_checkout_session.assert_not_called()
 
     def test_a_stripe_session_that_no_longer_fits_is_refused(self):
@@ -1067,11 +903,9 @@ class TestTheTotalHoldIsBounded:
         provider.live_checkout_session.return_value = None
         provider.recorded_checkout_session.return_value = None
 
-        first, second, third = self._providers(provider)
-        with first, second, third:
-            response = self._post(
-                self._client(user), "order-create-checkout-session", order
-            )
+        first, second = self._providers(provider)
+        with first, second:
+            response = self._post(self._client(user), order)
 
         assert response.status_code == 400
         assert response.json()["code"] == "payment_window_expired"

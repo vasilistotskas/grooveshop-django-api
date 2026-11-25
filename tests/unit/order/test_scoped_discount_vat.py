@@ -42,10 +42,7 @@ from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("trust_intent_binding"),
-]
+pytestmark = pytest.mark.django_db
 
 D = Decimal
 NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
@@ -115,7 +112,7 @@ def _promotion(*, scope=TargetScope.ORDER, targets=(), **kwargs):
 def _checkout(cart, *, user=None, points=None):
     country = CountryFactory()
     enable_rate(country, price=SHIPPING, free_shipping_threshold=None)
-    return OrderService.create_order_from_cart_offline(
+    return OrderService.create_order_from_cart(
         **priced(
             legal_acceptance=checkout_acceptance(),
             cart=cart,
@@ -499,10 +496,8 @@ class TestStaffAddedLine:
         assert gross_by_rate == {D("13"): D("56.50"), D("24"): D("10.00")}
 
 
-class TestPaymentFirstPath:
-    def test_it_freezes_the_allocation_like_the_order_first_path(self):
-        from order.enum.status import PaymentStatus
-
+class TestOnlinePayWay:
+    def test_it_freezes_the_allocation_like_an_offline_one(self):
         user = UserAccountFactory()
         category = ProductCategoryFactory()
         food = _product("100.00", "13", category)
@@ -515,32 +510,30 @@ class TestPaymentFirstPath:
         country = CountryFactory()
         enable_rate(country, price=SHIPPING, free_shipping_threshold=None)
 
-        with patch("order.payments.payment.get_payment_provider") as provider:
-            provider.return_value.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {"payment_id": "pi_scoped", "status": "succeeded"},
+        order = OrderService.create_order_from_cart(
+            **priced(
+                legal_acceptance=checkout_acceptance(),
+                cart=_cart((food, 1), (other, 1), user=user),
+                shipping_address={
+                    "first_name": "Maria",
+                    "last_name": "Papadopoulou",
+                    "email": "maria@example.com",
+                    "street": "Ermou",
+                    "street_number": "1",
+                    "city": "Athens",
+                    "zipcode": "10563",
+                    "country_id": country.alpha_2,
+                    "phone": "+306900000000",
+                    "shipping_kind": "home_delivery",
+                },
+                pay_way=PayWayFactory(
+                    provider_code="stripe",
+                    settlement=PaySettlement.ONLINE,
+                    active=True,
+                ),
+                user=user,
             )
-            order = OrderService.create_order_from_cart(
-                **priced(
-                    legal_acceptance=checkout_acceptance(),
-                    cart=_cart((food, 1), (other, 1), user=user),
-                    shipping_address={
-                        "first_name": "Maria",
-                        "last_name": "Papadopoulou",
-                        "email": "maria@example.com",
-                        "street": "Ermou",
-                        "street_number": "1",
-                        "city": "Athens",
-                        "zipcode": "10563",
-                        "country_id": country.alpha_2,
-                        "phone": "+306900000000",
-                        "shipping_kind": "home_delivery",
-                    },
-                    payment_intent_id="pi_scoped",
-                    pay_way=PayWayFactory(provider_code="stripe"),
-                    user=user,
-                )
-            )
+        )
 
         assert _allocation(order) == {food.pk: D("56.50"), other.pk: D(0)}
         _assert_documents_bill_what_the_customer_owes(order)

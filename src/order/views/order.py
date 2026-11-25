@@ -10,7 +10,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.http import FileResponse
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
@@ -80,15 +79,10 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCancellationError,
     OrderCartChangedError,
-    OrderChangedDuringPaymentError,
     OrderTotalChangedError,
     ParcelWithCourierError,
-    PaymentAmountMismatchError,
-    PaymentCurrencyMismatchError,
     PaymentInProgressError,
-    PaymentNotFoundError,
     PaymentStatusUnavailableError,
-    PaymentVerificationError,
     PickupPointUnfitError,
     RefundOutstandingError,
     StockReservationError,
@@ -115,8 +109,6 @@ from order.serializers.order import (
     ConfirmAgentPaymentResponseSerializer,
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
-    CreatePaymentIntentRequestSerializer,
-    CreatePaymentIntentResponseSerializer,
     OrderCancelErrorSerializer,
     OrderCreateErrorSerializer,
     OrderCreateFromCartSerializer,
@@ -145,7 +137,6 @@ from order.throttles import (
     VivaReturnThrottle,
 )
 from page_config.models import LegalDocumentUnavailableError
-from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
 from shipping.api_errors import PickupPointCheckUnavailable
@@ -201,10 +192,8 @@ GUEST_UUID_QUERY_ACTIONS = frozenset(
     {
         "cancel",
         "payment_status",
-        "create_payment_intent",
         "create_checkout_session",
         "confirm_agent_payment",
-        "retry_payment",
         "invoice",
         "invoice_download",
         "specimen_download",
@@ -288,22 +277,6 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
-    "create_payment_intent": ActionConfig(
-        request=CreatePaymentIntentRequestSerializer,
-        response=CreatePaymentIntentResponseSerializer,
-        # The order changed while the provider call was in flight.
-        responses={
-            400: PaymentProviderErrorSerializer,
-            409: ErrorResponseSerializer,
-        },
-        operation_id="createOrderPaymentIntent",
-        summary=_("Create a payment intent for an order"),
-        description=_(
-            "Create a payment intent for Stripe payments on an existing order"
-        ),
-        parameters=[GUEST_ORDER_UUID_PARAMETER],
-        tags=["Orders"],
-    ),
     "create_checkout_session": ActionConfig(
         request=CreateCheckoutSessionRequestSerializer,
         response=CreateCheckoutSessionResponseSerializer,
@@ -352,24 +325,6 @@ serializers_config: SerializersConfig = {
         description=_(
             "Retrieve the current payment status from the payment provider. "
             "This fetches the latest status directly from Stripe/PayPal."
-        ),
-        parameters=[GUEST_ORDER_UUID_PARAMETER],
-        tags=["Orders"],
-    ),
-    "retry_payment": ActionConfig(
-        request=CreatePaymentIntentRequestSerializer,
-        response=CreatePaymentIntentResponseSerializer,
-        # The order changed while the provider call was in flight.
-        responses={
-            400: PaymentProviderErrorSerializer,
-            409: ErrorResponseSerializer,
-        },
-        operation_id="retryOrderPayment",
-        summary=_("Retry payment for a failed or pending order"),
-        description=_(
-            "Create a fresh Stripe PaymentIntent for an order whose previous "
-            "payment failed or was never completed, so the customer can try again "
-            "without starting a new order."
         ),
         parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
@@ -747,7 +702,8 @@ class OrderViewSet(BaseModelViewSet):
 
     @staticmethod
     def _close_open_intent(order, provider) -> bool:
-        """End the order's open client-confirmed payment before a hosted
+        """End the order's open client-confirmed payment (an agent's
+        delegated card still awaiting its confirmation) before a hosted
         link opens, so the two are never payable together; ``False``
         when it may still land. An order with none has nothing open."""
         if not (order.payment_id and provider.supports_payment_intent):
@@ -879,19 +835,6 @@ class OrderViewSet(BaseModelViewSet):
         )
 
     @staticmethod
-    def _new_payment_went_ahead(order, locked_order) -> bool:
-        """Whether what changed on *locked_order* since the service recorded
-        *order*'s new payment is that payment's own webhook moving it to
-        PROCESSING or COMPLETED (and the order with it), not a cancel or
-        another payment."""
-        return (
-            locked_order.payment_id == order.payment_id
-            and locked_order.status != OrderStatus.CANCELED
-            and locked_order.payment_status
-            in (PaymentStatus.PROCESSING, PaymentStatus.COMPLETED)
-        )
-
-    @staticmethod
     def _order_changed_during_payment(order) -> Response:
         """409 for a payment whose order changed during the provider call.
 
@@ -933,39 +876,31 @@ class OrderViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """
-        Create an order with dual-flow support.
+        Create an order from the cart, before any payment.
 
         Deliberately NOT wrapped in ``transaction.atomic``: the service
-        owns the one transaction that creates the order, and the
-        payment-first flow asks the provider about the intent before it
-        opens. A view-level block would put that HTTP call inside a
-        transaction again, idle on a pooled connection that
-        ``idle_in_transaction_session_timeout`` kills.
+        owns the one transaction that creates the order, and asks the
+        carrier for a live shipping price before it opens. A view-level
+        block would put that HTTP call inside a transaction again, idle
+        on a pooled connection that ``idle_in_transaction_session_timeout``
+        kills.
 
-        This endpoint supports two payment flows based on payment method type:
-
-        **Payment-first (online, intent-based):**
-        - Requires payment_intent_id
-        - Flow: Payment confirmed → Order created
-        - Examples: Stripe
-        - Idempotent per payment intent: a repeat submit of the same cart
-          answers 201 with the order the first submit created, not a
-          second order
+        Every pay way creates the order first, under the locked quote
+        that runs every refusal, so no money moves for an order that is
+        refused. An offline pay way (cash on delivery, bank transfer) is
+        collected later; an online one (Viva Wallet, Stripe) is paid
+        afterwards on the provider's hosted page
+        (``create_checkout_session``). Deductions covering the full total
+        settle the order at once.
 
         **An agent checkout** (``agentCheckout``, from the agent gateway
-        alone) places one order on either flow: a repeat answers 201 with
-        the order it placed, before anything else is judged.
-
-        **Order-first (offline + redirect-based online):**
-        - No payment_intent_id required
-        - Flow: Order created → Payment pending (redirect to hosted checkout or pay later)
-        - Examples: Cash on Delivery, Bank Transfer, Viva Wallet
+        alone) places one order: a repeat answers 201 with the order it
+        placed, before anything else is judged.
 
         Required request data:
-        - cart_id: Cart ID or UUID to create order from
         - pay_way_id: Payment method ID
-        - payment_intent_id: Required ONLY for online payments
         - Shipping address fields (first_name, last_name, email, street, etc.)
+        The cart comes from the ``X-Cart-Id`` header.
 
         Returns:
             Response: Order details with 201 status on success
@@ -1225,68 +1160,6 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except PaymentNotFoundError as e:
-            logger.warning("Payment not found: %s", e)
-            return Response(
-                {
-                    "detail": _("Payment not found"),
-                    "error": {
-                        "type": OrderCreateErrorType.PAYMENT_NOT_FOUND,
-                    },
-                    "code": OrderCreateErrorType.PAYMENT_NOT_FOUND,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except PaymentVerificationError as e:
-            logger.warning("Payment verification failed: %s", e)
-            return Response(
-                {
-                    "detail": _("Payment verification failed"),
-                    "error": {
-                        "type": OrderCreateErrorType.PAYMENT_VERIFICATION
-                    },
-                    "code": OrderCreateErrorType.PAYMENT_VERIFICATION,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except PaymentAmountMismatchError as e:
-            logger.warning(
-                "Payment amount mismatch: provider=%d cents, calculated=%d cents",
-                e.provider_amount_cents,
-                e.calculated_amount_cents,
-            )
-            return Response(
-                {
-                    "detail": _("Payment amount does not match order total."),
-                    "error": {
-                        "type": OrderCreateErrorType.PAYMENT_AMOUNT_MISMATCH,
-                    },
-                    "code": OrderCreateErrorType.PAYMENT_AMOUNT_MISMATCH,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except PaymentCurrencyMismatchError as e:
-            logger.warning(
-                "Payment currency mismatch: provider='%s', expected='%s'",
-                e.provider_currency,
-                e.expected_currency,
-            )
-            return Response(
-                {
-                    "detail": _(
-                        "Payment currency does not match order currency."
-                    ),
-                    "error": {
-                        "type": OrderCreateErrorType.PAYMENT_CURRENCY_MISMATCH,
-                    },
-                    "code": OrderCreateErrorType.PAYMENT_CURRENCY_MISMATCH,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         except ValidationError as e:
             logger.warning("Validation error: %s", e)
             # Re-raised so the API handler adds code and fields.
@@ -1364,41 +1237,14 @@ class OrderViewSet(BaseModelViewSet):
 
         self._validate_pay_way_for_order(pay_way, validated_data)
 
-        # Step 2: route on what the pay way settles and what the
-        # provider can do — never on a provider name. This carried
-        # its own ``{"viva_wallet"}`` literal, a second copy of the
-        # one in src/order/services.py; both are now the provider's own
-        # ``supports_payment_intent`` declaration.
-
-        # An intent-less submission routes ORDER-FIRST, whatever the
-        # online pay way: deductions covering the FULL total (gift
-        # cards, a 100% promotion, a full loyalty redemption) settle
-        # there with no provider involved, and a remainder leaves the
-        # order PENDING for the payment opened afterwards.
-        if (
-            PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
-            and provider_supports(
-                pay_way.provider_code, "supports_payment_intent"
-            )
-            and validated_data.get("payment_intent_id")
-        ):
-            # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
-            return self._create_with_payment_intent(
-                request,
-                pay_way,
-                validated_data,
-                agent_checkout=agent_checkout,
-            )
-        # Order-first flow: No payment_intent_id required
-        # (offline payments + redirect-based online providers like Viva Wallet)
-        return self._create_without_payment_intent(
+        return self._create_order(
             request,
             pay_way,
             validated_data,
             agent_checkout=agent_checkout,
         )
 
-    def _create_with_payment_intent(
+    def _create_order(
         self,
         request,
         pay_way: PayWay,
@@ -1407,111 +1253,12 @@ class OrderViewSet(BaseModelViewSet):
         agent_checkout: UUID | None,
     ) -> Response:
         """
-        Create order with payment-first flow (online payments).
+        Create the order, PENDING, for every pay way.
 
-        Requires payment_intent_id to be provided and confirmed.
-        ``validated_data`` comes from ``OrderCreateFromCartSerializer``
-        and is already type-checked and cross-validated.
-        """
-
-        # Step 1: Get cart from request (validate cart exists first)
-        cart, user = self._get_cart_and_user(request)
-
-        # Step 2: Validate payment_intent_id is provided
-        # The serializer marks this optional (offline path uses the same
-        # serializer) so we enforce the online-only requirement here.
-        payment_intent_id = validated_data.get("payment_intent_id") or ""
-        if not payment_intent_id:
-            raise ValidationError(
-                {
-                    "payment_intent_id": [
-                        _(
-                            "Payment intent ID is required for online payment methods"
-                        )
-                    ]
-                },
-                code="payment_intent_required",
-            )
-
-        # Step 3: Validate cart is ready for checkout
-        validation_result = OrderService.validate_cart_for_checkout(cart)
-        if not validation_result.get("valid", False):
-            raise CartNotReadyError.from_validation(validation_result)
-
-        # Step 4: Build and validate shipping address from validated data
-        shipping_address = self._build_shipping_address_from_validated(
-            validated_data
-        )
-        try:
-            OrderService.validate_shipping_address(
-                shipping_address, pay_way=pay_way
-            )
-        except DjangoValidationError as e:
-            raise ValidationError(
-                e.message_dict
-                if hasattr(e, "message_dict")
-                else {"detail": _("Invalid shipping address")},
-                code="invalid_shipping_address",
-            )
-
-        # Step 5: Get loyalty points to redeem (if any)
-        loyalty_points_to_redeem = validated_data.get(
-            "loyalty_points_to_redeem"
-        )
-
-        # Step 5.5: Pull Meta Pixel context (fbp/fbc/UA/IP/event_ids) the
-        # storefront proxy forwarded for Conversions API matching. The
-        # service-level helper ``_sanitise_meta_context`` filters this
-        # against an allow-list, so it's safe to forward as-is here.
-        meta_context = _meta_context_from(request, validated_data.get("meta"))
-
-        # The legal texts the buyer accepts, resolved before anything is
-        # created or a payment is looked up: a text the store cannot show
-        # refuses the checkout here (``LegalDocumentUnavailableError``).
-        legal_acceptance = OrderLegalAcceptanceService.accept(request)
-
-        # Step 6: Create order from cart with payment_intent_id
-        order = OrderService.create_order_from_cart(
-            cart=cart,
-            shipping_address=shipping_address,
-            payment_intent_id=payment_intent_id,
-            pay_way=pay_way,
-            user=user,
-            loyalty_points_to_redeem=loyalty_points_to_redeem,
-            gift_card_codes=validated_data.get("gift_card_codes"),
-            meta_context=meta_context,
-            attribution=OrderAttributionService.input_from_request(
-                request, validated_data.get("attribution")
-            ),
-            legal_acceptance=legal_acceptance,
-            expected_total=self._expected_total(validated_data),
-            expected_cart_digest=validated_data.get("expected_cart_digest"),
-            agent_checkout=agent_checkout,
-        )
-
-        logger.info(
-            "Order %s created successfully (online payment) for user %s with payment %s",
-            order.id,
-            user.id if user else "guest",
-            payment_intent_id,
-        )
-
-        return self._order_response(request, order)
-
-    def _create_without_payment_intent(
-        self,
-        request,
-        pay_way: PayWay,
-        validated_data: dict,
-        *,
-        agent_checkout: UUID | None,
-    ) -> Response:
-        """
-        Create order with order-first flow.
-
-        Used for offline payments and every online provider (Viva
-        Wallet, Stripe). No payment_intent_id required.
-        Order created with PENDING status.
+        Deductions covering the FULL total (gift cards, a 100% promotion,
+        a full loyalty redemption) settle it at once with no provider
+        involved; otherwise an online order waits for the payment opened
+        afterwards and an offline one for the courier or the transfer.
         ``validated_data`` comes from ``OrderCreateFromCartSerializer``
         and is already type-checked and cross-validated.
         """
@@ -1555,8 +1302,8 @@ class OrderViewSet(BaseModelViewSet):
         # refuses the checkout here (``LegalDocumentUnavailableError``).
         legal_acceptance = OrderLegalAcceptanceService.accept(request)
 
-        # Step 5: Create order from cart without payment_intent_id
-        order = OrderService.create_order_from_cart_offline(
+        # Step 5: Create order from cart
+        order = OrderService.create_order_from_cart(
             cart=cart,
             shipping_address=shipping_address,
             pay_way=pay_way,
@@ -1584,8 +1331,8 @@ class OrderViewSet(BaseModelViewSet):
 
     def _order_response(self, request, order: Order) -> Response:
         """The answer to an order creation: the order, ``201``. A repeat
-        of an agent checkout or of a payment intent gets the same answer
-        the call that created the order got."""
+        of an agent checkout gets the same answer the call that created
+        the order got."""
         response_serializer = self.get_response_serializer()(
             order, context={"request": request}
         )
@@ -1722,10 +1469,10 @@ class OrderViewSet(BaseModelViewSet):
         cross-validated values that match the published OpenAPI schema.
 
         IMPORTANT: this dict is the only path by which the request body
-        reaches ``OrderService.create_order_from_cart`` and
-        ``create_order_from_cart_offline``. Every field the service reads
-        must be forwarded here — silently dropping a key means the field
-        is lost on the order without any error to the caller.
+        reaches ``OrderService.create_order_from_cart``. Every field the
+        service reads must be forwarded here — silently dropping a key
+        means the field is lost on the order without any error to the
+        caller.
         """
         return {
             # Customer + address (always present)
@@ -1776,244 +1523,10 @@ class OrderViewSet(BaseModelViewSet):
             },
         }
 
-    # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
-    # creation, Viva Wallet checkout session). Stack the global anon/user caps
+    # Payment endpoints are expensive and abuse-prone (a Stripe or Viva
+    # Wallet hosted checkout session). Stack the global anon/user caps
     # with tight per-IP / per-user burst throttles. Guest orders can hit these
     # via uuid query param, so both anon and user throttles are needed.
-    @action(
-        detail=True,
-        methods=["POST"],
-        throttle_classes=[
-            AnonIpRateThrottle,
-            UserBudgetThrottle,
-            PaymentAttemptThrottle,
-            PaymentAttemptAnonThrottle,
-        ],
-    )
-    def create_payment_intent(self, request, *args, **kwargs):
-        """Create a payment intent for an order."""
-        order = self.get_object()
-
-        if refusal := self._payment_start_refusal(order):
-            return refusal
-
-        if not order.pay_way or not provider_supports(
-            order.pay_way.provider_code, "supports_payment_intent"
-        ):
-            logger.info(
-                "Payment-intent endpoint refused: order=%s pay_way=%s "
-                "provider=%s cannot mint a client-confirmed intent",
-                order.id,
-                order.pay_way_id,
-                getattr(order.pay_way, "provider_code", None),
-            )
-            return Response(
-                {
-                    "detail": _(
-                        "This order is not configured for Stripe payments."
-                    ),
-                    "code": "order_not_stripe",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
-        request_serializer.is_valid(raise_exception=True)
-
-        validated_data = request_serializer.validated_data
-
-        payment_data = validated_data.get("payment_data", {})
-
-        if validated_data.get("payment_method_id"):
-            payment_data["payment_method_id"] = validated_data[
-                "payment_method_id"
-            ]
-        if validated_data.get("customer_id"):
-            payment_data["customer_id"] = validated_data["customer_id"]
-        if validated_data.get("return_url"):
-            payment_data["return_url"] = validated_data["return_url"]
-
-        try:
-            success, payment_response = PayWayService.process_payment(
-                pay_way=order.pay_way, order=order, **payment_data
-            )
-        except OrderChangedDuringPaymentError:
-            return self._order_changed_during_payment(order)
-
-        if not success:
-            return Response(
-                {
-                    "detail": _("Failed to create payment intent."),
-                    "error": payment_response,
-                    "code": "payment_intent_failed",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if order.payment_status == PaymentStatus.COMPLETED:
-            # The provider took the payment at once: the order is confirmed
-            # now, as its webhook, which may not come, would confirm it.
-            OrderLifecycleService.confirm(order)
-
-        response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(data=payment_response)
-        response_serializer.is_valid(raise_exception=True)
-
-        return Response(response_serializer.validated_data)
-
-    @action(
-        detail=True,
-        methods=["POST"],
-        url_path="retry-payment",
-        throttle_classes=[
-            AnonIpRateThrottle,
-            UserBudgetThrottle,
-            PaymentAttemptThrottle,
-            PaymentAttemptAnonThrottle,
-        ],
-    )
-    def retry_payment(self, request, *args, **kwargs):
-        """Create a fresh Stripe PaymentIntent for a failed/pending order.
-
-        The customer retains the same order, the same items, and the
-        same reserved stock (already decremented at order creation).
-        We just mint a new PaymentIntent, which the service records with
-        the status the provider reported (a payment taken at once
-        confirms the order), and return the client secret so the
-        frontend can re-mount Stripe Elements.
-        """
-        order = self.get_object()
-
-        if refusal := self._payment_start_refusal(order):
-            return refusal
-
-        retryable_statuses = {
-            PaymentStatus.FAILED,
-            PaymentStatus.PENDING,
-            PaymentStatus.CANCELED,
-        }
-        if order.payment_status not in retryable_statuses:
-            return Response(
-                {
-                    "detail": _(
-                        "This order's payment status does not allow a retry."
-                    ),
-                    "code": "payment_retry_not_allowed",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not order.pay_way or not provider_supports(
-            order.pay_way.provider_code, "supports_payment_intent"
-        ):
-            logger.info(
-                "Payment-intent endpoint refused: order=%s pay_way=%s "
-                "provider=%s cannot mint a client-confirmed intent",
-                order.id,
-                order.pay_way_id,
-                getattr(order.pay_way, "provider_code", None),
-            )
-            return Response(
-                {
-                    "detail": _("Retry is only supported for Stripe payments."),
-                    "code": "payment_retry_stripe_only",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
-        request_serializer.is_valid(raise_exception=True)
-        validated_data = request_serializer.validated_data
-
-        payment_data = dict(validated_data.get("payment_data") or {})
-        for key in ("payment_method_id", "customer_id", "return_url"):
-            value = validated_data.get(key)
-            if value:
-                payment_data[key] = value
-
-        previous_payment_id = order.payment_id
-        previous_payment_status = order.payment_status
-        try:
-            success, payment_response = PayWayService.process_payment(
-                pay_way=order.pay_way, order=order, **payment_data
-            )
-        except OrderChangedDuringPaymentError:
-            return self._order_changed_during_payment(order)
-
-        if not success:
-            return Response(
-                {
-                    "detail": _("Failed to create payment intent."),
-                    "error": payment_response,
-                    "code": "payment_intent_failed",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        new_payment_id = payment_response.get("payment_id")
-
-        # The service recorded the new payment under its own lock, with
-        # the status the provider reported (pending, processing, or taken
-        # at once): it is kept, never reset. Here only the retry is noted,
-        # under the row lock, and a change landing since the service wrote
-        # wins as it does there.
-        with transaction.atomic():
-            locked_order = Order.objects.select_for_update().get(pk=order.pk)
-            # The service stored the new intent under its own lock; a
-            # change landing since then wins in the same way, except the
-            # new payment's own webhook moving it ahead: that payment is
-            # going through, and the answer is its recorded status.
-            if (
-                locked_order.status,
-                locked_order.payment_status,
-                locked_order.payment_id,
-            ) != (
-                order.status,
-                order.payment_status,
-                order.payment_id,
-            ) and not self._new_payment_went_ahead(order, locked_order):
-                return self._order_changed_during_payment(order)
-            if not locked_order.metadata:
-                locked_order.metadata = {}
-            retry_history = locked_order.metadata.setdefault(
-                "payment_retries", []
-            )
-            retry_history.append(
-                {
-                    "at": timezone.now().isoformat(),
-                    "previous_payment_id": previous_payment_id or "",
-                    "new_payment_id": new_payment_id or "",
-                }
-            )
-            locked_order.save(update_fields=["metadata"])
-        order = locked_order
-        if order.payment_status == PaymentStatus.COMPLETED:
-            # The provider took the payment at once: the order is confirmed
-            # now, as its webhook, which may not come, would confirm it.
-            OrderLifecycleService.confirm(order)
-
-        OrderHistory.log_payment_update(
-            order=order,
-            previous_value={
-                "payment_status": str(previous_payment_status),
-                "payment_id": previous_payment_id or "",
-            },
-            new_value={
-                "payment_status": str(order.payment_status),
-                "payment_id": order.payment_id or "",
-                "retry": True,
-            },
-        )
-
-        response_serializer_class = self.get_response_serializer()
-        # The status the order records, which a webhook may have moved
-        # ahead of what the provider answered.
-        response_serializer = response_serializer_class(
-            data={**payment_response, "status": order.payment_status}
-        )
-        response_serializer.is_valid(raise_exception=True)
-        return Response(response_serializer.validated_data)
-
     @action(
         detail=True,
         methods=["POST"],
@@ -2055,7 +1568,6 @@ class OrderViewSet(BaseModelViewSet):
         # hides unconfigured providers, but a stale client (or a key
         # removed mid-session) could still submit one — refuse before
         # the provider constructor raises ImproperlyConfigured.
-        from pay_way.services import PayWayService
 
         if not PayWayService.is_provider_configured(
             order.pay_way.provider_code
@@ -2236,7 +1748,6 @@ class OrderViewSet(BaseModelViewSet):
         # A Shared Payment Token is granted against a specific merchant
         # account, so it must be confirmed with THIS tenant's own
         # identity at the PSP that issued it.
-        from pay_way.services import PayWayService
 
         delegated = [
             code
@@ -2270,7 +1781,7 @@ class OrderViewSet(BaseModelViewSet):
             order.pay_way.provider_code, "supports_payment_intent"
         ):
             logger.info(
-                "Payment-intent endpoint refused: order=%s pay_way=%s "
+                "Agent payment refused: order=%s pay_way=%s "
                 "provider=%s cannot mint a client-confirmed intent",
                 order.id,
                 order.pay_way_id,
@@ -2310,8 +1821,8 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Persist under a row lock (same reason as retry_payment: a
-        # concurrent webhook for the same intent must not lose-update).
+        # Persist under a row lock: a concurrent webhook for the same
+        # intent must not lose-update.
         # A synchronous "succeeded" marks the order paid inline so the
         # agent gets a definitive answer; the payment_intent.succeeded
         # webhook remains the idempotent backstop.

@@ -143,9 +143,10 @@ def tenant_site_name() -> str:
       1. ``Tenant.store_name`` — the customer-facing branding field
          (blank by default; what ``MyAdminSite`` already uses for
          ``site_header``/``site_title``).
-      2. ``Tenant.name`` — the always-set internal tenant name.
-      3. ``settings.SITE_NAME`` — platform fallback (public schema,
-         no active tenant, or a tenant row with both fields empty).
+      2. ``Tenant.name`` — the internal tenant name, never blank
+         (``tenant_name_not_blank``).
+      3. ``settings.SITE_NAME`` — the public schema, or no active
+         tenant.
 
     The webside.gr seed migration (``0002_seed_webside_tenant``) sets
     both ``name`` and ``store_name`` to ``"Webside"``, so this

@@ -1289,6 +1289,14 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                 condition=models.Q(is_platform_storefront=True),
                 name="tenant_single_platform_storefront",
             ),
+            # Every store has a name: the storefront prints it as the
+            # schema.org Brand and seller and as the RSS title. The admin
+            # form strips and requires it; this also refuses a raw ORM
+            # write or a command that skips the form.
+            models.CheckConstraint(
+                condition=~models.Q(name__regex=r"^\s*$"),
+                name="tenant_name_not_blank",
+            ),
         ]
 
     def __str__(self):

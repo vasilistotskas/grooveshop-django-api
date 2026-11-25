@@ -108,3 +108,26 @@ class ShippingZone(TimeStampMixinModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs) -> None:
+        super().save(*args, **kwargs)
+        # The zone's country may have changed under its rates.
+        self.sync_rate_countries()
+
+    def rate_country_id(self) -> str | None:
+        """The ``ShippingRate.country`` this zone's rates carry: its
+        country for a base zone, none for a region zone.
+
+        The column the release before shipping zones prices by, kept
+        written for the expand release (``0025``): a worker or a rollback
+        still on that release finds exactly the rates its one-rate-per-
+        country shape can price, never a region's, and its unique
+        ``(provider, country, kind)`` refuses a duplicate it would insert.
+        The contract release drops the column.
+        """
+        return None if self.regions.exists() else self.country_id
+
+    def sync_rate_countries(self) -> None:
+        """Write :meth:`rate_country_id` onto every rate of the zone, after
+        a change of its country or its regions."""
+        self.rates.update(country_id=self.rate_country_id())

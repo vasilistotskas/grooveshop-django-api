@@ -11,6 +11,8 @@ transaction leaves the worker's database at the latest migration again.
 from __future__ import annotations
 
 from decimal import Decimal
+from importlib import import_module
+from types import SimpleNamespace
 
 from django.db import connection
 from django.test import TestCase
@@ -125,3 +127,106 @@ class TestRatesMoveIntoZones(TestCase):
 
         with self.assertRaisesMessage(RuntimeError, "Crete"):
             migrate_to(BEFORE)
+
+
+def _backfill():
+    """``0024``'s forward function, as the contract release runs it
+    again over the rates the release before inserted without a zone."""
+    return import_module(
+        "shipping.migrations.0024_shipping_rate_zone_backfill"
+    ).zone_every_rate
+
+
+def _country_name(apps, code: str) -> str:
+    Translation = apps.get_model("country", "CountryTranslation")
+    name = (
+        Translation.objects.filter(master_id=code, language_code="el")
+        .values_list("name", flat=True)
+        .first()
+    )
+    return name or code
+
+
+class TestTheBackfillIsSafeToRunAgain(TestCase):
+    def test_a_name_another_zone_has_takes_the_country_code(self):
+        apps = migrate_to(BEFORE)
+        Country = apps.get_model("country", "Country")
+        Zone = apps.get_model("shipping", "ShippingZone")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Rate.objects.all().delete()
+        Country.objects.get_or_create(
+            alpha_2="QZ", defaults={"alpha_3": "QZX", "sort_order": 0}
+        )
+        name = _country_name(apps, "GR")
+        Zone.objects.create(name=name, country_id="QZ")
+        Rate.objects.create(
+            provider=Provider.objects.get(code="flat_rate"),
+            country_id="GR",
+            kind="home_delivery",
+            price=Decimal("3.00"),
+        )
+        _settle_deferred_constraints()
+
+        apps = migrate_to(AFTER)
+        Zone = apps.get_model("shipping", "ShippingZone")
+
+        self.assertEqual(Zone.objects.get(country_id="GR").name, f"{name} (GR)")
+
+    def test_a_country_with_two_base_zones_uses_the_oldest(self):
+        apps = migrate_to(BEFORE)
+        Zone = apps.get_model("shipping", "ShippingZone")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Rate.objects.all().delete()
+        oldest = Zone.objects.create(name="Greece", country_id="GR")
+        Zone.objects.create(name="Greece again", country_id="GR")
+        Rate.objects.create(
+            provider=Provider.objects.get(code="flat_rate"),
+            country_id="GR",
+            kind="home_delivery",
+            price=Decimal("3.00"),
+        )
+        _settle_deferred_constraints()
+
+        apps = migrate_to(AFTER)
+        Rate = apps.get_model("shipping", "ShippingRate")
+
+        self.assertEqual(
+            list(Rate.objects.values_list("zone_id", flat=True)), [oldest.pk]
+        )
+
+    def test_a_rate_its_base_zone_already_prices_is_deleted(self):
+        apps = migrate_to(AFTER)
+        Zone = apps.get_model("shipping", "ShippingZone")
+        Provider = apps.get_model("shipping", "ShippingProvider")
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Rate.objects.all().delete()
+        flat_rate = Provider.objects.get(code="flat_rate")
+        greece = Zone.objects.filter(
+            country_id="GR", regions__isnull=True
+        ).first() or Zone.objects.create(name="Greece", country_id="GR")
+        kept = Rate.objects.create(
+            provider=flat_rate,
+            zone=greece,
+            kind="home_delivery",
+            price=Decimal("3.00"),
+        )
+        # What the release before inserts during the rollout: a country
+        # and no zone, for a (provider, kind) the base zone already has.
+        Rate.objects.create(
+            provider=flat_rate,
+            country_id="GR",
+            kind="home_delivery",
+            price=Decimal("4.00"),
+        )
+        _settle_deferred_constraints()
+
+        with self.assertLogs(
+            "shipping.migrations.0024_shipping_rate_zone_backfill", "WARNING"
+        ):
+            _backfill()(apps, SimpleNamespace(connection=connection))
+
+        self.assertEqual(
+            list(Rate.objects.values_list("pk", flat=True)), [kept.pk]
+        )

@@ -166,13 +166,24 @@ Django's response cache keys on the full URL, so `?shippable=` and
 ### Release history
 
 Release N (expand, `shipping` `0022`-`0025`): the zone tables; one base zone
-per country a store had rates for, named after the country, each rate put in
-it (so nothing a store serves or charges changed); `ShippingRate.country`
-made nullable and taken out of the state with its unique constraint and
-index (`SeparateDatabaseAndState`), `zone` required in the state and
-nullable in the database for the release still serving during the rollout.
-Release N+1 (contract, `contract_of` `0025`) puts any rate that release wrote
-into its country's base zone, sets `zone` NOT NULL and drops `country`, the
-old constraint and its index ([`docs/migrations.md`](../migrations.md)). The
-backfill's reverse refuses a store whose region zones hold rates: the old
-shape has one rate per `(provider, country, kind)`.
+per country a store had rates for (the oldest, if it already had two), named
+after the country (with its code added when another zone has that name),
+each rate put in it, so nothing a store serves or charges changed. `zone` is
+required in the state and nullable in the database for the release still
+serving during the rollout, or back in a rollback. `ShippingRate.country`
+is nullable and not editable: `ShippingRate.save` writes the zone's country
+on a base zone's rate and leaves it empty on a region zone's
+(`ShippingZone.rate_country_id`), and a zone's country or region-set change
+rewrites its rates (`ShippingZone.save`, `shipping.signals`). So the release
+before, which prices by `country` alone, finds exactly the rates it can
+price. Its unique constraint and index leave the state only; in the
+database the constraint still refuses that release a duplicate of a base
+zone's rate.
+
+Release N+1 (contract, `contract_of` `0025`), in this order: rerun `0024`'s
+`zone_every_rate` over the rates without a zone (a duplicate of a rate its
+base zone already has is deleted and logged), set `zone` NOT NULL, then drop
+`country`, the old constraint and its index
+([`docs/migrations.md`](../migrations.md)). The backfill's reverse refuses a
+store whose region zones hold rates: the old shape has one rate per
+`(provider, country, kind)`.

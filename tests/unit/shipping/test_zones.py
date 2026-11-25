@@ -487,3 +487,59 @@ class TestARateWithoutAZone:
         assert synced, "the store's zoned ACS rates are synced"
         assert None not in synced
         assert zoneless.country not in synced
+
+
+class TestTheCountryARateCarries:
+    """The expand release writes ``ShippingRate.country`` for the release
+    before (``ShippingZone.rate_country_id``): a base zone's rate carries
+    the country, a region zone's none, so that release prices exactly
+    the rates its one-rate-per-country shape can."""
+
+    def test_a_base_zone_rate_carries_its_country(self, greece_like):
+        country = greece_like["country"]
+        rate = greece_like["base"].rates.get()
+
+        assert rate.country_id == country.alpha_2
+        assert list(
+            ShippingRate.objects.filter(country_id=country.alpha_2)
+        ) == [rate]
+
+    def test_a_region_zone_rate_carries_none(self, greece_like):
+        assert greece_like["islands_zone"].rates.get().country_id is None
+
+    def test_a_save_of_some_fields_still_writes_it(self, greece_like):
+        rate = greece_like["base"].rates.get()
+        ShippingRate.objects.filter(pk=rate.pk).update(country=None)
+        rate.refresh_from_db()
+
+        rate.save(update_fields=["is_active"])
+
+        rate.refresh_from_db()
+        assert rate.country_id == greece_like["country"].alpha_2
+
+    def test_a_zone_that_gains_regions_clears_it(self, greece_like):
+        base = greece_like["base"]
+
+        base.regions.add(greece_like["mainland"])
+
+        assert base.rates.get().country_id is None
+
+    def test_a_zone_that_loses_its_regions_writes_it(self, greece_like):
+        islands_zone = greece_like["islands_zone"]
+        greece_like["base"].delete()
+
+        islands_zone.regions.clear()
+
+        assert (
+            islands_zone.rates.get().country_id
+            == greece_like["country"].alpha_2
+        )
+
+    def test_a_zone_moved_to_another_country_moves_it(self, greece_like):
+        base = greece_like["base"]
+        other = CountryFactory(num_regions=0)
+
+        base.country = other
+        base.save()
+
+        assert base.rates.get().country_id == other.alpha_2

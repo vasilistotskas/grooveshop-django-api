@@ -431,12 +431,15 @@ caller:
     staff) is not the same. Both are personal (`Order.PERSONAL_METADATA`).
   - **The order resumed.** `order_to_resume`: the one this checkout made, the
     latest if there are two, whichever was placed last, among
-    `payable_orders_of_cart`: it holds its stock for an online payment that is
-    pending or failed (not one processing, or flagged for another amount), is
-    not an agent's (the gateway's are answered by their agent checkout or
-    refused, above), and its payment window still fits a link of its provider
-    (`payment_hold.window_closed` with `min_hosted_session`). Its row is
-    locked.
+    `unpaid_orders_of_cart` (they hold their stock for an online payment, and
+    are not an agent's: the gateway's are answered by their agent checkout or
+    refused, above), not canceled, and with a payment window that still fits a
+    link of its provider (`payment_hold.window_closed` with
+    `min_hosted_session`). One whose payment is being decided (processing,
+    flagged for another amount, or paid while the repeat waited) is returned
+    whatever its window: asking for its link answers that a payment is in
+    progress, where a second order would ask the shopper to pay twice. Its row
+    is locked.
   - **When.** Under the cart row lock, before the cart is validated, since the
     order holds the cart's stock. The quote is priced only when the cart has
     such an order. A quote that refuses, another total or other contents are a
@@ -444,7 +447,7 @@ caller:
     checkouts racing end with one order.
   - **The stock.** The storefront reserves before every order
     (`StockManager.reserve_cart_stock`), which does not hold again the units
-    the cart's payable unpaid order already took (`units_held_for_cart`), so a
+    the cart's unpaid order already took (`units_held_for_cart`), so a
     repeat of the last units is not refused there; a resume releases any hold
     left. The storefront still marks a line whose product has no stock left, so
     that shopper's way back is the order's own "Pay now".
@@ -452,9 +455,10 @@ caller:
     with the repeat's own ads consent and browser data, language and newly
     accepted legal texts. The storefront then asks for its payment link and
     gets the live one ([§4](payments.md)).
-  - **A changed checkout** places a new order, as before. That includes one
-    that spent something the first order took (a gift card's balance, a
-    single-use coupon): its second quote is another total. Cancelling the
+  - **A changed checkout** places a new order, as before. One that spent
+    something is not the same the second time: a drained gift card is refused
+    (`gift_card_not_redeemable`), a single-use coupon is gone from the cart,
+    and points are there only with a balance that covers them twice. Cancelling the
     earlier order in the same step (supersede) waits for a verified way to
     close its payment link first.
 - For **COD/offline**: dispatches courier task via

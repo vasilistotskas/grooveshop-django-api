@@ -22,9 +22,10 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from country.factories import CountryFactory
 from giftcard.factories import GiftCardFactory
+from order.checkout import resume
 from order.checkout.resume import FINGERPRINT_KEY
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import CartStockUnavailableError, OrderServiceError
+from order.exceptions import CartStockUnavailableError, InvalidGiftCardError
 from order.inventory.stock import StockManager
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.stock_reservation import StockReservation
@@ -79,16 +80,17 @@ class _Checkout:
             **changes,
         }
 
-    def order(self, *, pay_way=None, extra=None, **address) -> Order:
-        return OrderService.create_order_from_cart(
-            **priced(
-                legal_acceptance=self.acceptance,
-                cart=self.cart,
-                shipping_address=self.address(**address),
-                pay_way=pay_way or self.viva,
-                **(extra or {}),
-            )
+    def request(self, *, pay_way=None, extra=None, **address) -> dict:
+        return priced(
+            legal_acceptance=self.acceptance,
+            cart=self.cart,
+            shipping_address=self.address(**address),
+            pay_way=pay_way or self.viva,
+            **(extra or {}),
         )
+
+    def order(self, **choices) -> Order:
+        return OrderService.create_order_from_cart(**self.request(**choices))
 
     def reserve(self) -> list:
         """What the storefront does before every order."""
@@ -231,6 +233,50 @@ class TestTheOrderTakesTheRepeatsOwnAnswers:
         assert earlier.legal_acceptances.count() == recorded
 
 
+class TestAPaymentBeingDecided:
+    """Money is being taken, or was: the repeat gets that order, whose link
+    answers that a payment is in progress, never a second one to pay."""
+
+    @pytest.mark.parametrize("window_closed", [False, True])
+    @pytest.mark.parametrize("decided", ["processing", "amount mismatch"])
+    def test_the_order_is_returned(self, decided, window_closed):
+        checkout = _Checkout()
+        earlier = checkout.order()
+        if decided == "processing":
+            earlier.payment_status = PaymentStatus.PROCESSING
+        else:
+            earlier.metadata[AMOUNT_MISMATCH_FLAG] = {"expected": "1"}
+        earlier.save(update_fields=["payment_status", "metadata"])
+        if window_closed:
+            Order.objects.filter(pk=earlier.pk).update(
+                created_at=earlier.created_at
+                - payment_hold.max_hold_window()
+                - timedelta(minutes=1)
+            )
+
+        assert checkout.order().pk == earlier.pk
+        assert Order.objects.count() == 1
+
+    def test_one_paid_while_the_repeat_waited_for_its_lock(self, monkeypatch):
+        checkout = _Checkout()
+        earlier = checkout.order()
+        real = resume.unpaid_orders_of_cart
+
+        def paid_meanwhile(cart, **kwargs):
+            """The candidates are read, then the payment commits."""
+            found = real(cart, **kwargs)
+            rows = list(found.values_list("pk", flat=True))
+            Order.objects.filter(pk__in=rows).update(
+                payment_status=PaymentStatus.COMPLETED
+            )
+            return Order.objects.filter(pk__in=rows)
+
+        monkeypatch.setattr(resume, "unpaid_orders_of_cart", paid_meanwhile)
+
+        assert checkout.order().pk == earlier.pk
+        assert Order.objects.count() == 1
+
+
 class TestAChangedCheckoutPlacesAnotherOrder:
     def test_going_back_to_the_first_of_two_resumes_it(self):
         checkout = _Checkout()
@@ -241,17 +287,17 @@ class TestAChangedCheckoutPlacesAnotherOrder:
         assert checkout.order().pk == first.pk
         assert Order.objects.count() == 2
 
-    def test_an_order_whose_address_was_edited_is_not_the_same(self):
+    @pytest.mark.parametrize("edit", [{"street": "Stadiou"}, {"floor": "2"}])
+    def test_an_order_whose_address_was_edited_is_not_the_same(self, edit):
         checkout = _Checkout()
         earlier = checkout.order()
-        Order.objects.filter(pk=earlier.pk).update(street="Stadiou")
+        Order.objects.filter(pk=earlier.pk).update(**edit)
 
         assert checkout.order().pk != earlier.pk
 
     def test_one_that_spent_a_gift_card(self, monkeypatch):
-        """The card's balance went into the first order, so the second
-        quote is another total: refused as the client's total, not resumed
-        and not charged twice."""
+        """The card's balance went into the first order: the second quote
+        refuses it, so the checkout is not resumed, nor charged twice."""
         checkout = _Checkout()
         real = Setting.get
         enabled = {"GIFT_CARDS_ENABLED": True, "GIFT_CARD_VALIDITY_DAYS": 1825}
@@ -261,11 +307,12 @@ class TestAChangedCheckoutPlacesAnotherOrder:
             lambda name, default=None: enabled.get(name, real(name, default)),
         )
         card = GiftCardFactory(initial_value=Money(Decimal("5.00"), "EUR"))
-        extra = {"gift_card_codes": [card.code]}
-        checkout.order(extra=extra)
+        # The same request twice, the total the client was first shown with it.
+        request = checkout.request(extra={"gift_card_codes": [card.code]})
+        OrderService.create_order_from_cart(**request)
 
-        with pytest.raises(OrderServiceError):
-            checkout.order(extra=extra)
+        with pytest.raises(InvalidGiftCardError):
+            OrderService.create_order_from_cart(**request)
 
         assert Order.objects.count() == 1
 
@@ -337,26 +384,6 @@ class TestAnOrderThatCannotBePaidIsNotResumed:
         checkout = _Checkout()
         earlier = checkout.order()
         Order.objects.filter(pk=earlier.pk).update(**ended)
-
-        assert checkout.order().pk != earlier.pk
-
-    @pytest.mark.parametrize(
-        "being_decided",
-        [
-            pytest.param(
-                {"payment_status": PaymentStatus.PROCESSING}, id="processing"
-            ),
-            pytest.param({"mismatch": True}, id="amount mismatch"),
-        ],
-    )
-    def test_one_being_decided(self, being_decided):
-        checkout = _Checkout()
-        earlier = checkout.order()
-        if being_decided.pop("mismatch", False):
-            earlier.metadata[AMOUNT_MISMATCH_FLAG] = {"expected": "1"}
-            earlier.save(update_fields=["metadata"])
-        else:
-            Order.objects.filter(pk=earlier.pk).update(**being_decided)
 
         assert checkout.order().pk != earlier.pk
 

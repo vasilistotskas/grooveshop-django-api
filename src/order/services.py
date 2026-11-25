@@ -35,7 +35,8 @@ from order.checkout.resume import (
     address_fingerprint,
     checkout_fingerprint,
     order_to_resume,
-    payable_orders_of_cart,
+    payment_undecided,
+    unpaid_orders_of_cart,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
@@ -698,12 +699,13 @@ class OrderService:
         checks.
 
         The order takes the repeat's own consent and browser data, language
-        and accepted legal texts: they are the buyer's latest. The cart's
-        stock holds are released, since the order has its units.
+        and accepted legal texts while nothing was paid: they are the buyer's
+        latest. The cart's stock holds are released, since the order has its
+        units.
         """
         if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             return None
-        if not payable_orders_of_cart(cart, pay_way=pay_way).exists():
+        if not unpaid_orders_of_cart(cart, pay_way=pay_way).exists():
             return None
         from b2b.services import B2BPricingService
 
@@ -740,14 +742,15 @@ class OrderService:
         if order is None:
             return None
         StockManager.reserve_cart_stock(cart, {})
-        meta = cls._sanitise_meta_context(meta_context)
-        if meta:
-            order.metadata["meta"] = meta
-        else:
-            order.metadata.pop("meta", None)
-        order.language_code = active_language_code()
-        order.save(update_fields=["metadata", "language_code"])
-        OrderLegalAcceptanceService.record(order, legal_acceptance)
+        if payment_undecided(order):
+            meta = cls._sanitise_meta_context(meta_context)
+            if meta:
+                order.metadata["meta"] = meta
+            else:
+                order.metadata.pop("meta", None)
+            order.language_code = active_language_code()
+            order.save(update_fields=["metadata", "language_code"])
+            OrderLegalAcceptanceService.record(order, legal_acceptance)
         logger.info(
             "Checkout of cart %s resumes its unpaid order %s",
             cart.uuid,

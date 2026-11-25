@@ -33,7 +33,8 @@ DRF's `IsAdminUser` is literally `request.user.is_staff`. On an API
 request that flag lives on a **tenant-schema** row:
 
 - `knox` is in `TENANT_APPS` only, so `knox_authtoken` is per-schema and
-  `request.user` is always a user from *that store's* schema
+  on a customer-token request `request.user` is always a user from *that
+  store's* schema (a `StaffBearer` request resolves its user in `public`)
   (`core.api.tokens.BoundedTokenAuthentication` documents this: cross
   tenant token replay is structurally impossible).
 - Those rows are the store's **customers**, so `is_staff` or `is_superuser` on
@@ -60,8 +61,8 @@ The admin closes this with a provenance stamp
 `PlatformStaffBackend` when it loads a user *from the public schema*. A
 customer API session never carries that stamp, because it never authenticates
 against public. The staff token flow stamps it, so the API has a sound notion
-of "store staff": a stamped platform identity with a staff-capable membership
-in the current tenant (`tenant.membership.is_store_staff`).
+of "store staff": a platform superuser, or a stamped platform identity with a
+staff-capable membership in the current tenant (`tenant.membership.is_store_staff`).
 
 ## The store team admin
 
@@ -177,8 +178,9 @@ permission (`tests_mt/test_platform_superuser_is_schema_aware.py`).
 ### Issuance and revocation
 
 The login endpoint is on the PLATFORM host only (`tenant.urls_public`). It
-calls `PlatformStaffBackend.authenticate_staff()` and requires an active
-staff-capable membership before minting. The storefront's headless login can
+calls `PlatformStaffBackend.authenticate_staff()` and mints only for a
+platform superuser (after the second factor below) or the holder of an active
+staff-capable membership. The storefront's headless login can
 never mint one: different URLconf, different backend, the same deliberately
 inert wall the admin uses. Revocation is deactivating the membership and
 clearing `is_staff`, plus token deletion; the per-request `is_staff` re-check
@@ -198,9 +200,10 @@ whose resource owners are that store's CUSTOMERS (it is what the agent surface
 authenticates against). Staff are public-schema identities, so the existing IdP
 structurally cannot issue for them, and a second, public-schema IdP would be
 real extra surface. PAT-style staff tokens cover operator scripting and
-first-party clients. Third-party delegated access would need OAuth2
-client-credentials on a public-schema IdP, with scopes mapping onto
-`tenant.role_scopes`, the same policy source.
+first-party clients. Third-party access would need a public-schema OAuth2
+IdP: the authorization-code grant for access a staff member delegates,
+client credentials for a service acting as itself, and in both cases scopes
+mapping onto `tenant.role_scopes`, the same policy source.
 
 ### Consequences
 

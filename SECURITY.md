@@ -2,8 +2,10 @@
 
 ## Supported versions
 
-Only the latest release of GrooveShop Django API receives security fixes. The
-platform deploys continuously from `main`, so older releases are not patched.
+Only the latest release of GrooveShop Django API receives security fixes. A
+fix is made on `main` and ships in the next release, which the platform deploys
+by pinning its image tag in `grooveshop-infrastructure`. There are no
+maintenance branches, so earlier releases get no backports.
 
 ## Reporting a vulnerability
 

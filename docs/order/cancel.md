@@ -401,8 +401,9 @@ customer who retries after a cancel that stopped half way is not refused
 product it restocks. Calling the courier before it returns would keep all
 those rows locked across the carrier's HTTP calls (BoxNow's lookup and
 cancel, ACS's delete), the connection's `idle_in_transaction_session_timeout`
-could end the cancel half way, and a shipment locked after the order while a
-tracking sync takes the two the other way round deadlocks. So:
+could end the cancel half way. The shipment is locked alone, after the
+order's commit: every path that holds both takes the order first
+(`shipping.locks.lock_with_order`). So:
 
 1. **The cancel commits first.** Step 3 writes
    `metadata['shipment_cancel_pending'] = true`

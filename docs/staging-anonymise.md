@@ -7,7 +7,10 @@ amounts but no real person. It is step 4 of
 has the operator side).
 
 Staging keeps more than identities alone (orders, products, stock, amounts), and
-**every** customer identity is replaced.
+**every** customer identity is replaced, except two kinds of account that are
+kept as they are: in `public`, the operators (staff, superusers and store
+members, so an account that is also a customer keeps its platform identity),
+and in a store schema, the demo logins (`devtools.anonymise.engine`).
 
 ## Where it runs
 

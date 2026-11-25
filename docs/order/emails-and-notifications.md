@@ -86,8 +86,8 @@ returns `True`/`False` by mapping the `Delivery` explicitly
 (`emails.send.was_sent`). A mail the pipeline did not send because the store
 switched it off or a gate is closed is a deliberate no-op: the task returns
 `True`, keeps its reservation and writes no "email sent" note, except the
-store-staff tasks, which return `False` for a store without a contact
-address.
+store-staff tasks, which return `False` for a store with neither a contact
+nor an owner address.
 
 `order.delivered`, `order.completed` and `order.review_request` carry a
 `review_links` list: one "Write a review" link per distinct product still

@@ -47,7 +47,9 @@ The flag can also be set at launch with `MEILI_EXPERIMENTAL_CONTAINS_FILTER`
 
 ### Django QuerySet API
 
-The CONTAINS operator is available through the `__contains` lookup in the IndexQuerySet API:
+The CONTAINS operator is available through the `__contains` lookup in the IndexQuerySet API.
+
+The engine accepts CONTAINS only on a field in the index's `filterable_fields`. Today the product and blog indexes filter on no free-text field ([index settings](index-settings.md)): `name`, `title` and `category_name` are not filterable, so the examples below are rejected by the engine until such a field is added to `MeiliMeta.filterable_fields` and the settings are applied (`meilisearch_apply_settings --all-tenants`). No code in the project uses the lookup.
 
 ```python
 from product.models import ProductTranslation

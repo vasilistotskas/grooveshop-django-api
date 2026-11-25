@@ -116,8 +116,9 @@ old worker answers a name it does not register with "unregistered task" and drop
 the message, so those documents stay as they were until the next full sync. The
 heal is the daily `sync-meilisearch-indexes` beat entry (02:00, every store),
 which upserts every qualifying document and prunes the stale ones. Run
-`meilisearch_sync_index` (or `meilisearch_sync_all_indexes`) once after the
-rollout to close the window at once.
+`meilisearch_sync_all_indexes` once after the rollout to close the window at
+once: `meilisearch_sync_index` only upserts, so it leaves a document that
+should have been removed.
 
 A writer that saves many rows wraps them in `meili.batching.collect_reindex()`.
 While it is open the product post-save signal, the product-attribute signal and

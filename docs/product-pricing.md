@@ -111,7 +111,7 @@ tables, and nothing deletes a spell.
 `product` migration `0050_backfill_price_spells` replays `HistoricalProduct`
 (at most 365 days) through the same evaluation function, per schema, so a
 product whose markdown started before the records existed has its reference
-immediately. It is idempotent (a product with spells is skipped) and loads no
+immediately when its history still shows the earlier price. It is idempotent (a product with spells is skipped) and loads no
 live model code. What it cannot know:
 
 - prices older than the oldest surviving history row: a product with no
@@ -216,7 +216,9 @@ is the VAT of the price actually charged, and
 prices customers were actually charged: `0051_reprice_discounted_products`
 recorded the move to this formula as an ordinary price drop (the spell closed, a
 new one opened at the new price, the episode re-evaluated by
-`evaluate_reduction`).
+`evaluate_reduction`). A product whose current spell did not hold the old
+formula's price carries a promotion; the migration left it to the nightly
+sweep, which re-prices it the same way.
 
 ## A product always has a VAT rate
 

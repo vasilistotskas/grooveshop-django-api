@@ -253,8 +253,9 @@ storefront's schemas reject.
 
 The agent gateway calls the cart and catalogue routes (`/cart`, `/cart/item`,
 `/cart/reserve-stock`, `/order`, `/product`, `/product/category/all`), so both
-are features in `STORE_FEATURES`, not presentation preferences: the routes
-refuse (404, `feature_gate:refused`) and the gateway stops offering the cart,
+are features in `STORE_FEATURES`, not presentation preferences: their
+shopper-facing actions refuse (404, `feature_gate:refused`; the lists below)
+and the gateway stops offering the cart,
 checkout and catalogue tools, the feeds and the chat's product tools. A
 client reads a field missing from `features` as off, so a new feature ships
 Django first (an addition), then its clients.

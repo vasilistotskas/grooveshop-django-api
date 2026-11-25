@@ -78,12 +78,10 @@ periodic task `allocate_credit_sources` (every five minutes, through
 touched since, so a source that waited for a claim is decided within five
 minutes of the claim resolving, whichever path resolved it (reconciliation, the
 admin outcome action, the provider's webhook, a decline); when it decided
-sources of an order that has a receipt it requests the credit documents. There
-is no data migration: the 0102 table is created empty and migrations stay
-additive. A gift card return booked without an allocation (the previous release
-serving after the migration) is found by `owing_sources` like any other source,
-valued from the gift-card ledger and moved when it put value back; one that
-moved before an existing receipt is left alone. `RefundAttempt` resolution
+sources of an order that has a receipt it requests the credit documents. A gift
+card return booked without an allocation is found by `owing_sources` like any
+other source, valued from the gift-card ledger and moved when it put value
+back; one that moved before an existing receipt is left alone. `RefundAttempt` resolution
 books a refund only for an attempt still PENDING (`RefundService.book_share`
 re-reads it under the order lock): a refund the provider made for an attempt
 staff declined meanwhile is booked as a refund nobody claimed, never reviving
@@ -187,8 +185,8 @@ means the receipt stands: a chargeback never reduces what the order is still
 for and never eats the duplicate) or decided returned (its credit comes from
 its own allocation, at the decision), so the excess never depends on when staff
 decide and nothing waits for them; `sync_overcharge` stamps
-`Order.overcharged_at` from `overcharge_held`, written once a refund's
-allocation is decided) back first: that part gives a duplicate payment back, it
+`Order.overcharged_at` from `overcharge_held`. A refund pays the duplicate part
+back first: that part gives a duplicate payment back, it
 does not reverse the sale, so it takes no room on the receipt and gets no
 credit document (`PaymentLedger.refundable_excess`, read as it stood at the
 source's own moment: the ledger rows before that row, ties by id, which already

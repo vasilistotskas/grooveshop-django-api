@@ -11,8 +11,8 @@
   `draft_catalogue_hash`, `updated_by_staff_id`. Only pages are deleted
   (soft); the other kinds are fixed keys.
 - `BuilderVersion`: an immutable snapshot (`data`, `i18n`), numbered per
-  document, with the derived `block_types` (`type@version`, GIN-indexed, for
-  the usage gate that will guard removing a block type), `refs`,
+  document, with the derived `block_types` (`type@version`, GIN-indexed, so
+  the documents that use a block type can be found), `refs`,
   `catalogue_hash`, `content_hash` (sha256 of the canonical encoding) and
   `size_bytes`. `kind` is `checkpoint` (a named save), `publish` or `restore` (a
   restored version; `restored_from` is the number it restores, `null` for
@@ -273,8 +273,7 @@ theme is.
 
 ### Typed data props (`src/builder/data_sources.py`)
 
-A block can declare a setting in the catalogue's `data` map, beside `refs`
-(both are read until the storefront stops serving `refs`):
+A block can declare a setting in the catalogue's `data` map, beside `refs`:
 
 - `{field: "ref", kind, onMissing}`: the setting holds one record's id (a slug
   for a page), checked like a `refs` entry;

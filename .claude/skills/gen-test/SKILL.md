@@ -25,7 +25,7 @@ Generate tests that match every convention in this codebase.
 
 ## Test File Placement
 
-```
+```text
 tests/
 ├── unit/{app}/           # No DB access or minimal DB (model logic, utils, pure functions)
 │   ├── test_models.py

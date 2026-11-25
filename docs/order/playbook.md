@@ -95,9 +95,9 @@ edit and on what really happened to the parcel, the stock and the money:
 4. For voucher mint mishaps, follow the order-47 recovery script
    in `commit 05208050`.
 
-This section used to tell every case to roll the status back to PENDING
-and cancel, which is right for the first case only. `update_order_status`
-refuses CANCELED, so `cancel_order` is the one way to cancel.
+Rolling the status back to PENDING and cancelling is right for the first
+case only. `update_order_status` refuses CANCELED, so `cancel_order` is the
+one way to cancel.
 
 ### 9.5 A customer email carries the wrong subject or wording
 
@@ -105,8 +105,8 @@ Before touching a template, check the DB translation overlay. Every
 non-empty `core.Translation` row is written over the compiled `.po` in
 every pod and worker (`src/core/rosetta_storage.py:apply_db_overlay`), so a
 stale row wins over a correct catalogue with nothing on disk to show
-for it — order #281 (2026-09-12) got "Η Παραγγελία Παραδόθηκε" as its
-*order received* subject from an April import row. A fresh
+for it: an *order received* email can carry a "delivered" subject because
+an old import row says so. A fresh
 `manage.py shell` never applies the overlay, so it will insist the
 catalogue is fine.
 

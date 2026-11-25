@@ -85,8 +85,8 @@ Orders made outside checkout — the demo seed (`src/devtools/demo_account.py`,
   `User-Agent` (an in-app browser names itself there), else `direct`.
   So every cart filled since `0015_cartattribution` has a row, the agent
   gateway's and the storage-blocked storefront's included, and **no row
-  means only** a cart from before that migration (2026-10-17, no
-  backfill: the first touch was never stored) or one that never held a
+  means only** a cart from before that migration (not backfilled: the
+  first touch was never stored) or one that never held a
   line, never "direct". A guest cart from before it that is merged into
   an account cart brings no source, so the merged cart has none either.
   The cart response does not expose it; the storefront never reads it.
@@ -188,8 +188,8 @@ catalogue can no longer change.
   `order.checkout.discounts.discounted_line_gross` reads the snapshots and raises
   when they do not add up to the order's discount (capped at its goods): a
   document on such lines would bill a total the customer never owed. That
-  is the state of an order created by the previous release during the
-  rollout of the column, or one whose discounted line staff deleted.
+  is the state of an order that has no allocation, or one whose discounted
+  line staff deleted.
 - **Orders without a snapshot.** `order` 0072 adds the column
   (`db_default` 0, currency column added with the `docs/migrations.md`
   money recipe) and 0073 gives every existing discounted order the
@@ -199,12 +199,11 @@ catalogue can no longer change.
   been edited since,
   so proportional, the rule every existing document was issued under, is
   the only honest reconstruction. `Invoice` rows are never touched, and
-  one with a MARK is frozen anyway. Orders the previous release creates
-  while it still serves the rollout are not covered by 0073 (it already
-  ran): run `manage.py heal_discount_allocation --all-tenants` once after
-  the last old pod has exited (idempotent: an order whose lines carry any
-  allocation is skipped). The invoice task fails loudly on such an order
-  until then and retries.
+  one with a MARK is frozen anyway. `manage.py heal_discount_allocation
+  --all-tenants` applies the same allocation to any discounted order still
+  without one (idempotent: an order whose lines carry any allocation is
+  skipped). The invoice task fails loudly on such an order until then and
+  retries.
 - **Shipping and the payment-method fee.** Incidental costs the seller
   charges the customer belong to the taxable amount of the goods they
   accompany (VAT Directive 2006/112/EC art. 78(b); Greek VAT Code, Law
@@ -301,12 +300,9 @@ those when a line is edited, so no admin surface edits one:
   line after checkout is a restock (`OrderItem.refund`, the order's "Restock
   returned items" action, or `POST order-items/<id>/restock`).
 - **The API.** `order-items` is read-only: `GET` list and detail and the
-  staff restock remain; `POST`, `PUT`, `PATCH` and `DELETE` are gone (they
-  could swap a line's product or change its quantity, leaving the snapshot,
-  `amount_due`, the VAT lines and the stock apart). Nothing called them (the
-  storefront, the gateway, the admin and the infrastructure scripts were
-  searched); the removal is accepted in `api-contract/ignore.txt` until the
-  storefront regenerates its types.
+  staff restock are served; there is no `POST`, `PUT`, `PATCH` or `DELETE`,
+  which could swap a line's product or change its quantity and leave the
+  snapshot, `amount_due`, the VAT lines and the stock apart.
 - **The snapshot.** `OrderItem.product_name` (the product's name in the
   ORDER's language, `Order.language_code`, else any language it has one in)
   and `OrderItem.sku` are written when the line is created, like `vat_rate`
@@ -324,13 +320,10 @@ those when a line is edited, so no admin surface edits one:
   (`order` 0100), so nothing is tightened in a second release. Migration
   0101 copies the current product into every existing line;
   `manage.py backfill_line_snapshots --all-tenants` (the same idempotent SQL,
-  `src/order/line_snapshot.py`) covers the lines the previous release creates
-  while it still serves the rollout, whose INSERTs leave the columns at `''`.
-  Run it **immediately after the rollout**, once per deploy that ships the
-  columns: until it has run, a confirmation, payment or shipping email for
-  a line the previous release wrote (an order placed in the rollout window)
-  prints a blank product name, and its invoice a blank name and SKU. There
-  is no fallback to the live product: the gap is closed by the command,
+  `src/order/line_snapshot.py`) fills any line whose columns are still
+  `''`: until it has run, a confirmation, payment or shipping email for
+  such a line prints a blank product name, and its invoice a blank name and
+  SKU. There is no fallback to the live product: the gap is closed by the command,
   never by reading the product again. The name is chosen as a new line
   chooses it (`product_name_for`): the order's language, then the next
   language of its parler fallback chain, then any language the product has.

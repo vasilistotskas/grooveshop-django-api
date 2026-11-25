@@ -2,18 +2,19 @@
 
 The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
-Source: `src/emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
-`sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
-`transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `figures.py`, `testsend.py`, `models.py`,
-`services.py`), `tests/utils/emails.py` and
+Source: `src/emails/` (`types.py`, `declare.py`, `registry.py`, `gates.py`,
+`recipients.py`, `sender.py`, `headers.py`, `optout.py`, `render.py`,
+`send.py`, `transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`,
+`preview.py`, `figures.py`, `testsend.py`, `models.py`, `services.py`),
+`tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
-**State.** The order, shipping, product, gift card, B2B, contact, account,
-cart, operational alert and allauth (account, MFA and social sign-in)
-emails and the platform's own mail (billing notices, the staff password
-reset, the health and backup alerts) are on the pipeline (see Registered
-types in [`types.md`](types.md)). Each domain moved onto it in turn, keeping the recorded golden files
-equal (see Tests in [`delivery.md`](delivery.md)).
+**Scope.** Every email the platform sends is on the pipeline: the order,
+shipping, product, gift card, B2B, contact, account, cart, operational alert
+and allauth (account, MFA and social sign-in) emails and the platform's own
+mail (billing notices, the staff password reset, the health and backup
+alerts); see Registered types in [`types.md`](types.md). The recorded golden
+files keep each email's output stable (see Tests in [`delivery.md`](delivery.md)).
 
 ## Which file to read
 

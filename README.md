@@ -108,7 +108,7 @@ check at `/api/v1/health`.
 ## Common commands
 
 ```bash
-uv run pytest                                  # all tests, in parallel
+uv run pytest                                  # tests/, in parallel
 uv run pytest tests/unit/path/to/test_file.py::test_name
 uv run pytest tests_mt -n 0                    # multi-tenant lane
 uv run ruff check --fix && uv run ruff format  # lint and format
@@ -157,8 +157,8 @@ detail.
   schema's clients that are live in production or staging; an accepted break
   is a dated line in `api-contract/ignore.txt`.
 - On `main`, python-semantic-release cuts the version, changelog and GitHub
-  release from Conventional Commits (`feat` is a minor, `fix` and `perf` a
-  patch).
+  release from Conventional Commits (`feat` is a minor; `fix`, `perf` and
+  `refactor` are patches).
 - A published release builds the Docker image and pushes it to Docker Hub
   (`gro0ve/grooveshop-django-api`) and GHCR.
 - Deployment is GitOps: the image tag is pinned in

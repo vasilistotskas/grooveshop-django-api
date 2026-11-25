@@ -6,9 +6,11 @@ amounts but no real person. It is step 4 of
 `grooveshop-infrastructure/scripts/staging-refresh.sh` (`grooveshop-infrastructure/docs/staging.md`
 has the operator side).
 
-It exists because the refresh used to copy production unchanged. Decision of
-2026-10-17: staging keeps more than identities alone, and **every** customer
-identity is replaced.
+Staging keeps more than identities alone (orders, products, stock, amounts), and
+**every** customer identity is replaced, except two kinds of account that are
+kept as they are: in `public`, the operators (staff, superusers and store
+members, so an account that is also a customer keeps its platform identity),
+and in a store schema, the demo logins (`devtools.anonymise.engine`).
 
 ## Where it runs
 
@@ -71,9 +73,12 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   written by `scripts/staging-arm-features.py` in the infrastructure repo, through
   `credentials.arm_credentials`: it reads the `STAGING_TENANT_CREDENTIALS` JSON
   (`{schema: {field: value}}`), accepts only the credential columns this module
-  derives, and refuses to run unless `SYSTEM_ENV` is `staging`, and refuses a tenant whose primary
-  domain is not exactly `<staging label>.webside.gr` or `.grooveshop.space` or has a live-mode
-  switch on.
+  derives, and refuses to run unless `SYSTEM_ENV` is `staging`, and refuses a tenant that has a
+  live-mode switch on or whose primary domain is not a staging host
+  (`is_staging_host`): exactly one label, then a parent in
+  `STAGING_DOMAIN_SUFFIXES`. The label is `staging` with optional hyphenated
+  parts around it (`staging`, `<name>-staging`, `staging-<name>`), matched whole, never as a
+  substring.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
   search queries, notifications, stock reservations, admin log entries, the email log, its provider

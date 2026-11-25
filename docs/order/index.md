@@ -44,9 +44,8 @@ Last refresh: 2026-11-24 (shipping zones: a rate belongs to a zone, a
 whole country or some of its regions, a home delivery is priced by its
 region's zone, an order or a saved address no home delivery reaches is
 refused, [§5.5](shipping-zones.md) / [§3.3](creation-address.md); every
-pay way creates the order first and pays it afterwards; the payment-first
-Stripe path, `retry-payment` and the order's `create_payment_intent` are
-removed, [§3.1](creation.md); before
+pay way creates the order first and pays it afterwards, [§3.1](creation.md);
+before
 that 2026-11-21: an order's address line 2, [§3.3](creation-address.md);
 an order has one payable payment link: a request for one returns the live
 one, [§4](payments.md); the cart digest leaves out the pay way and

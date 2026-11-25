@@ -65,10 +65,9 @@ second run beside another one is safe only with its own database name, e.g.
 The collision does not look like a collision. It surfaces as a flood of
 `psycopg.errors.DuplicateDatabase: database "test_postgres_gw1" already exists`
 and `ObjectInUse: ... is being accessed by other users`, reported as ERRORs at
-setup of whatever test each worker happened to start with. On 2026-08-20 this
-produced `2018 errors` and `541 failed, 1457 errors`, and a targeted
-`pytest tests/unit/pay_way/` reporting `66 errors` while the same file passed
-56/56 under `-n0`. It reads exactly like a catastrophic regression.
+setup of whatever test each worker happened to start with. A targeted run can
+report dozens of errors while the same file passes under `-n0`. It reads exactly
+like a catastrophic regression.
 
 Before believing **any** mass-failure result, check whether another pytest
 process is running with the same `DB_NAME`. If one is, discard the result and
@@ -81,4 +80,3 @@ re-run rather than debugging it.
 - Password hashing uses MD5 (faster than the production Argon2 hasher)
 - Coverage minimum is 70% (`fail_under = 70`, enforced on the combined CI shards)
 - Query counts use Django's `CaptureQueriesContext` (`len(ctx)`) and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
-- Durations that are exact multiples of ~30 s on Windows mean the Docker Desktop `localhost` IPv6 stall — rerun with `REDIS_HOST=127.0.0.1`

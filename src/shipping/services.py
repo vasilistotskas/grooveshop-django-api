@@ -44,6 +44,7 @@ from shipping.zones import (
     chargeable,
     destination_rates,
     offered,
+    reaching,
     standing_destinations,
 )
 
@@ -1197,7 +1198,9 @@ class ShippingService:
         if code is None and region_id:
             code = cls._home_delivery_carrier(
                 carriers,
-                ShippingRate.objects.filter(zone__country_id=country_code),
+                reaching(
+                    ShippingRate.objects.filter(zone__country_id=country_code)
+                ),
                 weight_grams,
             )
         return code
@@ -1284,11 +1287,13 @@ class ShippingService:
             return rate
         if (
             region_id
-            and ShippingRate.objects.filter(
-                provider=provider,
-                kind=kind,
-                zone__country_id=country_code,
-                is_active=True,
+            and reaching(
+                ShippingRate.objects.filter(
+                    provider=provider,
+                    kind=kind,
+                    zone__country_id=country_code,
+                    is_active=True,
+                )
             ).exists()
         ):
             # The carrier delivers this way in the country, only not to

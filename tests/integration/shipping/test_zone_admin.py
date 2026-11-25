@@ -173,11 +173,9 @@ def test_the_changelist_says_what_each_zone_covers(client, country):
     assert "2 regions" in body
 
 
-class TestTheCountryTheRatesCarry:
-    """The base zone's rate carries its country (the dual write), and the
-    database still holds the old unique ``(provider, country, kind)``: a
-    region zone's rate of the same carrier and kind must never carry it,
-    not even for a moment of the save."""
+class TestARegionZoneBesideABaseZone:
+    """A region zone may have the same carrier and kind as the base zone
+    of its country."""
 
     @pytest.fixture
     def flat_rate(self):
@@ -203,9 +201,9 @@ class TestTheCountryTheRatesCarry:
 
         assert response.status_code == 302, _form_errors(response)
         zone = ShippingZone.objects.get(name="Islands")
-        assert zone.rates.get().country_id is None
-        base_rate.refresh_from_db()
-        assert base_rate.country_id == country.pk
+        assert list(zone.regions.all()) == [islands]
+        assert zone.rates.get().provider == flat_rate
+        assert base_rate.zone.rates.get() == base_rate
 
     def test_replacing_a_region_zones_regions_is_saved(
         self, client, country, flat_rate, base_rate
@@ -240,5 +238,4 @@ class TestTheCountryTheRatesCarry:
 
         assert response.status_code == 302, _form_errors(response)
         assert list(zone.regions.all()) == [after]
-        rate.refresh_from_db()
-        assert rate.country_id is None
+        assert zone.rates.get() == rate

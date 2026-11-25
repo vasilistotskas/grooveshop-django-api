@@ -49,8 +49,11 @@ SURFACES = (
         # for ACS lockers is the synced ``AcsStation`` rows.
         # The locker and station rows are what the two pickup-point
         # lists serve; a sync's deactivation is an unsignalled
-        # ``update`` and marks the surface itself.
+        # ``update`` and marks the surface itself. A region added to a
+        # country, or removed from it, decides whether its base zone
+        # delivers home anywhere (``shipping.zones.reaching``).
         invalidated_by=(
+            "region.Region",
             "shipping.ShippingRate",
             "shipping.ShippingZone",
             "shipping.ShippingZoneRegion",

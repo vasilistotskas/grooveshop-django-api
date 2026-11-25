@@ -35,10 +35,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ErrorDetail
 
+from region.models import Region
 from shipping.enum import ShippingKind
 from shipping.interfaces import get_provider, is_registered
 from shipping.models import (
@@ -139,7 +140,7 @@ def destination_rates(
 ) -> QuerySet[ShippingRate]:
     """Every rate that applies to a destination, active or not: the home
     deliveries of its zone (:func:`zone_for`) and the pickup points of
-    its country's base zone."""
+    its country's base zone (:func:`reaching`)."""
     country_code = country_code.upper()
     home_zone = zone_for(country_code, region_code)
     base_zone = zone_for(country_code) if region_code else home_zone
@@ -148,7 +149,26 @@ def destination_rates(
         matches |= Q(zone=home_zone, kind=ShippingKind.HOME_DELIVERY)
     if base_zone is not None:
         matches |= Q(zone=base_zone, kind=ShippingKind.PICKUP_POINT)
-    return ShippingRate.objects.filter(matches)
+    return reaching(ShippingRate.objects.filter(matches))
+
+
+def reaching(rates: QuerySet[ShippingRate]) -> QuerySet[ShippingRate]:
+    """``rates`` without the ones no address resolves to: the home
+    delivery of a base zone whose country's every region is held by a
+    region zone. Each of those regions is priced by its own zone, and a
+    home address in a country with regions names one, so the base zone
+    delivers home nowhere. Its pickup points still apply: a point has no
+    region."""
+    held = ShippingZoneRegion.objects.filter(region_id=OuterRef("pk"))
+    regions = Region.objects.filter(country_id=OuterRef("zone__country_id"))
+    return rates.exclude(
+        Q(kind=ShippingKind.HOME_DELIVERY)
+        & ~Exists(
+            ShippingZoneRegion.objects.filter(zone_id=OuterRef("zone_id"))
+        )
+        & Exists(regions)
+        & ~Exists(regions.exclude(Exists(held)))
+    )
 
 
 def carrier_offers(
@@ -203,16 +223,9 @@ def offered(rates: QuerySet[ShippingRate]) -> list[ShippingRate]:
 
 def chargeable(rates: QuerySet[ShippingRate]) -> QuerySet[ShippingRate]:
     """``rates`` a shopper can be charged: active, with an active
-    provider and a zone. The same rule as
-    ``ShippingService.shippable_country_codes``."""
-    # A rate the previous release inserts during a rollout has a country
-    # and no zone (``0025`` keeps the column nullable for it) and applies
-    # nowhere until the contract release backfills it into its country's
-    # zone and sets ``zone`` NOT NULL. Said here, not left to the INNER
-    # JOIN a ``select_related("zone")`` happens to make.
-    return rates.filter(
-        is_active=True, provider__is_active=True, zone__isnull=False
-    )
+    provider, and reaching an address (:func:`reaching`). The same rule
+    as ``ShippingService.shippable_country_codes``."""
+    return reaching(rates.filter(is_active=True, provider__is_active=True))
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,7 +233,7 @@ class HomeCoverage:
     """Where the store's home deliveries reach, read once.
 
     ``countries``: the countries whose base zone has an offered
-    home-delivery rate. ``regions``: every region a region zone holds,
+    home-delivery rate some address resolves to (:func:`reaching`). ``regions``: every region a region zone holds,
     with whether that zone has one. A region a region zone holds is
     served by that zone alone; any other is served by its country's base
     zone. ``reached``: the countries some zone, base or region, delivers

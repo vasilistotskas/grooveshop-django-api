@@ -179,7 +179,10 @@ What it decides:
 - operations the router keeps out of a schema are ignored there (a
   TENANT_APPS drop never blocks `public`);
 - `RunSQL` that drops, renames or sets NOT NULL needs `contract_of`, and
-  every migration it names must have been applied by an EARLIER deploy;
+  every migration it names must have been applied by an EARLIER deploy. A
+  table or column it drops or renames must also be out of the applied state:
+  an expand that dual-writes the old column keeps it in the state, so its
+  contract is one release further away (`shipping` 0025, 0027);
 - `RunPython` and column type changes are not classified: review them.
 
 **Escape hatch.** `accepted_downtime = "<reason>"` on a migration prints

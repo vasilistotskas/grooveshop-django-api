@@ -1,10 +1,8 @@
-from collections.abc import Generator, Iterable
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from simple_history.models import HistoricalRecords
@@ -14,26 +12,6 @@ from tenant.staff_actors import history_user_getter, history_user_setter
 
 if TYPE_CHECKING:
     from region.models import Region
-
-#: The zones whose region set ``ShippingZone.set_regions`` is writing:
-#: the receivers in ``shipping.signals`` leave their rates to its one sync.
-_SETTING_REGIONS: ContextVar[frozenset[int]] = ContextVar(
-    "shipping_setting_regions", default=frozenset()
-)
-
-
-def setting_regions(zone_id: int | None) -> bool:
-    """Whether ``ShippingZone.set_regions`` is writing this zone's set."""
-    return zone_id in _SETTING_REGIONS.get()
-
-
-@contextmanager
-def _writing_regions(zone_id: int) -> Generator[None]:
-    token = _SETTING_REGIONS.set(_SETTING_REGIONS.get() | {zone_id})
-    try:
-        yield
-    finally:
-        _SETTING_REGIONS.reset(token)
 
 
 class ShippingZoneRegion(models.Model):
@@ -138,43 +116,12 @@ class ShippingZone(TimeStampMixinModel):
     def __str__(self) -> str:
         return self.name
 
-    def save(self, *args, **kwargs) -> None:
-        super().save(*args, **kwargs)
-        # The zone's country may have changed under its rates.
-        self.sync_rate_countries()
-
-    def rate_country_id(self) -> str | None:
-        """The ``ShippingRate.country`` this zone's rates carry: its
-        country for a base zone, none for a region zone.
-
-        The column the release before shipping zones prices by, kept
-        written for the expand release (``0025``): a worker or a rollback
-        still on that release finds exactly the rates its one-rate-per-
-        country shape can price, never a region's, and its unique
-        ``(provider, country, kind)`` refuses a duplicate it would insert.
-        The contract release drops the column.
-        """
-        return None if self.regions.exists() else self.country_id
-
-    def sync_rate_countries(self) -> None:
-        """Write :meth:`rate_country_id` onto every rate of the zone, after
-        a change of its country or its regions."""
-        self.rates.update(country_id=self.rate_country_id())
-
     def set_regions(self, regions: Iterable[Region]) -> None:
         """Replace the zone's region set.
 
         Refused (``ValidationError``) where the store's zones would break
         (``shipping.zones.zone_errors``): emptied, the zone would be a
-        second base zone of its country. ``regions.set`` removes before it
-        adds, so a replacement passes through an empty set, a base zone
-        for that moment: syncing the rates' country there would write the
-        base zone's country, which the old unique ``(provider, country,
-        kind)`` refuses next to the real base zone's rate. So the
-        receivers leave the rates alone while the set is written
-        (:func:`setting_regions`), and they are synced once, for the set
-        written. A ``ShippingZoneRegion`` row written another way is
-        synced by ``shipping.signals``.
+        second base zone of its country.
         """
         from shipping.zones import zone_errors
 
@@ -183,6 +130,4 @@ class ShippingZone(TimeStampMixinModel):
             zone=self, country_code=self.country_id, regions=regions
         ):
             raise ValidationError(errors)
-        with transaction.atomic(), _writing_regions(self.pk):
-            self.regions.set(regions)
-        self.sync_rate_countries()
+        self.regions.set(regions)

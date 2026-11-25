@@ -23,7 +23,8 @@ construction. ``SeparateDatabaseAndState`` is judged by its
 ``database_operations`` only. ``RunSQL`` is opaque: SQL that drops,
 renames or sets NOT NULL is allowed only in a migration that declares
 ``contract_of``, and only once every migration it names was applied by an
-earlier deploy. ``RunPython`` is not classified.
+earlier deploy; a table or column it drops or renames must also be out of
+the applied state, whatever it declares. ``RunPython`` is not classified.
 
 ``accepted_downtime = "<reason>"`` on a migration reports its findings
 without blocking. See ``docs/migrations.md``.
@@ -73,6 +74,34 @@ _DESTRUCTIVE_SQL = re.compile(
     r")",
     re.IGNORECASE,
 )
+
+_IDENTIFIER = r'(?:"[^"]+"|[A-Za-z_]\w*)'
+_TABLE_REF = rf"(?:{_IDENTIFIER}\.)?(?P<table>{_IDENTIFIER})"
+_IF_EXISTS = r"(?:IF\s+EXISTS\s+)?"
+_ALTER_TABLE = re.compile(
+    rf"\bALTER\s+TABLE\s+{_IF_EXISTS}(?:ONLY\s+)?{_TABLE_REF}"
+    r"(?P<actions>[^;]*)",
+    re.IGNORECASE,
+)
+_DROP_TABLE = re.compile(
+    rf"\bDROP\s+TABLE\s+{_IF_EXISTS}(?P<tables>[^;]*)", re.IGNORECASE
+)
+_DROP_COLUMN = re.compile(
+    r"\bDROP\s+(?!CONSTRAINT\b|DEFAULT\b|NOT\s+NULL\b|EXPRESSION\b"
+    rf"|IDENTITY\b)(?:COLUMN\s+)?{_IF_EXISTS}(?P<column>{_IDENTIFIER})",
+    re.IGNORECASE,
+)
+_RENAME = re.compile(
+    r"\bRENAME\s+(?!CONSTRAINT\b)(?:(?P<table>TO\b)"
+    rf"|(?:COLUMN\s+)?(?P<column>{_IDENTIFIER})\s+TO\b)",
+    re.IGNORECASE,
+)
+
+
+def _unquoted(identifier: str) -> str:
+    if identifier.startswith('"'):
+        return identifier[1:-1]
+    return identifier.lower()
 
 
 @dataclass(frozen=True)
@@ -243,17 +272,33 @@ def _sql_text(sql: str | Iterable) -> str:
     )
 
 
+def _removed_keys(sql: str) -> set[Key]:
+    """The tables and columns ``sql`` drops or renames."""
+    removed: set[Key] = set()
+    for statement in _ALTER_TABLE.finditer(sql):
+        table = _unquoted(statement["table"])
+        actions = statement["actions"]
+        for drop in _DROP_COLUMN.finditer(actions):
+            removed.add((table, _unquoted(drop["column"])))
+        for rename in _RENAME.finditer(actions):
+            column = rename["column"]
+            removed.add((table, _unquoted(column) if column else None))
+    for statement in _DROP_TABLE.finditer(sql):
+        for name in statement["tables"].split(","):
+            if named := re.match(rf"\s*{_TABLE_REF}", name):
+                removed.add((_unquoted(named["table"]), None))
+    return removed
+
+
 def _run_sql(
-    operation: operations.RunSQL,
-    migration: Migration,
-    allow: Allow,
-    applied: frozenset[MigrationKey],
-    pending: frozenset[MigrationKey],
+    operation: operations.RunSQL, migration: Migration, walk: _Walk
 ) -> list[str]:
-    if not allow(migration.app_label, **operation.hints):
+    if not walk.allow(migration.app_label, **operation.hints):
         return []
-    if not _DESTRUCTIVE_SQL.search(_sql_text(operation.sql)):
+    sql = _sql_text(operation.sql)
+    if not _DESTRUCTIVE_SQL.search(sql):
         return []
+    applied, pending = walk.applied, walk.pending
     if not any(app == migration.app_label for app, _ in applied):
         return []  # a fresh schema: nothing serves it yet
     contract_of: Sequence[MigrationKey] = getattr(migration, "contract_of", ())
@@ -277,7 +322,15 @@ def _run_sql(
                 f"contract_of {target[0]}.{target[1]} is not an applied "
                 "migration of this schema"
             )
-    return reasons
+    if reasons:
+        return reasons
+    # ``contract_of`` says which migration took a column out of state; this
+    # says whether it did. ``shipping`` 0025 kept ``country`` in the state
+    # for a dual write, and a drop naming it would have passed.
+    return [
+        f"removes {_describe(key)}, which the serving release still reads"
+        for key in sorted(_removed_keys(sql) & walk.serving, key=str)
+    ]
 
 
 @dataclass(frozen=True)
@@ -319,13 +372,7 @@ def _operation_reasons(
         )
     reasons = []
     if isinstance(operation, operations.RunSQL):
-        reasons = _run_sql(
-            operation,
-            migration,
-            walk.allow,
-            walk.applied,
-            walk.pending,
-        )
+        reasons = _run_sql(operation, migration, walk)
     operation.state_forwards(app_label, state)
     return reasons
 

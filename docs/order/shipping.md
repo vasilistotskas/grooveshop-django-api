@@ -352,8 +352,8 @@ accepting Cyprus orders at the Greek flat rate.
      detail serializer), before the generic `shipment`.
    - The checkout hooks. `checkout_fields()` returns the request fields it
      takes, by name. The ones named in `location_keys` are its pickup
-     point: they lead `PickupPointSerializer`, so the quote, the payment
-     intent and the order all take them, and the cart digest covers them.
+     point: they lead `PickupPointSerializer`, so the quote and the order both
+     take them, and the cart digest covers them.
      The rest are options for the order alone and follow `shipping_kind`
      on `OrderCreateFromCartSerializer`. The order view hands what the
      body sent of them to the carrier as the payload. `field_rank` places
@@ -391,6 +391,21 @@ accepting Cyprus orders at the Greek flat rate.
    `canceled_shipment_q` so the order shows under follow-up
    ([§2.3](state-machines.md)).
 6. Wire the COD path if applicable (see ACS for the pattern).
+7. Join the project-wide registries:
+   - settings: the app in `TENANT_APPS` (`src/settings/application.py`), its
+     beat entries (`src/settings/schedule.py`), throttle scopes
+     (`src/settings/api.py`), platform integration settings
+     (`src/settings/integrations.py`) and per-store settings
+     (`src/settings/store_settings.py`), where it has any;
+   - every model in the anonymise rules (`src/devtools/anonymise/rules.py`),
+     which a test enforces;
+   - its credential fields on `Tenant`, read by a reader in
+     `src/tenant/credentials.py` and listed in `CARRIER_CREDENTIAL_FIELDS`;
+   - any token it caches in `PROTECTED_FRAGMENTS`
+     (`src/core/cache/protected.py`), so no purge forces a new login;
+   - every model that decides where it delivers in the `invalidated_by` of
+     `src/shipping/cache_surfaces.py` and `src/country/cache_surfaces.py`
+     (ACS: `AcsStation`).
 
 ### 5.4 Operational alert emails (`src/shipping/alerts.py`)
 

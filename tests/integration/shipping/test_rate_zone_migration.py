@@ -313,3 +313,45 @@ class TestTheContractRerun(TestCase):
             list(History.objects.values_list("zone_id", flat=True)),
             [greece.pk],
         )
+
+
+class TestTheZoneBecomesRequired(TestCase):
+    """``0026`` and ``0027``, as a store meets them."""
+
+    def test_a_zone_less_rate_is_zoned_and_the_column_is_tightened(self):
+        apps = migrate_to(("shipping", "0025_shipping_rate_zone_required"))
+        Rate = apps.get_model("shipping", "ShippingRate")
+        Rate.objects.all().delete()
+        provider = apps.get_model("shipping", "ShippingProvider").objects.get(
+            code="flat_rate"
+        )
+        with connection.cursor() as cursor:
+            # The release before 0022 inserts no zone.
+            cursor.execute(
+                "INSERT INTO shipping_shippingrate (provider_id, country_id, "
+                "kind, price, price_currency, "
+                "free_shipping_threshold_currency, is_active, created_at, "
+                "updated_at) VALUES (%s, 'GR', 'home_delivery', 3, 'EUR', "
+                "'EUR', true, now(), now())",
+                [provider.pk],
+            )
+
+        apps = migrate_to(
+            ("shipping", "0027_shipping_rate_country_out_of_state")
+        )
+
+        Rate = apps.get_model("shipping", "ShippingRate")
+        self.assertEqual(Rate.objects.get().zone.country_id, "GR")
+        self.assertFalse(
+            any(field.name == "country" for field in Rate._meta.get_fields())
+        )
+        with connection.cursor() as cursor:
+            columns = {
+                column.name: column.null_ok
+                for column in connection.introspection.get_table_description(
+                    cursor, "shipping_shippingrate"
+                )
+            }
+        self.assertFalse(columns["zone_id"])
+        # Kept for the release still serving, and free to be NULL.
+        self.assertTrue(columns["country_id"])

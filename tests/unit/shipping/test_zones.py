@@ -34,7 +34,6 @@ from shipping.interfaces import get_provider
 from shipping.models import (
     ShippingProvider,
     ShippingRate,
-    ShippingZoneRegion,
 )
 from shipping.services import ShippingService
 from shipping.zones import (
@@ -43,7 +42,6 @@ from shipping.zones import (
     chargeable,
     destination_errors,
     destination_rates,
-    offered,
     rate_kind_errors,
     standing_destinations,
     zone_errors,
@@ -443,153 +441,130 @@ def test_a_zone_save_serialises_the_countrys_zones():
     assert held >= 1
 
 
-class TestARateWithoutAZone:
-    """A rate the previous release inserts during the rollout: a country
-    and no zone (``0025`` keeps the column nullable for it until the
-    contract release backfills it). It applies nowhere, and nothing that
-    reads the store's rates fails on it."""
-
-    @pytest.fixture
-    def zoneless(self):
-        served = CountryFactory(num_regions=0)
-        enable_rate(served)
-        # A zoned ACS rate, so the station sync has a country to sync.
-        enable_rate(served, provider_code="acs", kind=ShippingKind.PICKUP_POINT)
-        written_by_the_old_release = CountryFactory(num_regions=0)
-        rate = enable_rate(served, provider_code="acs")
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE shipping_shippingrate "
-                "SET zone_id = NULL, country_id = %s WHERE id = %s",
-                [written_by_the_old_release.alpha_2, rate.pk],
-            )
-        return SimpleNamespace(
-            rate=rate,
-            served=served.alpha_2,
-            country=written_by_the_old_release.alpha_2,
-        )
-
-    def test_it_is_not_chargeable(self, zoneless):
-        rates = ShippingRate.objects.all()
-
-        assert zoneless.rate.pk not in chargeable(rates).values_list(
-            "pk", flat=True
-        )
-        assert zoneless.rate not in offered(rates)
-
-    def test_the_stores_countries_and_coverage_leave_it_out(self, zoneless):
-        shippable = ShippingService.shippable_country_codes()
-        coverage = HomeCoverage.load()
-
-        assert zoneless.served in shippable
-        assert zoneless.country not in shippable
-        assert zoneless.country not in coverage.reached
-
-    def test_the_acs_station_sync_never_syncs_a_null_country(
-        self, zoneless, acs_configured_tenant
-    ):
-        from shipping_acs.tasks import sync_acs_stations
-
-        with mock.patch(
-            "shipping_acs.services.AcsService.sync_stations",
-            return_value={"upserted": 0, "deactivated": 0},
-        ) as sync:
-            sync_acs_stations.run()
-
-        synced = {call.kwargs["country"] for call in sync.call_args_list}
-        assert zoneless.served in synced
-        assert None not in synced
-        assert zoneless.country not in synced
-
-
-class TestTheCountryARateCarries:
-    """The expand release writes ``ShippingRate.country`` for the release
-    before (``ShippingZone.rate_country_id``): a base zone's rate carries
-    the country, a region zone's none, so that release prices exactly
-    the rates its one-rate-per-country shape can."""
-
-    def test_a_base_zone_rate_carries_its_country(self, greece_like):
-        country = greece_like["country"]
-        rate = greece_like["base"].rates.get()
-
-        assert rate.country_id == country.alpha_2
-        assert list(
-            ShippingRate.objects.filter(country_id=country.alpha_2)
-        ) == [rate]
-
-    def test_a_region_zone_rate_carries_none(self, greece_like):
-        assert greece_like["islands_zone"].rates.get().country_id is None
-
-    def test_a_save_of_some_fields_still_writes_it(self, greece_like):
-        rate = greece_like["base"].rates.get()
-        ShippingRate.objects.filter(pk=rate.pk).update(country=None)
-        rate.refresh_from_db()
-
-        rate.save(update_fields=["is_active"])
-
-        rate.refresh_from_db()
-        assert rate.country_id == greece_like["country"].alpha_2
-
-    def test_a_zone_that_gains_regions_clears_it(self, greece_like):
-        base = greece_like["base"]
-
-        base.regions.add(greece_like["mainland"])
-
-        assert base.rates.get().country_id is None
-
-    def test_a_zone_that_loses_its_regions_writes_it(self, greece_like):
-        islands_zone = greece_like["islands_zone"]
-        greece_like["base"].delete()
-
-        islands_zone.regions.clear()
-
-        assert (
-            islands_zone.rates.get().country_id
-            == greece_like["country"].alpha_2
-        )
-
+class TestTheRegionSet:
     def test_a_zone_cannot_lose_its_regions_beside_a_base_zone(
         self, greece_like
     ):
-        # Emptied, it would be the country's second base zone, its rate
-        # the base zone's duplicate under the old unique (provider,
-        # country, kind): refused by the zones' rule, never an
-        # IntegrityError, and nothing is written.
+        # Emptied, it would be the country's second base zone.
         islands_zone = greece_like["islands_zone"]
 
         with pytest.raises(ValidationError) as refused:
             islands_zone.set_regions([])
 
         assert set(refused.value.message_dict) == {"regions"}
-
         assert list(islands_zone.regions.all()) == [greece_like["islands"]]
-        assert islands_zone.rates.get().country_id is None
-
-    def test_a_region_row_written_directly_rewrites_it(self, greece_like):
-        base = greece_like["base"]
-        country = greece_like["country"].alpha_2
-
-        ShippingZoneRegion.objects.create(
-            zone=base, region=greece_like["mainland"]
-        )
-        assert base.rates.get().country_id is None
-
-        ShippingZoneRegion.objects.filter(zone=base).delete()
-        assert base.rates.get().country_id == country
 
     def test_a_region_a_zone_holds_cannot_be_deleted(self, greece_like):
-        # So no cascade empties a zone's set under its rates.
+        # So no cascade empties a zone's set, making it a base zone.
         with pytest.raises(ProtectedError):
             greece_like["islands"].delete()
 
-    def test_a_zone_moved_to_another_country_moves_it(self, greece_like):
-        base = greece_like["base"]
-        other = CountryFactory(num_regions=0)
 
-        base.country = other
-        base.save()
+class TestAnOverriddenBaseZone:
+    """A base zone whose country's every region a region zone holds
+    delivers home nowhere: no address resolves to it. Its pickup points
+    still apply."""
 
-        assert base.rates.get().country_id == other.alpha_2
+    @pytest.fixture
+    def overridden(self):
+        """Two regions, each in a region zone of its own: one delivers
+        home, the other does not. The base zone has a home and a pickup
+        rate."""
+        country = CountryFactory(num_regions=0)
+        crete, islands = (RegionFactory(country=country) for _ in "ab")
+        enable_rate(country, price=MAINLAND)
+        base = whole_country_zone(country)
+        crete_zone = ShippingZoneFactory(country=country, regions=[crete])
+        ShippingZoneFactory(country=country, regions=[islands])
+        return SimpleNamespace(
+            country=country,
+            code=country.alpha_2,
+            base=base,
+            crete=crete,
+            crete_zone=crete_zone,
+        )
+
+    def _home(self, code, region=None):
+        return ShippingService.active_rate(
+            provider_code="flat_rate",
+            kind=ShippingKind.HOME_DELIVERY.value,
+            country_code=code,
+            region_id=region,
+        )
+
+    def test_the_country_is_not_delivered_home_to(self, overridden):
+        coverage = HomeCoverage.load()
+
+        assert overridden.code not in coverage.countries
+        assert overridden.code not in coverage.reached
+        assert not coverage.serves(overridden.code, None)
+        assert overridden.code not in ShippingService.shippable_country_codes()
+        assert standing_destinations([overridden.code]) == {overridden.code: []}
+
+    def test_a_quote_without_a_region_is_refused(self, overridden):
+        with pytest.raises(ShippingUnavailableError):
+            self._home(overridden.code)
+        assert (
+            ShippingService.resolve_home_delivery_provider(
+                country_code=overridden.code
+            )
+            is None
+        )
+
+    def test_a_region_is_refused_as_the_country_is(self, overridden):
+        # Not ``ShippingRegionUnavailableError``: the carrier delivers
+        # home nowhere else in the country.
+        with pytest.raises(ShippingUnavailableError) as refused:
+            self._home(overridden.code, overridden.crete.alpha)
+        assert not isinstance(refused.value, ShippingRegionUnavailableError)
+
+    def test_a_region_zone_that_delivers_stands_for_the_country(
+        self, overridden
+    ):
+        rate = ShippingRateFactory(
+            provider=ShippingProvider.objects.get(code="flat_rate"),
+            zone=overridden.crete_zone,
+            price=ISLANDS,
+        )
+
+        coverage = HomeCoverage.load()
+        assert overridden.code not in coverage.countries
+        assert overridden.code in coverage.reached
+        assert self._home(overridden.code, overridden.crete.alpha) == rate
+        assert standing_destinations([overridden.code]) == {
+            overridden.code: [
+                StandingDestination(
+                    kinds=frozenset({ShippingKind.HOME_DELIVERY.value}),
+                    region_code=overridden.crete.alpha,
+                    region_codes=(overridden.crete.alpha,),
+                )
+            ]
+        }
+
+    def test_its_pickup_points_still_apply(self, overridden):
+        pickup = enable_rate(
+            overridden.country,
+            provider_code="boxnow",
+            kind=ShippingKind.PICKUP_POINT,
+        )
+
+        assert list(destination_rates(overridden.code)) == [pickup]
+        assert pickup in chargeable(ShippingRate.objects.all())
+
+    def test_a_region_no_zone_holds_brings_it_back(self, overridden):
+        elsewhere = RegionFactory(country=overridden.country)
+
+        coverage = HomeCoverage.load()
+        assert overridden.code in coverage.countries
+        assert coverage.serves(overridden.code, elsewhere.alpha)
+        assert self._home(overridden.code).zone == overridden.base
+
+    def test_a_country_without_regions_is_its_base_zones(self):
+        country = CountryFactory(num_regions=0)
+        rate = enable_rate(country)
+
+        assert rate in chargeable(ShippingRate.objects.all())
+        assert country.alpha_2 in HomeCoverage.load().countries
 
 
 class TestARegionOnlyCountry:

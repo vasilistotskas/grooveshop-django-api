@@ -59,7 +59,7 @@ class ShippingZoneFactory(CustomDjangoModelFactory):
     @factory.post_generation
     def regions(self, create, extracted, **kwargs):
         if create and extracted:
-            self.regions.set(extracted)
+            self.set_regions(extracted)
 
 
 class ShippingRateFactory(CustomDjangoModelFactory):

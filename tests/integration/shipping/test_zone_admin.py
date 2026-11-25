@@ -10,7 +10,11 @@ from django.urls import reverse
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
-from shipping.factories import ShippingZoneFactory, whole_country_zone
+from shipping.factories import (
+    ShippingRateFactory,
+    ShippingZoneFactory,
+    whole_country_zone,
+)
 from shipping.models import ShippingProvider, ShippingZone
 from tenant.enum import TenantMembershipRole
 from tests.utils.staff import (
@@ -167,3 +171,74 @@ def test_the_changelist_says_what_each_zone_covers(client, country):
     body = response.content.decode()
     assert "Whole country" in body
     assert "2 regions" in body
+
+
+class TestTheCountryTheRatesCarry:
+    """The base zone's rate carries its country (the dual write), and the
+    database still holds the old unique ``(provider, country, kind)``: a
+    region zone's rate of the same carrier and kind must never carry it,
+    not even for a moment of the save."""
+
+    @pytest.fixture
+    def flat_rate(self):
+        return ShippingProvider.objects.get(code="flat_rate")
+
+    @pytest.fixture
+    def base_rate(self, country, flat_rate):
+        return ShippingRateFactory(
+            provider=flat_rate, zone=whole_country_zone(country)
+        )
+
+    def test_a_new_region_zone_with_the_base_zones_carrier_is_saved(
+        self, client, country, flat_rate, base_rate
+    ):
+        islands = RegionFactory(country=country)
+
+        response = _post(
+            client,
+            country,
+            regions=[islands],
+            rates=[(flat_rate, "home_delivery")],
+        )
+
+        assert response.status_code == 302, _form_errors(response)
+        zone = ShippingZone.objects.get(name="Islands")
+        assert zone.rates.get().country_id is None
+        base_rate.refresh_from_db()
+        assert base_rate.country_id == country.pk
+
+    def test_replacing_a_region_zones_regions_is_saved(
+        self, client, country, flat_rate, base_rate
+    ):
+        before, after = (RegionFactory(country=country) for _ in "ab")
+        zone = ShippingZoneFactory(
+            name="Islands", country=country, regions=[before]
+        )
+        rate = ShippingRateFactory(provider=flat_rate, zone=zone)
+
+        response = client.post(
+            reverse("admin:shipping_shippingzone_change", args=[zone.pk]),
+            {
+                "name": zone.name,
+                "country": country.pk,
+                "covered_regions": [after.pk],
+                "rates-TOTAL_FORMS": "1",
+                "rates-INITIAL_FORMS": "1",
+                "rates-MIN_NUM_FORMS": "0",
+                "rates-MAX_NUM_FORMS": "1000",
+                "rates-0-id": rate.pk,
+                "rates-0-zone": zone.pk,
+                "rates-0-provider": flat_rate.pk,
+                "rates-0-kind": "home_delivery",
+                "rates-0-price_0": "7.50",
+                "rates-0-price_1": "EUR",
+                "rates-0-free_shipping_threshold_0": "",
+                "rates-0-free_shipping_threshold_1": "EUR",
+                "rates-0-is_active": "on",
+            },
+        )
+
+        assert response.status_code == 302, _form_errors(response)
+        assert list(zone.regions.all()) == [after]
+        rate.refresh_from_db()
+        assert rate.country_id is None

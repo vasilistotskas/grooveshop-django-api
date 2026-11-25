@@ -43,7 +43,10 @@ class ShippingRate(TimeStampMixinModel):
     )
     # Written by ``save`` from the zone, never set by hand (the expand
     # release's dual write, ``ShippingZone.rate_country_id``); nothing in
-    # this release reads it. The contract release drops it.
+    # this release reads it. The contract release drops it. So a rate is
+    # written through ``save`` (never ``bulk_create`` or a queryset
+    # ``update`` of ``zone``), and a zone's regions through
+    # ``ShippingZone.set_regions``, which rewrites its rates' country.
     country = models.ForeignKey(
         "country.Country",
         null=True,

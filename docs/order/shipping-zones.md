@@ -57,12 +57,18 @@ does any other rate.
   by the base zone. Every surface that knows no address (`/shipping/policy`,
   `/shipping/free-shipping-info`, `/shipping/product/<id>`, the cart's
   `freeShippingProgress`) is judged at the country's standing destinations
-  (`standing_destinations`): its base zone when that has an active rate,
-  else each of its region zones with one. So a country served only in some
-  regions, which is shippable and may be the one checkout preselects,
-  advertises those regions' prices: the product estimate takes the
-  cheapest, the free-shipping line their thresholds, and each policy row
-  names its regions (`regionCodes`, empty for a base zone).
+  (`standing_destinations`, every country in two queries). Only offered
+  rates count, by the gate the shippable countries use (`offered`): the
+  base zone stands for the deliveries it offers, and a home delivery it
+  does not offer is judged at each region zone that offers one. So a
+  country served at home only in some regions, which is shippable and may
+  be the one checkout preselects, advertises those regions' prices: the
+  product estimate takes the cheapest, the free-shipping line their
+  thresholds, and each policy row names its regions (`regionCodes`, empty
+  for a base zone).
+- **A zone's regions are written by `ShippingZone.set_regions`** (the
+  admin writes them before the inline rates), which syncs its rates'
+  `country` once for the set written; a rate is written through `save`.
 
 ### Served destinations
 

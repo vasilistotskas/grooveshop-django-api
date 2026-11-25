@@ -9,6 +9,7 @@ from unittest import mock
 
 import pytest
 from django.db import connection, transaction
+from django.test.utils import CaptureQueriesContext
 from djmoney.money import Money
 
 from country.factories import CountryFactory
@@ -42,7 +43,7 @@ from shipping.zones import (
     zone_errors,
     zone_for,
 )
-from tests.utils.shipping import enable_rate
+from tests.utils.shipping import enable_rate, registered_carrier
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -571,12 +572,15 @@ class TestARegionOnlyCountry:
         return SimpleNamespace(country=country.alpha_2, crete=crete.alpha)
 
     def test_its_standing_destinations_are_its_region_zones(self, crete_only):
-        assert standing_destinations(crete_only.country) == [
-            StandingDestination(
-                region_code=crete_only.crete,
-                region_codes=(crete_only.crete,),
-            )
-        ]
+        assert standing_destinations([crete_only.country]) == {
+            crete_only.country: [
+                StandingDestination(
+                    kinds=frozenset({ShippingKind.HOME_DELIVERY.value}),
+                    region_code=crete_only.crete,
+                    region_codes=(crete_only.crete,),
+                )
+            ]
+        }
 
     def test_it_is_shippable(self, crete_only):
         assert crete_only.country in ShippingService.shippable_country_codes()
@@ -621,9 +625,15 @@ class TestARegionOnlyCountry:
         assert estimate.price.amount == ISLANDS
 
     def test_a_country_with_a_base_zone_is_judged_there(self, greece_like):
-        assert standing_destinations(greece_like["country"].alpha_2) == [
-            StandingDestination(region_code=None)
-        ]
+        country = greece_like["country"].alpha_2
+
+        assert standing_destinations([country]) == {
+            country: [
+                StandingDestination(
+                    kinds=frozenset({ShippingKind.HOME_DELIVERY.value})
+                )
+            ]
+        }
         rows = [
             row
             for row in ShippingService.shipping_policy()
@@ -632,3 +642,83 @@ class TestARegionOnlyCountry:
         assert [(row["price"], row["region_codes"]) for row in rows] == [
             (MAINLAND, [])
         ]
+
+
+class TestStandingDestinationsCountOfferedRatesOnly:
+    """The same gate as the shippable countries: a base zone stands for
+    the country only for what it really offers."""
+
+    @pytest.fixture
+    def regions(self):
+        country = CountryFactory(num_regions=0)
+        crete = RegionFactory(country=country)
+        ShippingRateFactory(
+            provider=ShippingProvider.objects.get(code="flat_rate"),
+            zone=ShippingZoneFactory(country=country, regions=[crete]),
+            price=ISLANDS,
+        )
+        ShippingProvider.objects.filter(code="flat_rate").update(is_active=True)
+        return SimpleNamespace(country=country, crete=crete.alpha)
+
+    def test_a_base_zone_rate_of_an_inactive_carrier_does_not_count(
+        self, regions
+    ):
+        off = ShippingProviderFactory(code="zones_off", is_active=False)
+        ShippingRateFactory(provider=off, country=regions.country)
+        code = regions.country.alpha_2
+
+        assert standing_destinations([code])[code] == [
+            StandingDestination(
+                kinds=frozenset({ShippingKind.HOME_DELIVERY.value}),
+                region_code=regions.crete,
+                region_codes=(regions.crete,),
+            )
+        ]
+
+    def test_a_pickup_only_base_zone_leaves_home_delivery_to_the_regions(
+        self, regions
+    ):
+        lockers = ShippingProviderFactory(
+            code="zones_lockers",
+            supports_home_delivery=False,
+            supports_pickup_point=True,
+        )
+        ShippingRateFactory(
+            provider=lockers,
+            country=regions.country,
+            kind=ShippingKind.PICKUP_POINT,
+        )
+        code = regions.country.alpha_2
+
+        with registered_carrier(lockers.code):
+            destinations = standing_destinations([code])[code]
+            rows = [
+                (row["kind"], row["region_codes"])
+                for row in ShippingService.shipping_policy()
+                if row["country_code"] == code
+            ]
+
+        assert destinations == [
+            StandingDestination(
+                kinds=frozenset({ShippingKind.PICKUP_POINT.value})
+            ),
+            StandingDestination(
+                kinds=frozenset({ShippingKind.HOME_DELIVERY.value}),
+                region_code=regions.crete,
+                region_codes=(regions.crete,),
+            ),
+        ]
+        assert sorted(rows) == [
+            ("home_delivery", [regions.crete]),
+            ("pickup_point", []),
+        ]
+
+    def test_every_country_is_read_at_once(self, regions, greece_like):
+        countries = [regions.country.alpha_2, greece_like["country"].alpha_2]
+
+        with CaptureQueriesContext(connection) as one:
+            standing_destinations(countries[:1])
+        with CaptureQueriesContext(connection) as both:
+            standing_destinations(countries)
+
+        assert len(both) == len(one)

@@ -30,5 +30,7 @@ def zone_regions_changed(sender, instance, action, **kwargs) -> None:
     """
     if action not in _CHANGES:
         return
-    instance.sync_rate_countries()
+    # ``ShippingZone.set_regions`` syncs once, for the set it wrote.
+    if not getattr(instance, "_setting_regions", False):
+        instance.sync_rate_countries()
     mark_model_stale(ShippingZoneRegion)

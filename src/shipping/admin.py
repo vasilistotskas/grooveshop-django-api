@@ -171,8 +171,11 @@ class ShippingZoneAdmin(BaseModelAdmin):
     )
 
     def save_related(self, request, form, formsets, change) -> None:
+        # The regions first: a rate takes its country from them
+        # (``ShippingZone.rate_country_id``), and one saved while a new
+        # region zone has none yet would carry the base zone's country.
+        form.instance.set_regions(form.cleaned_data["covered_regions"])
         super().save_related(request, form, formsets, change)
-        form.instance.regions.set(form.cleaned_data["covered_regions"])
 
     def get_queryset(self, request):
         return (

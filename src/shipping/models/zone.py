@@ -1,10 +1,16 @@
-from django.db import models
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel
 from tenant.staff_actors import history_user_getter, history_user_setter
+
+if TYPE_CHECKING:
+    from region.models import Region
 
 
 class ShippingZoneRegion(models.Model):
@@ -131,3 +137,22 @@ class ShippingZone(TimeStampMixinModel):
         """Write :meth:`rate_country_id` onto every rate of the zone, after
         a change of its country or its regions."""
         self.rates.update(country_id=self.rate_country_id())
+
+    def set_regions(self, regions: Iterable[Region | str]) -> None:
+        """Replace the zone's region set, the one writer of it.
+
+        ``regions.set`` removes before it adds, so a replacement passes
+        through an empty set, a base zone for that moment: syncing the
+        rates' country there would write the base zone's country, which
+        the old unique ``(provider, country, kind)`` refuses next to the
+        real base zone's rate. The rates are synced once, for the set
+        written. ``ShippingZoneRegion`` rows are never written another way
+        (a region is ``PROTECT``ed, so none disappears under a zone).
+        """
+        with transaction.atomic():
+            self._setting_regions = True
+            try:
+                self.regions.set(regions)
+            finally:
+                self._setting_regions = False
+            self.sync_rate_countries()

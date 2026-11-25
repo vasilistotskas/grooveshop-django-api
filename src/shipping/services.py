@@ -710,8 +710,8 @@ class ShippingService:
         yet: to the store's first shipping country, the one checkout
         preselects (:meth:`initial_country_code`), at its standing
         destinations (``shipping.zones.standing_destinations``: the base
-        zone, or each region zone of a country served only in some
-        regions, the cheapest winning); at the products value
+        zone for what it offers, each region zone for a home delivery it
+        does not, the cheapest winning); at the products value
         every "free above X" rule is judged on, after the automatic
         promotions such a cart gets
         (``PromotionEngine.evaluate_single_unit``), whose free shipping
@@ -740,7 +740,9 @@ class ShippingService:
         )
         prices = [
             option["price"]
-            for destination in standing_destinations(country_code)
+            for destination in standing_destinations([country_code])[
+                country_code
+            ]
             for option in cls.available_options(
                 country_code=country_code,
                 region_id=destination.region_code,
@@ -750,7 +752,8 @@ class ShippingService:
                 items=items,
                 free=promotion.free_shipping,
             )
-            if not option["exceeds_max_weight"]
+            if option["kind"] in destination.kinds
+            and not option["exceeds_max_weight"]
             and not option["exceeds_parcel_size"]
         ]
         if not prices:
@@ -849,15 +852,18 @@ class ShippingService:
         One row per (provider, kind, country) the store actually offers
         (:meth:`offered_rates`), over :meth:`shippable_country_codes`
         and each country's standing destinations
-        (``shipping.zones.standing_destinations``): its base zone, whose
-        rows carry no ``region_codes``, or, in a country served only in
-        some regions, each region zone, whose rows name its regions;
+        (``shipping.zones.standing_destinations``, read for every country
+        at once): the base zone, whose rows carry no ``region_codes``, and,
+        for a home delivery it does not offer, each region zone that does,
+        whose rows name its regions;
         straight from the ``ShippingRate``: no cart, weight or order
         value is involved, so the price is the rate's own, before a
         live carrier quote or a free-shipping threshold. Powers
         ``GET /api/v1/shipping/policy`` which the storefront turns into
         its Organization ``hasShippingService`` markup.
         """
+        countries = cls.shippable_country_codes()
+        standing = standing_destinations(countries)
         return [
             {
                 "country_code": country_code,
@@ -876,11 +882,12 @@ class ShippingService:
                 "max_weight_grams": rate.max_weight_grams,
                 "region_codes": list(destination.region_codes),
             }
-            for country_code in cls.shippable_country_codes()
-            for destination in standing_destinations(country_code)
+            for country_code in countries
+            for destination in standing[country_code]
             for provider, kind, _adapter, rate in cls.offered_rates(
                 country_code, destination.region_code
             )
+            if kind.value in destination.kinds
         ]
 
     @staticmethod
@@ -1025,8 +1032,8 @@ class ShippingService:
 
         Judged for the country with no region, as every caller here
         knows none: at its standing destinations
-        (``shipping.zones.standing_destinations``), the base zone, or
-        each region zone of a country served only in some regions.
+        (``shipping.zones.standing_destinations``), the base zone for
+        what it offers, each region zone for a home delivery it does not.
 
         Each passes the gate :meth:`active_rate` puts on a quote (an
         active provider with a registered adapter, supporting the kind,
@@ -1043,8 +1050,12 @@ class ShippingService:
         standing = reduce(
             operator.or_,
             (
-                destination_rates(country_code, destination.region_code)
-                for destination in standing_destinations(country_code)
+                destination_rates(country_code, destination.region_code).filter(
+                    kind__in=destination.kinds
+                )
+                for destination in standing_destinations([country_code])[
+                    country_code
+                ]
             ),
             ShippingRate.objects.none(),
         )

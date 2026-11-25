@@ -13,8 +13,8 @@ that says where home delivery reaches:
 * a read that knows **no region at all** (the store's standing prices:
   the policy, the free-shipping line, a product's "shipping from", a
   cart before checkout) is judged for the country's
-  :func:`standing_destinations`: its base zone, or, in a country served
-  only in some regions, each of those region zones;
+  :func:`standing_destinations`: its base zone for what it offers, and,
+  for a home delivery it does not offer, each region zone that does;
 * a **pickup point** is priced by the base zone of its country. Neither
   carrier's catalogue gives a point a ``Region``, so a point is judged by
   country, and a pickup rate on a region zone would never apply:
@@ -71,41 +71,67 @@ class StandingDestination:
     """A destination a read that knows no region is judged for.
 
     ``region_code`` is what to price it as (``None`` for the base zone,
-    else one region of the region zone), and ``region_codes`` every
-    region it stands for (empty for the base zone, which covers the
-    country).
+    else one region of the region zone), ``region_codes`` every region it
+    stands for (empty for the base zone, which covers the country), and
+    ``kinds`` the deliveries it is judged for there.
     """
 
-    region_code: str | None
+    kinds: frozenset[str]
+    region_code: str | None = None
     region_codes: tuple[str, ...] = ()
 
 
-def standing_destinations(country_code: str) -> list[StandingDestination]:
-    """Where a read that knows no region judges ``country_code``.
+def standing_destinations(
+    country_codes: Iterable[str],
+) -> dict[str, list[StandingDestination]]:
+    """Where a read that knows no region judges each of ``country_codes``.
 
-    The base zone when it has an active rate: it prices the country, a
-    region zone only overriding it for some regions. Otherwise the store
-    delivers only to some regions, so each region zone with an active
-    rate stands for itself, priced by its own rates. Empty when the store
-    has neither.
+    Only offered rates count (:func:`offered`: active, an active carrier
+    that passes the gate a quote puts on it), as for
+    ``ShippingService.shippable_country_codes``. The base zone stands for
+    what it offers. A home delivery the base zone does not offer is judged
+    at each region zone that offers one instead: the store delivers home
+    only to some regions. A country with nothing offered maps to an empty
+    list. Two queries for every country at once, plus one adapter answer
+    per (carrier, kind).
     """
-    country_code = country_code.upper()
-    zones = ShippingZone.objects.filter(
-        country_id=country_code, rates__is_active=True
-    ).distinct()
-    if zones.filter(regions__isnull=True).exists():
-        return [StandingDestination(region_code=None)]
+    codes = {code.upper() for code in country_codes}
+    rates = offered(ShippingRate.objects.filter(zone__country_id__in=codes))
     regions: dict[int, list[str]] = {}
     for zone_id, region_code in (
-        ShippingZoneRegion.objects.filter(zone__in=zones)
+        ShippingZoneRegion.objects.filter(zone__country_id__in=codes)
         .order_by("zone_id", "region_id")
         .values_list("zone_id", "region_id")
     ):
         regions.setdefault(zone_id, []).append(region_code)
-    return [
-        StandingDestination(region_code=codes[0], region_codes=tuple(codes))
-        for codes in regions.values()
-    ]
+
+    home = ShippingKind.HOME_DELIVERY.value
+    base_kinds: dict[str, set[str]] = {}
+    home_zones: dict[str, set[int]] = {}
+    for rate in rates:
+        country = rate.zone.country_id
+        if rate.zone_id in regions:
+            if rate.kind == home:
+                home_zones.setdefault(country, set()).add(rate.zone_id)
+        else:
+            base_kinds.setdefault(country, set()).add(rate.kind)
+
+    standing: dict[str, list[StandingDestination]] = {}
+    for country in codes:
+        destinations = []
+        if kinds := base_kinds.get(country):
+            destinations.append(StandingDestination(kinds=frozenset(kinds)))
+        if home not in base_kinds.get(country, ()):
+            destinations += [
+                StandingDestination(
+                    kinds=frozenset({home}),
+                    region_code=regions[zone][0],
+                    region_codes=tuple(regions[zone]),
+                )
+                for zone in sorted(home_zones.get(country, ()))
+            ]
+        standing[country] = destinations
+    return standing
 
 
 def destination_rates(

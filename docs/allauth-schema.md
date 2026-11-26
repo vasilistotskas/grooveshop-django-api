@@ -66,9 +66,9 @@ fails without it.
 
 ## Reauthentication
 
-A call that needs a recent proof of identity (managing a second factor, and
-the storefront's account deletion in `user.views.account`) answers 401 with
-the ways this customer can give it, `data.flows`, from
+A call of allauth's that needs a recent proof of identity (managing a second
+factor) answers 401 with the ways this customer can give it, `data.flows`,
+from
 `allauth.account.internal.flows.reauthentication.get_reauthentication_flows`:
 
 * `reauthenticate`: a customer with a usable password.
@@ -91,7 +91,8 @@ The storefront's account deletion (`user.views.account`) is a REST call
 authenticated by a Knox token, which carries no session: it names the allauth
 app session the customer signed in with in `X-Session-Token`, and the view
 reads the reauthentication there (`_reauthentication_required`), never in a
-session of another customer. Its refusal is a 403 `reauthentication_required`
+session of another customer nor in the request's own cookie session, so a
+stolen token cannot borrow someone else's fresh confirmation. Its refusal is a 403 `reauthentication_required`
 with the same `flows`, so the storefront sends the customer to confirm it is
 them and back.
 

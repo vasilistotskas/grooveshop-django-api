@@ -1825,8 +1825,8 @@ msgstr "Παρουσιάστηκε μη αναμενόμενο σφάλμα κα
 msgid "Analytics"
 msgstr "Αναλυτικά"
 
-msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. The caller must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``."
-msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ο καλών πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, στη συνεδρία allauth που ορίζει με το ``X-Session-Token``."
+msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
+msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ένας πελάτης που διαγράφει τον δικό του λογαριασμό πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, στη συνεδρία allauth που ορίζει με το ``X-Session-Token``· η άρνηση αναφέρει τους τρόπους με τους οποίους μπορεί."
 
 msgid "Anonymous"
 msgstr "Ανώνυμος"
@@ -14761,6 +14761,9 @@ msgstr "Η διεύθυνση που δόθηκε στη φόρμα ενημερ
 
 msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 msgstr "Η ολοκλήρωση αγοράς του agent gateway που δημιούργησε αυτή την παραγγελία. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη της δημιουργίας της απαντάται με αυτή την παραγγελία."
+
+msgid "The allauth app session the customer signed in with, where it confirmed it is them."
+msgstr "Η συνεδρία εφαρμογής allauth με την οποία συνδέθηκε ο πελάτης, όπου επιβεβαίωσε ότι είναι ο ίδιος."
 
 msgid "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
 msgstr "Η ροή του allauth: ``reauthenticate`` (ο κωδικός πρόσβασης), ``mfa_reauthenticate`` (δεύτερος παράγοντας), ``reauthenticate_by_code`` (κωδικός που του στέλνεται με email)."

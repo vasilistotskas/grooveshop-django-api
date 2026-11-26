@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.account.internal.flows.login import record_authentication
 from allauth.account.internal.flows.reauthentication import (
     is_reauthentication_required,
 )
@@ -26,6 +27,7 @@ from allauth.core.context import request_context
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
 from django.contrib.auth import get_user_model
+from django.http import HttpRequest
 from django.test import Client
 from django.urls import reverse
 from rest_framework import status
@@ -183,12 +185,42 @@ class TestTheStorefrontsSession:
 
     def test_another_customers_session_proves_nothing(self, signed_in):
         other = UserAccountFactory(plain_password=PASSWORD)
-        theirs = _allauth(
+        EmailAddress.objects.create(
+            user=other, email=other.email, verified=True, primary=True
+        )
+        login = _allauth(
             "/auth/login", {"email": other.email, "password": PASSWORD}
-        ).json()["meta"]["session_token"]
-        _allauth("/auth/reauthenticate", {"password": PASSWORD}, theirs)
+        )
+        assert login.status_code == status.HTTP_200_OK
+        theirs = login.json()["meta"]["session_token"]
+        confirmed = _allauth(
+            "/auth/reauthenticate", {"password": PASSWORD}, theirs
+        )
+        assert confirmed.status_code == status.HTTP_200_OK
 
         response = _delete_with(signed_in, theirs)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.json()["code"] == "reauthentication_required"
+
+    def test_another_customers_cookie_session_proves_nothing(self, signed_in):
+        # The customer's token sent with a cookie session in which someone
+        # else confirmed it is them just now.
+        other = UserAccountFactory(plain_password=PASSWORD)
+        session = signed_in.client.session
+        borrowed = HttpRequest()
+        borrowed.session = session
+        borrowed.user = other
+        record_authentication(
+            borrowed, other, method="password", reauthenticated=True
+        )
+        session.save()
+
+        response = signed_in.client.post(
+            reverse("user-account-delete-account", args=[signed_in.user.pk]),
+            {"confirmation": "DELETE"},
+            format="json",
+        )
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.json()["code"] == "reauthentication_required"

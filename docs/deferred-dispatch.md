@@ -222,11 +222,9 @@ outside a task.
   sent; the request to Meta is bounded by `META_CAPI_TIMEOUT_SECONDS`.
 
 - **Recommendation events** (`recommendation.events.record_events`): each
-  row's `event_key` is `dispatch_key` over the task id, the kind, the
-  impression id, the product and the position, unique, so every copy of one
-  dispatch makes the same keys and a second copy inserts nothing. Two beacons
-  are two tasks and stay two rows even for one impression id: a cached strip
-  shows one id to every viewer.
+  row's `event_key` is the event itself (the kind, the showing's
+  `impression_id`, the item), unique, so a second copy of the task and a
+  beacon sent again for the same showing insert nothing.
 
 A task whose effect is a state of a row needs no id, and its state also covers
 two dispatches of it from different paths. When the effect is the row's own

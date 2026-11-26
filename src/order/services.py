@@ -30,6 +30,16 @@ from order.checkout.quote import (
     OrderQuoteService,
     ShippingChoice,
 )
+from order.checkout.resume import (
+    FINGERPRINT_KEY,
+    address_fingerprint,
+    cart_lines,
+    checkout_fingerprint,
+    order_to_resume,
+    payment_undecided,
+    quantities_of,
+    unpaid_orders_of_cart,
+)
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
 from order.enum.status import (
@@ -47,6 +57,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCartChangedError,
+    OrderServiceError,
     OrderTotalChangedError,
     PaymentError,
     ProductNotFoundError,
@@ -247,11 +258,15 @@ class OrderLegalAcceptanceService:
     def record(
         order: Order, acceptance: LegalAcceptance
     ) -> list[OrderLegalAcceptance]:
-        """Store *acceptance* on *order*, in its creation transaction."""
+        """Store *acceptance* on *order*, in its creation transaction, or
+        in the one that resumes it: a text already recorded stays as it was
+        first accepted."""
         return [
-            OrderLegalAcceptance.objects.create(
-                order=order, document=document, source=acceptance.source
-            )
+            OrderLegalAcceptance.objects.get_or_create(
+                order=order,
+                document=document,
+                defaults={"source": acceptance.source},
+            )[0]
             for document in acceptance.documents
         ]
 
@@ -659,6 +674,92 @@ class OrderService:
         if waiting.count() >= limit:
             raise UnpaidOrderLimitError(limit)
 
+    @classmethod
+    def _resume_same_checkout(
+        cls,
+        cart,
+        *,
+        user,
+        pay_way,
+        shipping_address: dict[str, Any],
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        meta_context: dict[str, Any] | None,
+        legal_acceptance: LegalAcceptance,
+        expected_total: ExpectedTotal,
+        expected_cart_digest: str | None,
+    ) -> Order | None:
+        """The cart's unpaid online order when this checkout is the one that
+        made it (``order.checkout.resume``), else ``None``.
+
+        A shopper who goes back and orders the same thing again would
+        otherwise place a second order holding the same stock, with its own
+        payment link. The checkout is compared by its fingerprint, which
+        needs its quote: priced here, under the cart lock, only when the
+        cart has such an order. A quote that refuses is a changed checkout,
+        refused again by the creation that follows, in its own order of
+        checks.
+
+        The order takes the repeat's own consent and browser data, language
+        and accepted legal texts while nothing was paid: they are the buyer's
+        latest. The cart's stock holds are released, since the order has its
+        units.
+        """
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
+            return None
+        if not unpaid_orders_of_cart(cart, pay_way=pay_way).exists():
+            return None
+        from b2b.services import B2BPricingService
+
+        B2BPricingService.bind_cart(cart, user)
+        try:
+            quote = OrderQuoteService.quote(
+                cart,
+                user=user,
+                email=shipping_address.get("email") or "",
+                pay_way=pay_way,
+                shipping=cls._shipping_choice(shipping_address),
+                loyalty_points=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                lock=True,
+            )
+        except OrderServiceError:
+            return None
+        if expected_total != quote.expected_total or (
+            expected_cart_digest is not None
+            and expected_cart_digest != quote.cart_digest
+        ):
+            return None
+        order = order_to_resume(
+            cart,
+            pay_way=pay_way,
+            fingerprint=checkout_fingerprint(
+                quote,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+            ),
+        )
+        if order is None:
+            return None
+        StockManager.reserve_cart_stock(cart, {})
+        if payment_undecided(order):
+            meta = cls._sanitise_meta_context(meta_context)
+            if meta:
+                order.metadata["meta"] = meta
+            else:
+                order.metadata.pop("meta", None)
+            order.language_code = active_language_code()
+            order.save(update_fields=["metadata", "language_code"])
+            OrderLegalAcceptanceService.record(order, legal_acceptance)
+        logger.info(
+            "Checkout of cart %s resumes its unpaid order %s",
+            cart.uuid,
+            order.id,
+        )
+        return order
+
     @staticmethod
     def _refuse_agent_order_on_unpaid_cart(
         cart, attribution: AttributionInput | None
@@ -846,6 +947,24 @@ class OrderService:
                     return existing_order
 
             cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
+
+            # The same checkout made again returns the cart's unpaid order
+            # and its payment link (#694), before the cart is validated:
+            # that order holds the cart's stock, the last units included.
+            resumed = cls._resume_same_checkout(
+                cart,
+                user=user,
+                pay_way=pay_way,
+                shipping_address=shipping_address,
+                loyalty_points_to_redeem=loyalty_points_to_redeem,
+                gift_card_codes=gift_card_codes,
+                meta_context=meta_context,
+                legal_acceptance=legal_acceptance,
+                expected_total=expected_total,
+                expected_cart_digest=expected_cart_digest,
+            )
+            if resumed is not None:
+                return resumed
 
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
@@ -1048,6 +1167,21 @@ class OrderService:
                 # distinction the whole shipping layer turns on.
                 "payment_type": pay_way.settlement,
             }
+            if PaySettlement(pay_way.settlement) == PaySettlement.ONLINE:
+                # What a repeat of this checkout is recognised by
+                # (``_resume_same_checkout``); an HMAC, and personal
+                # (``Order.PERSONAL_METADATA``).
+                order.metadata[FINGERPRINT_KEY] = {
+                    "checkout": checkout_fingerprint(
+                        quote,
+                        pay_way=pay_way,
+                        shipping_address=shipping_address,
+                        loyalty_points=loyalty_points_to_redeem,
+                        gift_card_codes=gift_card_codes,
+                    ),
+                    "address": address_fingerprint(order),
+                    "lines": cart_lines(quantities_of(cart_items)),
+                }
             # Wholesale audit: which group priced this order. The line
             # prices are already snapshotted on OrderItem rows — this
             # records WHY they differ from retail.

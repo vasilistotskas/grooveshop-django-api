@@ -23,13 +23,15 @@ from django.db.models import Q
 
 from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
 from recommendation.models import RecommendationEvent
-from tenant.celery import dispatch_key
 
 logger = logging.getLogger(__name__)
 
 _KINDS = frozenset(EventKind.values)
 _SURFACES = frozenset(Surface.values)
 _STRATEGIES = frozenset(StrategyCode.values)
+_EVENT_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL, "grooveshop:recommendation-event"
+)
 
 
 def _as_uuid(value: Any) -> uuid.UUID | None:
@@ -61,13 +63,14 @@ def record_events(
     would poison the nightly aggregation with nothing to say why.
     ``attach`` is never accepted from here — it is derived from orders.
 
-    Each row's ``event_key`` is ``tenant.celery.dispatch_key`` over the task
-    id, the kind, the impression id, the product and the position: another
+    Each row's ``event_key`` is the event itself: the kind, the showing
+    (``impression_id``, minted by the beacon for each showing of a strip
+    and by the order confirmation for each email) and the item. Another
     copy of the task (a retry, a message delivered again, the sweep's copy
-    of a publish) makes the same keys, and the unique constraint on them
-    leaves its rows out. Two items of one product at one position are one
-    event: a strip shows a product once (the engine merges candidates by
-    product), and every sender numbers the positions.
+    of a publish) and a click sent twice (it carries its showing's id) make
+    the same keys, and the unique constraint on them leaves their rows out.
+    An impression beacon is a showing of its own, with a new id each time:
+    the storefront sends one per showing.
     """
     if (
         kind not in _KINDS
@@ -91,12 +94,10 @@ def record_events(
             session_key=session_key or "",
             user_id=user_id,
             cart_uuid=_as_uuid(cart_uuid),
-            event_key=dispatch_key(
-                "recommendation-event",
-                kind,
-                impression_id,
-                item["product_id"],
-                item.get("position"),
+            event_key=uuid.uuid5(
+                _EVENT_NAMESPACE,
+                f"{kind}|{impression_id}|{item['product_id']}|"
+                f"{item.get('position')}",
             ),
         )
         for item in items

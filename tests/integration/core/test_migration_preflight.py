@@ -220,6 +220,104 @@ class TestContractMigrations:
             )
         ]
 
+    @pytest.mark.parametrize(
+        ("sql", "key"),
+        [
+            (
+                "ALTER TABLE country_country DROP COLUMN alpha_3",
+                "column country_country.alpha_3",
+            ),
+            (
+                (
+                    'ALTER TABLE IF EXISTS ONLY "country_country" ALTER '
+                    'phone_code DROP NOT NULL, DROP IF EXISTS "alpha_3"'
+                ),
+                "column country_country.alpha_3",
+            ),
+            (
+                (
+                    "UPDATE country_country SET alpha_3 = ''; alter table "
+                    "public.country_country rename alpha_3 to iso3"
+                ),
+                "column country_country.alpha_3",
+            ),
+            (
+                "ALTER TABLE public . country_country DROP COLUMN alpha_3",
+                "column country_country.alpha_3",
+            ),
+            (
+                (
+                    "ALTER TABLE country_country -- the old code\n"
+                    "DROP COLUMN /* obsolete */ alpha_3"
+                ),
+                "column country_country.alpha_3",
+            ),
+            (
+                "ALTER TABLE country_country RENAME TO nation",
+                "table country_country",
+            ),
+            (
+                "DROP TABLE IF EXISTS gone_already, country_country CASCADE",
+                "table country_country",
+            ),
+        ],
+    )
+    def test_sql_removing_what_the_serving_state_holds_is_blocked(
+        self, sql, key
+    ):
+        # A declared ``contract_of`` is not enough: the migration it names
+        # must have taken the column out of the state.
+        state, applied = _serving_now()
+        contract = _migration(
+            "country",
+            "0999_drop",
+            [migrations.RunSQL(sql)],
+            contract_of=[("country", "0015_image_flag_servable")],
+        )
+
+        assert [f.reason for f in _classify(state, applied, [contract])] == [
+            f"removes {key}, which the serving release still reads"
+        ]
+
+    def test_dropping_the_rates_country_after_the_expand_is_blocked(self):
+        # The case this exists for: ``0025`` kept ``country`` in the state,
+        # so a contract of it would have dropped a column in use.
+        state, applied, _plan = _deploy(
+            ("shipping", "0026_shipping_rate_zone_rerun")
+        )
+        contract = _migration(
+            "shipping",
+            "0999_drop",
+            [
+                migrations.RunSQL(
+                    "ALTER TABLE shipping_shippingrate DROP COLUMN country_id"
+                )
+            ],
+            contract_of=[("shipping", "0025_shipping_rate_zone_required")],
+        )
+
+        assert [f.reason for f in _classify(state, applied, [contract])] == [
+            (
+                "removes column shipping_shippingrate.country_id, which the "
+                "serving release still reads"
+            )
+        ]
+
+    def test_every_contract_in_the_history_is_safe_after_its_expand(self):
+        # The control: real contracts, each on the state just before it.
+        loader = MigrationLoader(None, ignore_no_migrations=True)
+        contracts = [
+            key
+            for key, migration in loader.graph.nodes.items()
+            if getattr(migration, "contract_of", ())
+        ]
+        assert contracts
+
+        for key in contracts:
+            state, applied, plan = _deploy(key)
+            migration = next(m for m in plan if (m.app_label, m.name) == key)
+            assert _reasons(_classify(state, applied, [migration]), key) == []
+
     def test_a_fresh_schema_runs_the_contract(self):
         contract = _migration(
             "page_config", "0999_drop", [DROP], contract_of=[EXPAND]
@@ -234,6 +332,10 @@ class TestContractMigrations:
             "ALTER TABLE page_config_navigationmenu ALTER slot DROP DEFAULT",
             "ALTER TABLE page_config_navigationmenu DROP CONSTRAINT foo",
             "ALTER TABLE page_config_navigationmenu RENAME CONSTRAINT a TO b",
+            (
+                "ALTER TABLE page_config_navigationmenu ALTER note SET "
+                "DEFAULT 'it''s a DROP COLUMN slot' /* DROP COLUMN slot */"
+            ),
         ],
     )
     def test_sql_that_removes_nothing_needs_no_declaration(self, sql):

@@ -733,4 +733,9 @@ def test_resending_a_reauthentication_code(document, user, token):
     assert_documented(
         document, "/auth/reauthenticate/code/resend", "post", response
     )
-    assert len(mail.outbox) == 1
+    # The resend is the reauthentication mail again, not a sign-in code.
+    [message] = mail.outbox
+    assert message.to == [user.email]
+    assert message.extra_headers["List-ID"].startswith(
+        "<account-reauthentication_code."
+    )

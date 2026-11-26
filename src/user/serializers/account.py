@@ -10,6 +10,7 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
 from core.api.image_field import MainImageSizeMixin
+from core.api.serializers import ErrorResponseSerializer
 
 if TYPE_CHECKING:
     from user.models.account import UserAccount as User
@@ -378,6 +379,38 @@ class DeleteAccountRequestSerializer(serializers.Serializer):
                 code="delete_confirmation_mismatch",
             )
         return value
+
+
+class ReauthenticationFlowSerializer(serializers.Serializer):
+    """One way the customer can confirm it is them: allauth's
+    reauthentication flow, as its own 401 lists it."""
+
+    id = serializers.CharField(
+        help_text=_(
+            "The allauth flow: ``reauthenticate`` (the password), "
+            "``mfa_reauthenticate`` (a second factor), "
+            "``reauthenticate_by_code`` (a code mailed to them)."
+        )
+    )
+    types = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text=_("The second factors the customer has."),
+    )
+
+
+class ReauthenticationRequiredSerializer(ErrorResponseSerializer):
+    """A refusal that waits for the customer to confirm it is them."""
+
+    flows = ReauthenticationFlowSerializer(
+        many=True,
+        required=False,
+        help_text=_(
+            "With ``reauthentication_required``: the ways this customer "
+            "can confirm it is them, in allauth's session the request names "
+            "(``X-Session-Token``)."
+        ),
+    )
 
 
 class DeleteAccountResponseSerializer(serializers.Serializer):

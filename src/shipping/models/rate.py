@@ -41,20 +41,6 @@ class ShippingRate(TimeStampMixinModel):
         on_delete=models.CASCADE,
         verbose_name=_("Shipping Zone"),
     )
-    # Written by ``save`` from the zone, never set by hand (the expand
-    # release's dual write, ``ShippingZone.rate_country_id``); nothing in
-    # this release reads it. The contract release drops it. So a rate is
-    # written through ``save`` (never ``bulk_create`` or a queryset
-    # ``update`` of ``zone``), and a zone's regions through
-    # ``ShippingZone.set_regions``, which rewrites its rates' country.
-    country = models.ForeignKey(
-        "country.Country",
-        null=True,
-        on_delete=models.PROTECT,
-        related_name="+",
-        editable=False,
-        verbose_name=_("Country"),
-    )
     kind = models.CharField(
         _("Shipping Kind"),
         max_length=32,
@@ -152,16 +138,7 @@ class ShippingRate(TimeStampMixinModel):
         indexes = [*TimeStampMixinModel.Meta.indexes]
 
     def __str__(self) -> str:
-        # ``zone_id``: a rate the previous release writes during a rollout
-        # has none yet (``0025``), and ``self.zone`` would raise for it.
         return f"{self.provider.code}/{self.zone_id}/{self.kind}"
-
-    def save(self, *args, **kwargs) -> None:
-        self.country_id = self.zone.rate_country_id()
-        update_fields = kwargs.get("update_fields")
-        if update_fields is not None:
-            kwargs["update_fields"] = {*update_fields, "country"}
-        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         super().clean()

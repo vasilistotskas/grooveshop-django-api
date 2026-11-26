@@ -66,10 +66,9 @@ fails without it.
 
 ## Reauthentication
 
-An allauth call that needs a recent proof of identity (managing a second
-factor) answers 401 with the ways this customer can give it, `data.flows`
-(the storefront's account deletion, `user.views.account`, answers 403
-`reauthentication_required` and no flows), from
+A call of allauth's that needs a recent proof of identity (managing a second
+factor) answers 401 with the ways this customer can give it, `data.flows`,
+from
 `allauth.account.internal.flows.reauthentication.get_reauthentication_flows`:
 
 * `reauthenticate`: a customer with a usable password.
@@ -85,6 +84,16 @@ factor) answers 401 with the ways this customer can give it, `data.flows`
   `ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND`, and the per-IP rules in
   `core.middleware.allauth_ratelimit`.
 * `mfa_reauthenticate`: a customer with an authenticator.
+
+The storefront's account deletion (`user.views.account`) is a REST call
+authenticated by a Knox token, which carries no session: it names the allauth
+app session the customer signed in with in `X-Session-Token`, and the view
+reads the reauthentication there (`_reauthentication_required`), never in a
+session of another customer. A request without it is checked on its own
+session, where allauth counts only the records written for this customer, so
+a stolen token cannot borrow someone else's fresh confirmation. Its refusal is a 403 `reauthentication_required`
+with the same `flows`, so the storefront sends the customer to confirm it is
+them and back.
 
 A customer with none of them (no password, no authenticator, no verified
 address) is refused: allauth up to 65.21 counted such a customer as always

@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -172,25 +172,8 @@ class StockManager:
         except Product.DoesNotExist:
             raise ProductNotFoundError(product_id=product_id)
 
-        # Calculate available stock by excluding active reservations
-        # Active = not consumed AND not expired
-        # Lock reservation rows to prevent concurrent requests from
-        # reading the same available stock and double-reserving.
-        # NOTE: We iterate and sum in Python instead of using aggregate()
-        # because PostgreSQL does not support FOR UPDATE with aggregates,
-        # causing Django to silently drop the lock clause.
         now = timezone.now()
-        active_reservations = (
-            StockReservation.objects.select_for_update().filter(
-                product=product, consumed=False, expires_at__gt=now
-            )
-        )
-
-        # Sum up all active reservation quantities
-        reserved_quantity = sum(r.quantity for r in active_reservations)
-
-        # Calculate available stock
-        available_stock = product.stock - reserved_quantity
+        available_stock = cls._free_units(product, now)
 
         # Validate sufficient stock
         if available_stock < quantity:
@@ -228,6 +211,19 @@ class StockManager:
 
         return reservation
 
+    @staticmethod
+    def _free_units(product: Product, now: datetime) -> int:
+        """The product's stock no live hold takes, read with the holds
+        locked: PostgreSQL drops FOR UPDATE from an aggregate, so they are
+        summed here rather than by the database. The caller holds the
+        product's row lock."""
+        active_reservations = (
+            StockReservation.objects.select_for_update().filter(
+                product=product, consumed=False, expires_at__gt=now
+            )
+        )
+        return product.stock - sum(r.quantity for r in active_reservations)
+
     @classmethod
     @transaction.atomic
     def reserve_cart_stock(
@@ -247,6 +243,18 @@ class StockManager:
         idempotent, and a line that changed or left the cart is freed in the
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
+
+        Any checkout places a new order unless it is one already placed,
+        and only the order's creation can tell (the resume compares the
+        whole checkout): so it is held in full against the stock as it is,
+        the earlier order keeping its own units, and nobody takes what a
+        new order needs before it is created. A cart placed for exactly
+        these lines by one of its unpaid orders
+        (``order.checkout.resume.lines_of_an_unpaid_order``) is never
+        refused for the units that order took: it holds what is free, up
+        to its lines, so the repeat that resumes the order goes through on
+        the last unit, and a changed checkout of the same lines is still
+        held as far as the stock allows.
 
         The first statement locks the ``Cart`` row (``select_for_update``),
         the lock checkout takes first, so the order is cart, then products,
@@ -280,6 +288,7 @@ class StockManager:
             raise ValueError("Quantity must be positive")
 
         from cart.models import Cart
+        from order.checkout.resume import lines_of_an_unpaid_order
 
         locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
         session_id = str(locked_cart.uuid)
@@ -301,9 +310,23 @@ class StockManager:
         ):
             cls.release_reservation(reservation_id)
 
+        repeat = bool(quantities) and lines_of_an_unpaid_order(
+            locked_cart, quantities
+        )
+        now = timezone.now()
         reservations: list[StockReservation] = []
         shortfalls: list[InsufficientStockError] = []
-        for product_id, quantity in sorted(quantities.items()):
+        for product_id, wanted in sorted(quantities.items()):
+            quantity = wanted
+            product = (
+                Product.objects.filter(pk=product_id).first()
+                if repeat
+                else None
+            )
+            if product is not None:
+                quantity = min(wanted, cls._free_units(product, now))
+                if quantity <= 0:
+                    continue
             try:
                 reservations.append(
                     cls.reserve_stock(

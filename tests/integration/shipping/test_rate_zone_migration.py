@@ -424,3 +424,43 @@ class TestTheZoneBecomesRequired(TestCase):
             }
             <= constraints
         )
+
+
+class TestTheCountryColumnIsDropped(TestCase):
+    """``0028``, and its reverse, which a rollback of it needs."""
+
+    def _columns(self) -> set[str]:
+        with connection.cursor() as cursor:
+            return {
+                column.name
+                for column in connection.introspection.get_table_description(
+                    cursor, "shipping_shippingrate"
+                )
+            }
+
+    def test_the_column_goes_and_comes_back(self):
+        migrate_to(("shipping", "0028_shipping_rate_drop_country_column"))
+        self.assertNotIn("country_id", self._columns())
+
+        migrate_to(("shipping", "0027_shipping_rate_country_out_of_state"))
+        self.assertIn("country_id", self._columns())
+        with connection.cursor() as cursor:
+            on_the_column = [
+                info
+                for info in connection.introspection.get_constraints(
+                    cursor, "shipping_shippingrate"
+                ).values()
+                if info["columns"] == ["country_id"]
+            ]
+        # The foreign key and its two indexes, as 0010 made them.
+        self.assertEqual(
+            sorted(
+                ("fk" if info["foreign_key"] else "index")
+                for info in on_the_column
+            ),
+            ["fk", "index", "index"],
+        )
+
+        # The rollback goes on through 0027's own reverse.
+        migrate_to(("shipping", "0025_shipping_rate_zone_required"))
+        self.assertIn("country_id", self._columns())

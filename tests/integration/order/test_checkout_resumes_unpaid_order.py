@@ -207,6 +207,23 @@ class TestTheStorefrontReservesBeforeEveryOrder:
         assert checkout.order(street="Stadiou").pk != (
             Order.objects.order_by("created_at").first().pk
         )
+        assert checkout.stock() == STOCK - 2
+        assert not StockReservation.objects.filter(consumed=False).exists()
+
+    def test_a_repeat_holds_what_is_left_of_its_lines(self):
+        checkout = _Checkout()
+        CartItem.objects.filter(pk=checkout.item.pk).update(quantity=2)
+        type(checkout.product).objects.filter(pk=checkout.product.pk).update(
+            stock=3
+        )
+        checkout.reserve()
+        earlier = checkout.order()
+
+        [reservation] = checkout.reserve()
+
+        assert reservation.quantity == 1
+        assert checkout.order().pk == earlier.pk
+        assert not StockReservation.objects.filter(consumed=False).exists()
 
     def test_a_promotion_gift_does_not_hide_the_repeat(self):
         """A gift line the order got at creation is not one of its lines."""

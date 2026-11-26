@@ -318,8 +318,12 @@ class StockManager:
         shortfalls: list[InsufficientStockError] = []
         for product_id, wanted in sorted(quantities.items()):
             quantity = wanted
-            if repeat:
-                product = Product.objects.get(pk=product_id)
+            product = (
+                Product.objects.filter(pk=product_id).first()
+                if repeat
+                else None
+            )
+            if product is not None:
                 quantity = min(wanted, cls._free_units(product, now))
                 if quantity <= 0:
                     continue

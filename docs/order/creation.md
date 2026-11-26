@@ -428,7 +428,8 @@ caller:
     every field of the shipping address. An online order stores it as
     `metadata["checkout_fingerprint"]`, with an HMAC of its own row's address
     beside it (`address_fingerprint`), so an order edited since (its owner, or
-    staff) is not the same. Both are personal (`Order.PERSONAL_METADATA`).
+    staff) is not the same, and the cart lines it was placed for (`lines`,
+    read by the reserve below). The key is personal (`Order.PERSONAL_METADATA`).
   - **The order resumed.** `order_to_resume`: the one this checkout made, the
     latest if there are two, whichever was placed last, among
     `unpaid_orders_of_cart` (they hold their stock for an online payment, and
@@ -446,12 +447,16 @@ caller:
     changed checkout, answered by the creation that follows. Two identical
     checkouts racing end with one order.
   - **The stock.** The storefront reserves before every order
-    (`StockManager.reserve_cart_stock`). A cart whose lines are exactly those
-    of one of its unpaid orders (`lines_of_an_unpaid_order`) gets no hold,
-    since that order already took the units, so a repeat of the last units is
-    not refused there; a resume releases any hold left from before. Any other
-    checkout is a new order and is held in full against the stock as it is:
-    the earlier order keeps its units. The storefront still marks a line whose product has no stock left, so
+    (`StockManager.reserve_cart_stock`), and only the creation can tell a
+    repeat from a new order, so every checkout is held against the stock as it
+    is: the earlier order keeps its units. A cart whose lines are exactly
+    those one of its unpaid orders was placed for (`lines` in the order's
+    `checkout_fingerprint` metadata, written at creation, so a promotion's
+    gift line is not one of them; `lines_of_an_unpaid_order`) is never
+    refused for the units that order took: it holds what is free, up to its
+    lines. So a repeat of the last units goes through, a changed address or
+    pay way of the same lines is still held as far as the stock allows, and a
+    resume releases the hold. The storefront still marks a line whose product has no stock left, so
     that shopper's way back is the order's own "Pay now".
   - **The answer.** The order, `201`, as for a repeat of an agent checkout,
     with the repeat's own ads consent and browser data, language and newly

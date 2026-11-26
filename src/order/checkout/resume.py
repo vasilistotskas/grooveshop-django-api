@@ -24,16 +24,15 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
     from django.db.models import QuerySet
 
-    from cart.models import Cart
+    from cart.models import Cart, CartItem
     from order.checkout.quote import CheckoutQuote
     from order.models.order import Order
     from pay_way.models import PayWay
@@ -189,23 +188,33 @@ def payment_undecided(order: Order) -> bool:
     )
 
 
-def lines_of_an_unpaid_order(cart: Cart, quantities: Mapping[int, int]) -> bool:
-    """Whether one of the cart's unpaid orders holds exactly these units
-    (product id -> quantity): a checkout of them is that order's again,
-    and resuming it needs no hold, since the order already took them."""
-    from order.models.item import OrderItem
+def quantities_of(items: Iterable[CartItem]) -> dict[int, int]:
+    """Product id -> units of a cart's items, a product on several lines
+    summed."""
+    quantities: dict[int, int] = {}
+    for item in items:
+        quantities[item.product_id] = (
+            quantities.get(item.product_id, 0) + item.quantity
+        )
+    return quantities
 
-    wanted = dict(quantities)
-    lines: dict[int, dict[int, int]] = {}
-    rows = (
-        OrderItem.objects.filter(order__in=unpaid_orders_of_cart(cart))
-        .values("order_id", "product_id")
-        .annotate(units=Sum("quantity"))
-        .values_list("order_id", "product_id", "units")
+
+def cart_lines(quantities: Mapping[int, int]) -> dict[str, int]:
+    """A checkout's lines as an order records them (product id -> units,
+    keyed by text as JSON keys are): what the storefront reserves, so a
+    promotion's gift lines, added at creation, are not part of it."""
+    return {str(product_id): units for product_id, units in quantities.items()}
+
+
+def lines_of_an_unpaid_order(cart: Cart, quantities: Mapping[int, int]) -> bool:
+    """Whether one of the cart's unpaid orders was placed for exactly these
+    lines (``cart_lines``, recorded at its creation): a checkout of them
+    may be that order's again, which already took the units."""
+    wanted = cart_lines(quantities)
+    recorded = unpaid_orders_of_cart(cart).values_list(
+        f"metadata__{FINGERPRINT_KEY}__lines", flat=True
     )
-    for order_id, product_id, units in rows:
-        lines.setdefault(order_id, {})[product_id] = units
-    return any(order_lines == wanted for order_lines in lines.values())
+    return any(lines == wanted for lines in recorded)
 
 
 def _hmac(content: dict[str, Any]) -> str:

@@ -27,6 +27,7 @@ from order.checkout.resume import FINGERPRINT_KEY
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import CartStockUnavailableError, InvalidGiftCardError
 from order.inventory.stock import StockManager
+from order.models.item import OrderItem
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.stock_reservation import StockReservation
 from order.payments import payment_hold
@@ -120,8 +121,9 @@ class TestTheSameCheckoutResumes:
         order = checkout.order()
 
         recorded = order.metadata[FINGERPRINT_KEY]
-        assert set(recorded) == {"checkout", "address"}
-        assert all(len(value) == 64 for value in recorded.values())
+        assert set(recorded) == {"checkout", "address", "lines"}
+        assert len(recorded["checkout"]) == len(recorded["address"]) == 64
+        assert recorded["lines"] == {str(checkout.product.pk): 1}
 
     def test_a_failed_attempt_still_resumes(self):
         """A failed payment does not end the order: its Viva payment
@@ -141,8 +143,10 @@ class TestTheStorefrontReservesBeforeEveryOrder:
         checkout.reserve()
         earlier = checkout.order()
 
-        # Nothing is held again: the order already took the units.
-        assert checkout.reserve() == []
+        # Held as far as the stock allows, until the creation knows it is
+        # the same order: the resume then releases it.
+        [again] = checkout.reserve()
+        assert again.quantity == 1
         assert checkout.order().pk == earlier.pk
 
         assert checkout.stock() == STOCK - 1
@@ -189,6 +193,39 @@ class TestTheStorefrontReservesBeforeEveryOrder:
 
         with pytest.raises(CartStockUnavailableError):
             checkout.reserve()
+
+    def test_a_changed_address_of_the_same_lines_is_still_held(self):
+        """Only the creation knows it is a new order: until then the units
+        it needs are held as far as the stock allows."""
+        checkout = _Checkout()
+        checkout.reserve()
+        checkout.order()
+
+        [reservation] = checkout.reserve()
+
+        assert reservation.quantity == 1
+        assert checkout.order(street="Stadiou").pk != (
+            Order.objects.order_by("created_at").first().pk
+        )
+
+    def test_a_promotion_gift_does_not_hide_the_repeat(self):
+        """A gift line the order got at creation is not one of its lines."""
+        checkout = _Checkout()
+        type(checkout.product).objects.filter(pk=checkout.product.pk).update(
+            stock=1
+        )
+        checkout.reserve()
+        earlier = checkout.order()
+        OrderItem.objects.create(
+            order=earlier,
+            product=ProductFactory(stock=5),
+            quantity=1,
+            price=Money(0, "EUR"),
+            vat_rate=0,
+        )
+
+        assert checkout.reserve() == []
+        assert checkout.order().pk == earlier.pk
 
     def test_a_hold_left_from_before_is_released(self):
         """A hold made while the order was not yet there (another tab)."""

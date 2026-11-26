@@ -14,7 +14,7 @@ what that means. The code wins over this page.
 - `Order.PERSONAL_METADATA`: the paths in `metadata` that are the buyer's: the
   browser identity the Conversions API reads (`meta`: IP address, user agent,
   `fbp`, `fbc`), the typed cancel reason (`cancellation.reason`) and the
-  checkout's HMACs (`checkout_fingerprint`).
+  checkout's HMACs and lines (`checkout_fingerprint`).
 - Each carrier's own records, through the carrier interface
   (`src/shipping/interfaces.py`): `erase_recipient_data`, `recipient_data` and
   `orders_written_since`.

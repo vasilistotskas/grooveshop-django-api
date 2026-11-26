@@ -33,9 +33,11 @@ from order.checkout.quote import (
 from order.checkout.resume import (
     FINGERPRINT_KEY,
     address_fingerprint,
+    cart_lines,
     checkout_fingerprint,
     order_to_resume,
     payment_undecided,
+    quantities_of,
     unpaid_orders_of_cart,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -1178,6 +1180,7 @@ class OrderService:
                         gift_card_codes=gift_card_codes,
                     ),
                     "address": address_fingerprint(order),
+                    "lines": cart_lines(quantities_of(cart_items)),
                 }
             # Wholesale audit: which group priced this order. The line
             # prices are already snapshotted on OrderItem rows — this

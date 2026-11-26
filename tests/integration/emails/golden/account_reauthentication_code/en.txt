@@ -1,0 +1,11 @@
+You are signed in and asked to confirm it is you. Enter this code in your open browser window.
+
+123456
+
+Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account.
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

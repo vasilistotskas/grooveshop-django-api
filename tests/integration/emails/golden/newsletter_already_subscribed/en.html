@@ -90,6 +90,13 @@
             line-height: 1.6;
         }
 
+        /* A one-time code the customer types: its size is inline, for
+           clients that drop this block, its colour here, so the dark rule
+           below can change it */
+        .email-body .email-code {
+            color: #1f2937;
+        }
+
         /* Cards */
         .email-card {
             background-color: #f9fafb;
@@ -283,6 +290,10 @@
 
             .email-body li {
                 color: #d1d5db;
+            }
+
+            .email-body .email-code {
+                color: #f9fafb;
             }
 
             .email-card {

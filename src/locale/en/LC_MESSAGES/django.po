@@ -3595,6 +3595,9 @@ msgstr "Confirmation Sent At"
 msgid "Confirmation Token"
 msgstr "Confirmation Token"
 
+msgid "Confirmation code"
+msgstr "Confirmation code"
+
 msgid "Confirmation sent at"
 msgstr "Confirmation sent at"
 
@@ -4423,6 +4426,9 @@ msgstr "Did the goods come back? Use \"Restock returned items\" to put them back
 #, python-brace-format
 msgid "Did you forget something? — {site_name}"
 msgstr "Did you forget something? — {site_name}"
+
+msgid "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
+msgstr "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
 
 msgid "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
 msgstr "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
@@ -13290,6 +13296,9 @@ msgstr "Sent when a customer turns on an authenticator app."
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Sent when a delivered, paid order is completed."
 
+msgid "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+msgstr "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+
 msgid "Sent when an order is canceled."
 msgstr "Sent when an order is canceled."
 
@@ -17598,6 +17607,9 @@ msgstr "You are receiving this email because you, or someone else, tried to sign
 msgid "You are signed in"
 msgstr "You are signed in"
 
+msgid "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+msgstr "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+
 msgid "You can only delete your own account."
 msgstr "You can only delete your own account."
 
@@ -17743,6 +17755,9 @@ msgstr "Your business's legal details are missing"
 
 msgid "Your cart has changed since its total was shown. Review your order and place it again."
 msgstr "Your cart has changed since its total was shown. Review your order and place it again."
+
+msgid "Your confirmation code"
+msgstr "Your confirmation code"
 
 msgid "Your data and preferences are still safely stored"
 msgstr "Your data and preferences are still safely stored"

@@ -3355,6 +3355,7 @@ components:
           - provider_signup
           - provider_token
           - reauthenticate
+          - reauthenticate_by_code
           - signup
           - verify_email
           - verify_phone

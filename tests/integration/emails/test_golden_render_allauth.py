@@ -31,7 +31,7 @@ from tests.utils.staff import (
     unbind_store_tenant,
 )
 from user.adapter import UserAccountAdapter
-from user.emails import ALLAUTH_TYPES
+from user.emails import ALLAUTH_TYPES, REAUTHENTICATION_CODE
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -132,9 +132,9 @@ def test_every_type_has_a_golden_case():
     assert set(CASES) == set(ALLAUTH_TYPES)
 
 
-def send(prefix: str, language: str):
+def send(prefix: str, language: str, **context):
     """Send *prefix* as allauth does, in the visitor's *language*."""
-    flow = dict(CASES[prefix])
+    flow = {**CASES[prefix], **context}
     if flow.pop("user", False):
         flow["user"] = UserAccountFactory(
             num_addresses=0,
@@ -160,4 +160,12 @@ def test_the_mail_is_what_the_customer_reads(prefix, language):
     message = send(prefix, language)
 
     name = ALLAUTH_TYPES[prefix].replace(".", "_")
+    assert_golden(GOLDEN, name, language, snapshot(message))
+
+
+def test_a_reauthentication_code_is_what_the_customer_reads(language):
+    prefix = "account/email/login_code"
+    message = send(prefix, language, reauthentication=True)
+
+    name = REAUTHENTICATION_CODE.replace(".", "_")
     assert_golden(GOLDEN, name, language, snapshot(message))

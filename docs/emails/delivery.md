@@ -301,7 +301,7 @@ tables (`src/devtools/anonymise/rules.py`).
   name, sender, contact address and static host so the files do not follow
   `.env`.
 - `tests/integration/emails/test_golden_render_allauth.py` records the
-  19 allauth mails through the adapter, and fails for a type with no
+  20 allauth mails through the adapter, and fails for a type with no
   case. `tests/integration/user/test_allauth_flows_use_the_pipeline.py`
   drives the real headless endpoints (sign-up, password reset, login
   code), and `test_allauth_email_store_identity.py` discovers the kinds

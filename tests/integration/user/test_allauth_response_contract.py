@@ -560,69 +560,186 @@ def _flow_ids(body: dict) -> list[str]:
     return [flow["id"] for flow in body["data"]["flows"]]
 
 
-def test_a_password_customer_reauthenticates_by_password(document, user, token):
+def test_a_password_customer_may_reauthenticate_by_a_code_too(
+    document, user, token
+):
     response = _sensitive_action(token, user)
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     body = assert_documented(document, *_sensitive_operation(user), response)
-    # allauth 65.22 would add `reauthenticate_by_code`; the setting keeps it
-    # off until the storefront that completes it is live.
-    assert body["data"]["flows"] == [{"id": "reauthenticate"}]
+    assert body["data"]["flows"] == [
+        {"id": "reauthenticate"},
+        {
+            "id": "reauthenticate_by_code",
+            "recipients": [{"email": user.email}],
+        },
+    ]
 
 
-def test_a_customer_with_a_second_factor_is_offered_both(document, user, token):
+def test_a_customer_without_a_password_reauthenticates_by_a_code(
+    document, user, passwordless_token
+):
+    # Before allauth 65.22 this customer had no way to reauthenticate and
+    # the check was skipped; now the code is the way.
+    response = _sensitive_action(passwordless_token, user)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    body = assert_documented(document, *_sensitive_operation(user), response)
+    assert _flow_ids(body) == ["reauthenticate_by_code"]
+
+
+def test_a_customer_with_a_second_factor_is_offered_all_three(
+    document, user, token
+):
     _with_totp(user)
 
     response = _sensitive_action(token, user)
 
     body = assert_documented(document, *_sensitive_operation(user), response)
-    assert _flow_ids(body) == ["reauthenticate", "mfa_reauthenticate"]
+    assert _flow_ids(body) == [
+        "reauthenticate",
+        "reauthenticate_by_code",
+        "mfa_reauthenticate",
+    ]
 
 
-def test_a_customer_with_no_way_to_reauthenticate_is_not_asked(
-    document, user, passwordless_token
+def test_reauthenticating_by_the_code_sent_to_a_verified_address(
+    document, user, token
 ):
-    # No password, no second factor, and the code method is off: refusing
-    # them would leave no way to add a second factor
-    # (``TenantAccountAdapter.is_reauthentication_required``).
-    response = _sensitive_action(passwordless_token, user)
+    from django.core import mail
 
-    assert response.status_code == status.HTTP_200_OK
+    mail.outbox.clear()
+    asked = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/request",
+        {"email": user.email},
+        token=token,
+    )
+    assert asked.status_code == status.HTTP_200_OK
     assert_documented(
-        document, "/account/authenticators/totp", "post", response
+        document, "/auth/reauthenticate/code/request", "post", asked
+    )
+    [message] = mail.outbox
+    assert message.to == [user.email]
+    code = _code_in(message)
+
+    pending = _sensitive_action(token, user)
+    pending_body = assert_documented(
+        document, *_sensitive_operation(user), pending
+    )
+    assert {
+        "id": "reauthenticate_by_code",
+        "recipients": [{"email": user.email}],
+        "is_pending": True,
+    } in pending_body["data"]["flows"]
+
+    confirmed = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/confirm",
+        {"code": code},
+        token=token,
+    )
+    assert confirmed.status_code == status.HTTP_200_OK
+    body = assert_documented(
+        document, "/auth/reauthenticate/code/confirm", "post", confirmed
+    )
+    assert body["data"]["methods"][-1]["method"] == "code"
+    assert body["data"]["methods"][-1]["reauthenticated"] is True
+
+    from allauth.mfa.models import Authenticator
+
+    activated = _sensitive_action(token, user)
+
+    assert activated.status_code == status.HTTP_200_OK
+    assert Authenticator.objects.filter(
+        user=user, type=Authenticator.Type.TOTP
+    ).exists()
+
+
+def test_a_wrong_reauthentication_code_is_a_documented_400(
+    document, user, token
+):
+    _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/request",
+        {"email": user.email},
+        token=token,
+    )
+
+    response = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/confirm",
+        {"code": "000000"},
+        token=token,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert_documented(
+        document, "/auth/reauthenticate/code/confirm", "post", response
     )
 
 
-def test_once_they_have_a_second_factor_they_are_asked_for_it(
-    document, user, passwordless_token
+def test_a_reauthentication_code_goes_only_to_an_address_of_the_customer(
+    document, user, token
 ):
-    _with_totp(user)
+    response = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/request",
+        {"email": "someone.else@example.com"},
+        token=token,
+    )
 
-    response = _sensitive_action(passwordless_token, user)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert_documented(
+        document, "/auth/reauthenticate/code/request", "post", response
+    )
 
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    body = assert_documented(document, *_sensitive_operation(user), response)
-    assert _flow_ids(body) == ["mfa_reauthenticate"]
 
-
-@pytest.mark.parametrize(
-    ("path", "body"),
-    [
-        ("/auth/reauthenticate/code/request", {"email": "a@example.com"}),
-        ("/auth/reauthenticate/code/confirm", {"code": "123456"}),
-        ("/auth/reauthenticate/code/resend", None),
-    ],
-)
-def test_the_code_method_is_refused_while_it_is_off(
-    document, token, path, body
+def test_confirming_a_reauthentication_code_that_was_never_asked_for(
+    document, token
 ):
-    response = _call(Client(), "post", path, body, token=token)
+    response = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/confirm",
+        {"code": "123456"},
+        token=token,
+    )
 
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert_documented(document, path, "post", response)
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert_documented(
+        document, "/auth/reauthenticate/code/confirm", "post", response
+    )
 
 
-def test_the_document_does_not_offer_the_flow_that_is_off(document):
-    flow_ids = document["components"]["schemas"]["Flow"]["properties"]["id"]
+def test_resending_a_reauthentication_code(document, user, token):
+    from django.core import mail
 
-    assert "reauthenticate_by_code" not in flow_ids["enum"]
+    _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate/code/request",
+        {"email": user.email},
+        token=token,
+    )
+    mail.outbox.clear()
+
+    response = _call(
+        Client(), "post", "/auth/reauthenticate/code/resend", token=token
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert_documented(
+        document, "/auth/reauthenticate/code/resend", "post", response
+    )
+    # The resend is the reauthentication mail again, not a sign-in code.
+    [message] = mail.outbox
+    assert message.to == [user.email]
+    assert message.extra_headers["List-ID"].startswith(
+        "<account-reauthentication_code."
+    )

@@ -356,7 +356,7 @@ sending is in a task because allauth's own `send_mail` talks SMTP inside the
 view, where a 421 from the mail server would fail the sign-up request; in the
 task it is a retry.
 
-The 19 types are `account.*` (twelve), `mfa.*` (five) and `social.*` (two),
+The 20 types are `account.*` (thirteen), `mfa.*` (five) and `social.*` (two),
 declared in `src/user/emails.py` through `_allauth_email`, which also fills the
 prefix map. All are customer mail, transactional and **required**: a store
 cannot switch a sign-in code, a reset link or a security notice off. Their

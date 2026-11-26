@@ -3599,6 +3599,9 @@ msgstr "Αποστολή επιβεβαίωσης"
 msgid "Confirmation Token"
 msgstr "Token επιβεβαίωσης"
 
+msgid "Confirmation code"
+msgstr "Κωδικός επιβεβαίωσης"
+
 msgid "Confirmation sent at"
 msgstr "Αποστολή επιβεβαίωσης"
 
@@ -4428,6 +4431,9 @@ msgstr "Επιστράφηκαν τα προϊόντα; Χρησιμοποιήσ
 #, python-brace-format
 msgid "Did you forget something? — {site_name}"
 msgstr "Ξεχάσατε κάτι; — {site_name}"
+
+msgid "Did you not ask for it? Do not give the code to anyone and change your password: someone may be signed in to your account."
+msgstr "Δεν τον ζητήσατε εσείς; Μη δώσετε τον κωδικό σε κανέναν και αλλάξτε τον κωδικό πρόσβασής σας: ίσως κάποιος άλλος είναι συνδεδεμένος στον λογαριασμό σας."
 
 msgid "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
 msgstr "Ψηφία με τα οποία γράφεται ένας τοπικός αριθμός αλλά δεν αποτελούν μέρος του αριθμού E.164 (π.χ. το αρχικό «0» της Γερμανίας). Null όταν η χώρα δεν έχει — οι περισσότερες δεν έχουν."
@@ -13296,6 +13302,9 @@ msgstr "Αποστέλλεται όταν ένας πελάτης ενεργοπ
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Αποστέλλεται όταν μια παραδομένη, εξοφλημένη παραγγελία ολοκληρώνεται."
 
+msgid "Sent when a signed-in customer asks for a code to confirm it is them, before a sensitive change such as deleting the account."
+msgstr "Στέλνεται όταν ένας συνδεδεμένος πελάτης ζητά κωδικό για να επιβεβαιώσει ότι είναι ο ίδιος, πριν από μια ευαίσθητη αλλαγή όπως η διαγραφή του λογαριασμού."
+
 msgid "Sent when an order is canceled."
 msgstr "Αποστέλλεται όταν μια παραγγελία ακυρώνεται."
 
@@ -17600,6 +17609,9 @@ msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάπ
 msgid "You are signed in"
 msgstr "Έχετε συνδεθεί"
 
+msgid "You are signed in and asked to confirm it is you. Enter this code in your open browser window."
+msgstr "Είστε συνδεδεμένοι και ζητήσατε να επιβεβαιώσετε ότι είστε εσείς. Εισαγάγετε αυτόν τον κωδικό στο ανοιχτό παράθυρο του προγράμματος περιήγησης."
+
 msgid "You can only delete your own account."
 msgstr "Μπορείτε να διαγράψετε μόνο τον δικό σας λογαριασμό."
 
@@ -17745,6 +17757,9 @@ msgstr "Λείπουν νομικά στοιχεία της επιχείρησή
 
 msgid "Your cart has changed since its total was shown. Review your order and place it again."
 msgstr "Το καλάθι σας άλλαξε από τότε που εμφανίστηκε το σύνολό του. Ελέγξτε την παραγγελία σας και υποβάλετέ την ξανά."
+
+msgid "Your confirmation code"
+msgstr "Ο κωδικός επιβεβαίωσής σας"
 
 msgid "Your data and preferences are still safely stored"
 msgstr "Τα δεδομένα και οι προτιμήσεις σας διατηρούνται με ασφάλεια"

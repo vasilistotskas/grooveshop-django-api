@@ -64,11 +64,10 @@ PLATFORM_APP_LABELS: frozenset[str] = frozenset(
         # ``public`` (``send_email`` runs a platform type under it), and the
         # emails page lists the ``Owner.PLATFORM`` types.
         "emails",
-        # ``allauth_idp_oidc`` deliberately ABSENT: allauth.idp.oidc is
-        # in TENANT_APPS only, so its tables do not exist in the public
-        # schema — the sections rendered on the control plane but 500'd
-        # (ProgrammingError) the moment they were opened. OIDC agent
-        # clients/tokens are per-store and live in the merchant admin.
+        # ``allauth_idp_oidc`` deliberately ABSENT: its public tables
+        # hold only the staff issuer's clients and tokens
+        # (``agent.staff``); a store's agent clients and tokens live in
+        # that store's schema and its merchant admin.
         "core",
     }
 )

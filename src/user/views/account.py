@@ -46,6 +46,7 @@ from user.filters.account import UserAccountFilter
 from user.serializers.account import (
     DeleteAccountRequestSerializer,
     DeleteAccountResponseSerializer,
+    ReauthenticationFlowSerializer,
     ReauthenticationRequiredSerializer,
     UserDataExportSerializer,
     UserDetailsSerializer,
@@ -657,7 +658,11 @@ class UserAccountViewSet(BaseModelViewSet):
                 {
                     "detail": _("Re-authentication required."),
                     "code": "reauthentication_required",
-                    "flows": get_reauthentication_flows(user),
+                    # Only what the schema declares: the code flow's
+                    # recipients name addresses no client here reads.
+                    "flows": ReauthenticationFlowSerializer(
+                        get_reauthentication_flows(user), many=True
+                    ).data,
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

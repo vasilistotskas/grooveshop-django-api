@@ -90,6 +90,13 @@
             line-height: 1.6;
         }
 
+        /* A one-time code the customer types: its size is inline, for
+           clients that drop this block, its colour here, so the dark rule
+           below can change it */
+        .email-body .email-code {
+            color: #1f2937;
+        }
+
         /* Cards */
         .email-card {
             background-color: #f9fafb;
@@ -285,6 +292,10 @@
                 color: #d1d5db;
             }
 
+            .email-body .email-code {
+                color: #f9fafb;
+            }
+
             .email-card {
                 background-color: #1f2937;
                 border-color: #374151;
@@ -345,7 +356,7 @@
 
 <p>Ο κωδικός επαλήθευσης του email σας εμφανίζεται παρακάτω. Εισαγάγετέ τον στο ανοιχτό παράθυρο του προγράμματος περιήγησης.</p>
 <div class="email-card text-center">
-    <p style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #1f2937; margin: 0;">123456</p>
+    <p class="email-code" style="font-size: 32px; font-weight: 700; letter-spacing: 4px; margin: 0;">123456</p>
 </div>
 
 

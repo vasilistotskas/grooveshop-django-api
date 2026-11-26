@@ -3,6 +3,45 @@
 
 
 
+## v3.274.0 (2026-11-26)
+
+### Bug fixes
+
+* fix(order): a resumed checkout holds its stock once, and is the checkout that made the order ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+* fix(order): a repeat gets its order while the payment is being decided, never a second one ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+* fix(order): a changed checkout is held in full, and an open payment link keeps its order resumable ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+* fix(order): only a repeat of the unpaid order's lines skips the hold; any other checkout holds in full
+
+Crediting the unpaid order's units to every reserve held a repeat twice until it resumed, and let a changed checkout hold more than the stock left. A cart whose lines are exactly one unpaid order's gets no hold; any other checkout is held against the stock as it is. ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+* fix(order): every checkout is held against the stock left; a repeat of an unpaid order's lines is never refused for them
+
+Only the creation can tell a repeat from a new order, so the reserve holds every checkout as far as the stock allows. A cart placed for exactly these lines by one of its unpaid orders (now recorded in the order's checkout_fingerprint metadata, so a promotion's gift line is not one of them) holds only what is free, so the repeat of the last units still resumes. ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+* fix(order): an order erased between the two reads is skipped, not a KeyError
+
+Docs: a live link is reused until its own expiry and only a new one needs the window; a paid order answers order_not_payable; the repeat's answers and link are qualified. The partial-hold test now asks for its two units. ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+### Features
+
+* feat(order): a repeat of the same checkout resumes its unpaid order (#806)
+
+* WIP feat(order): a repeated checkout resumes its cart's unpaid order (#694)
+
+Work in progress, not reviewed: resume only (supersede not started).
+checkout_fingerprint on online orders, _resume_same_checkout under the
+cart lock before validation, the offline view's unlocked pre-check
+removed. Targeted tests pass; the broad creation run was not finished. ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
+### Refactoring
+
+* refactor(cart): the reserve and the order record one product-to-units map
+
+The cart's reserve builds its quantities with order.checkout.resume.quantities_of, the function the order's recorded lines come from, so the two cannot drift; a product gone between the cart read and the repeat's free count is reported by reserve_stock. Tests: a repeat holds what is left of its lines; a changed address converts its hold. ([`790dd1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/790dd1a876f59c976c2834ed678bc987bfb56d3a))
+
 ## v3.273.0 (2026-11-26)
 
 ### Bug fixes

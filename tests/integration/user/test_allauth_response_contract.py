@@ -626,7 +626,7 @@ def test_reauthenticating_by_the_code_sent_to_a_verified_address(
 
     pending = _sensitive_action(token, user)
     pending_body = assert_documented(
-        document, "/account/authenticators/recovery-codes", "post", pending
+        document, *_sensitive_operation(user), pending
     )
     assert {
         "id": "reauthenticate_by_code",
@@ -648,10 +648,14 @@ def test_reauthenticating_by_the_code_sent_to_a_verified_address(
     assert body["data"]["methods"][-1]["method"] == "code"
     assert body["data"]["methods"][-1]["reauthenticated"] is True
 
-    assert (
-        _sensitive_action(token, user).status_code
-        != status.HTTP_401_UNAUTHORIZED
-    )
+    from allauth.mfa.models import Authenticator
+
+    activated = _sensitive_action(token, user)
+
+    assert activated.status_code == status.HTTP_200_OK
+    assert Authenticator.objects.filter(
+        user=user, type=Authenticator.Type.TOTP
+    ).exists()
 
 
 def test_a_wrong_reauthentication_code_is_a_documented_400(

@@ -213,6 +213,7 @@ class TestTheStorefrontReservesBeforeEveryOrder:
     def test_a_repeat_holds_what_is_left_of_its_lines(self):
         checkout = _Checkout()
         CartItem.objects.filter(pk=checkout.item.pk).update(quantity=2)
+        checkout.item.refresh_from_db()
         type(checkout.product).objects.filter(pk=checkout.product.pk).update(
             stock=3
         )

@@ -434,13 +434,17 @@ caller:
     latest if there are two, whichever was placed last, among
     `unpaid_orders_of_cart` (they hold their stock for an online payment, and
     are not an agent's: the gateway's are answered by their agent checkout or
-    refused, above), not canceled, and with a payment window that still fits a
-    link of its provider (`payment_hold.window_closed` with
-    `min_hosted_session`). One whose payment is being decided (processing,
-    flagged for another amount, or paid while the repeat waited) is returned
-    whatever its window: asking for its link answers that a payment is in
-    progress, where a second order would ask the shopper to pay twice. Its row
-    is locked.
+    refused, above), not canceled, and still payable (`_still_payable`): a
+    link already opened for it is reused until the expiry its provider applied
+    (`payment_hold_expires_at`), however little is left, and only an order
+    without one needs a window that still fits a new link of its provider
+    (`payment_hold.window_closed` with `min_hosted_session`). One whose
+    payment is being decided (processing, or flagged for another amount) is
+    returned whatever its window: asking for its link answers that a payment
+    is in progress (`payment_in_progress`), where a second order would ask
+    the shopper to pay twice. One paid while the repeat waited for its lock is
+    returned too, and asking for its link answers `order_not_payable`: it is
+    paid, nothing is left to wait for. Its row is locked.
   - **When.** Under the cart row lock, before the cart is validated, since the
     order holds the cart's stock. The quote is priced only when the cart has
     such an order. A quote that refuses, another total or other contents are a
@@ -458,10 +462,12 @@ caller:
     pay way of the same lines is still held as far as the stock allows, and a
     resume releases the hold. The storefront still marks a line whose product has no stock left, so
     that shopper's way back is the order's own "Pay now".
-  - **The answer.** The order, `201`, as for a repeat of an agent checkout,
-    with the repeat's own ads consent and browser data, language and newly
-    accepted legal texts. The storefront then asks for its payment link and
-    gets the live one ([§4](payments.md)).
+  - **The answer.** The order, `201`, as for a repeat of an agent checkout.
+    While its payment is undecided the order takes the repeat's own ads
+    consent and browser data, language and newly accepted legal texts; one
+    being decided or paid keeps its own. The storefront then asks for its
+    payment link: a live one if the order has it, else a new one while its
+    window fits one ([§4](payments.md)).
   - **A changed checkout** places a new order, as before. One that spent
     something is not the same the second time: a drained gift card is refused
     (`gift_card_not_redeemable`), a single-use coupon is gone from the cart,

@@ -153,9 +153,9 @@ def order_to_resume(
     ):
         if order.status == OrderStatus.CANCELED:
             continue
-        if order.metadata[FINGERPRINT_KEY]["address"] != address_fingerprint(
-            order
-        ):
+        # Erased (GDPR) between the two reads: no longer this checkout's.
+        stored = order.metadata.get(FINGERPRINT_KEY)
+        if stored is None or stored["address"] != address_fingerprint(order):
             continue
         if payment_undecided(order) and not _still_payable(order, provider):
             continue

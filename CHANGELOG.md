@@ -3,6 +3,156 @@
 
 
 
+## v3.273.0 (2026-11-26)
+
+### Bug fixes
+
+* fix(user): account deletion reads the reauthentication in the storefront's allauth session (#838) ([`db332da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db332daeb2236c23b8d776451653a7f12ec89b7b))
+
+* fix(user): account deletion reads the reauthentication in the customer's allauth session ([`db332da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db332daeb2236c23b8d776451653a7f12ec89b7b))
+
+* fix(user): declare the session header on account deletion, and prove both foreign sessions are refused
+
+The deletion operation documents X-Session-Token as an optional header. The test of another customer's session now signs that customer in for real (a verified address) and checks the confirmation succeeded; a new test holds that a cookie session in which someone else confirmed it is them does not count. ([`db332da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db332daeb2236c23b8d776451653a7f12ec89b7b))
+
+* fix(recommendation): the suggestions body names no impression; the beacon mints each showing's id (#794) ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* fix(emails): a mail task queued after a commit mails once per dispatch
+
+A task queued through dispatch_on_commit can run more than once: the
+message a publish wrote before it failed and the sweep's copy of that
+publish, a message delivered again after a worker was lost, a retry. The
+sweep's copy went out under a new task id, so every mail task that the
+audit in #719 listed sent its mail twice.
+
+- dispatch_on_commit publishes each call with a task id of its own,
+  which the kept DeferredDispatch row holds in its options, so the
+  sweep's copy goes out under the same id as the message.
+- tenant.celery.dispatch_key(namespace, *parts) derives an effect's key
+  from the running task's id. emails.log.delivery_id is built on it and
+  gives the same ids as before.
+- emails.log.delivering reads the delivery's row and the transport sends
+  under a session-level advisory lock on the delivery id. Two copies that
+  run at the same moment (the sweep's copy and the message are delivered
+  together) send once, and a copy waiting on a worker that died sends in
+  its place. A send outside a task takes no lock. A database that cannot
+  be reached does not stop the send.
+
+Tests run every mail task on #720's list twice under one id and once
+under another, and run two copies on two connections at once.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* fix(emails): a lock wait that lock_timeout ends is a wait that ran out
+
+A session that sets lock_timeout ends an advisory lock wait with
+LockNotAvailable, not QueryCanceled. The delivery lock read that as an
+unreachable database and sent without the lock; it now raises it for the
+retry, as for statement_timeout. The threaded tests run on
+tests.utils.concurrency, and the held SMTP send is tests.utils.emails.HeldTransport.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* fix(recommendation): an event task records its rows once per dispatch
+
+record_events gives each row the key of the task copy that writes it
+(RecommendationEvent.dispatch_key, unique, built with
+AddUniqueConstraintAdaptively in a migration of its own), so another copy
+of record_recommendation_event, which the order confirmation queues after a
+commit, inserts nothing. Two beacons are two tasks and stay two rows even
+for one impression id; a natural key on the impression would merge separate
+views of a cached strip.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* fix(recommendation): every showing of a strip is an impression of its own
+
+The suggestions body carried an impression id minted per response, but
+the storefront caches that body (Nitro, per seed and surface) and the edge
+caches the page it is drawn into, so one id was every viewer's while it
+was cached. Attach matching through a carried id then picked up another
+visitor's impression row, and no beacon could be told from a second view.
+
+The body names no impression any more: the client mints an impression_id
+each time it shows a strip and sends it with the impression, that
+showing's clicks and the add to cart that follows. A row's event_key is
+the event itself (the kind, the showing, the item), so a beacon sent
+again for one showing and another copy of its task record nothing more.
+
+Removing impressionId from the response ships after the storefront
+release that stops reading it reaches production. ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* fix(recommendation): the suggestions body names no impression
+
+Once the storefront reads the showing's id from the impression beacon,
+the body's own impression id, shared by every viewer of a cached copy,
+is dead output: it is removed. An impression that brings an id of its
+own is refused (impression_id_minted), so every showing is one Django
+minted. A row's event_key becomes the event itself (the kind, the showing,
+the item): a beacon sent again for one showing, a click reported twice and
+another copy of the task record nothing more.
+
+Ships after the storefront release that stops requiring impressionId in
+the body reaches production; the API contract check holds it until then. ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+### Chores
+
+* chore(i18n): translate the new key and push columns
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+### Documentation
+
+* docs(recommendation): the suggestions body names no impression in the engine's diagram ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* docs(recommendation): only a click and a task's copies dedupe; each impression beacon is a showing ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+### Features
+
+* feat(recommendation): the impression beacon mints the showing's id
+
+The suggestions body's impression id is shared by every viewer while the
+storefront and the edge cache the body and the page it is drawn into. The
+beacon is the first request that is one viewer's and passes no cache, so
+an impression event that names no id is now given one there, recorded
+with that request's own session, cart and customer, and returned; the
+showing's clicks and the add to cart that follows one carry it. A click
+must name its showing. An impression that still names the body's id (the
+storefront serving today) is recorded under it.
+
+This undoes the previous commit's removal of the body's id: that removal
+follows once the storefront reads the minted id. ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+### Refactoring
+
+* refactor(core): the advisory lock held across a send is one helper
+
+core.db.locks.held_across_calls holds a session-level advisory lock outside
+any transaction (a transaction-scoped one inside one), for a send that waits
+on another service. emails.log.delivering holds the delivery's lock through
+it and keeps its own rule that an unreachable database does not stop a send;
+the Meta Conversions API dispatch is the next user.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+* refactor(recommendation): the row's key is event_key, what makes two rows one event
+
+Named for what it guards, not for where it comes from today: the key is the
+task copy's now, and is what any later source of an event's identity
+writes.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
+### Testing
+
+* test(emails): mail copies count from a baseline, and the reset reaches an account
+
+Building an order mails its own order_created dispatches, so each case
+counts what the task under test mails. The staff reset mails only an
+account that can sign in.
+
+Refs #720 ([`8c6978c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6978cbb9a48338d2d506b617ff5e2dc75f522d))
+
 ## v3.272.1 (2026-11-25)
 
 ### Refactoring

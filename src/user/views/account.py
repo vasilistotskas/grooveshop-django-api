@@ -46,6 +46,7 @@ from user.filters.account import UserAccountFilter
 from user.serializers.account import (
     DeleteAccountRequestSerializer,
     DeleteAccountResponseSerializer,
+    ReauthenticationRequiredSerializer,
     UserDataExportSerializer,
     UserDetailsSerializer,
     UsernameUpdateResponseSerializer,
@@ -186,17 +187,76 @@ serializers_config: SerializersConfig = {
     "delete_account": ActionConfig(
         request=DeleteAccountRequestSerializer,
         response=DeleteAccountResponseSerializer,
+        responses={
+            403: OpenApiResponse(
+                response=ReauthenticationRequiredSerializer,
+                description=_(
+                    "Not the caller's account, or the caller has not "
+                    "confirmed it is them recently "
+                    "(``reauthentication_required``, with the ways it can)"
+                ),
+            ),
+        },
         operation_id="deleteUserAccountGdpr",
+        parameters=[
+            OpenApiParameter(
+                name="X-Session-Token",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                required=False,
+                description=_(
+                    "The allauth app session the customer signed in with, "
+                    "where it confirmed it is them."
+                ),
+            ),
+        ],
         summary=_("Delete account (GDPR right-to-erasure)"),
         description=_(
             "Anonymises the user's orders (kept for tax/accounting) and "
             "hard-deletes every other linked record. Irreversible. "
-            "Caller must have re-authenticated via allauth within the "
-            "window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+            "A customer deleting their own account must have "
+            "re-authenticated via allauth within "
+            "``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session "
+            "it names with ``X-Session-Token``; the refusal lists the ways "
+            "it can."
         ),
         tags=["User Accounts"],
     ),
 }
+
+
+def _reauthentication_required(request, user) -> bool:
+    """Whether ``user`` must confirm it is them before this request.
+
+    allauth records a reauthentication in the session it happened in: for
+    the storefront, the allauth app session it signed the customer in with,
+    named by ``X-Session-Token`` (this API is authenticated by a Knox
+    token, whose request carries no session of its own). That session is
+    read when it is the same customer's; any other is not looked at. A
+    request without it is checked on its own session, where allauth counts
+    only records written for this customer
+    (``get_authentication_records`` compares the user they were written
+    for).
+    """
+
+    from allauth.account.internal.flows.reauthentication import (
+        is_reauthentication_required,
+    )
+    from allauth.headless.internal.sessionkit import (
+        authenticate_by_x_session_token,
+    )
+
+    http = request._request
+    token = http.headers.get("X-Session-Token")
+    found = authenticate_by_x_session_token(token) if token else None
+    if found is None or found.user is None or found.user.pk != user.pk:
+        return is_reauthentication_required(http, app="user")
+    own = http.session
+    http.session = found.session
+    try:
+        return is_reauthentication_required(http, app="user")
+    finally:
+        http.session = own
 
 
 # ``crud_config`` emits a "create" entry because ``write=`` also drives
@@ -570,7 +630,7 @@ class UserAccountViewSet(BaseModelViewSet):
         from this check.
         """
         from allauth.account.internal.flows.reauthentication import (
-            did_recently_reauthenticate,
+            get_reauthentication_flows,
         )
 
         from user.signals import (
@@ -592,11 +652,12 @@ class UserAccountViewSet(BaseModelViewSet):
 
         # Require recent reauthentication for the account owner.
         # Staff acting on behalf of another user are exempt.
-        if request.user == user and not did_recently_reauthenticate(request):
+        if request.user == user and _reauthentication_required(request, user):
             return Response(
                 {
                     "detail": _("Re-authentication required."),
                     "code": "reauthentication_required",
+                    "flows": get_reauthentication_flows(user),
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

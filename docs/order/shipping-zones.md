@@ -157,6 +157,9 @@ carrier gate (`carrier_offers`), so the `shipping` and `regions_countries`
 surfaces both declare, in `invalidated_by`:
 
 - `ShippingZone` and `ShippingZoneRegion`;
+- `Region` (and `Country`, for the pickers): shared rows, so a platform edit
+  purges these surfaces in every schema (`core.cache.invalidation`). A region added to a country, or removed, decides
+  whether its base zone delivers home anywhere (`reaching`);
 - `ShippingProvider`: a carrier switched on or off changes what is
   shippable;
 - `shipping_acs.AcsStation`: ACS offers lockers in a country only while it
@@ -201,10 +204,11 @@ Django's response cache keys on the full URL, so `?shippable=` and
    with the schema and the zone. The zone's rate is the one charged all
    along, so what shoppers were quoted stays what they are charged. `0027`
    sets `zone` NOT NULL (`contract_of` `0025`) and takes `country` out of the
-   state: the code writes and reads the zone alone.
+   state: the code writes and reads the zone alone. It also drops the old
+   unique `(provider, country, kind)` and its index and empties the column,
+   which nothing keeps true any more; release N reads none of them.
 3. **N+2 (contract, `0028`, `contract_of` `0027`).** Drops the rate's `country_id`
-   column, and with it the old unique `(provider, country, kind)` and its
-   index. It cannot be part of N+1: release N names the column in every
+   column. It cannot be part of N+1: release N names the column in every
    SELECT and INSERT, and serves until its last pod exits
    ([`docs/migrations.md`](../migrations.md)). The history table keeps its
    column in the database: a history row whose country never had a base zone

@@ -242,6 +242,17 @@ class TestContractMigrations:
                 "column country_country.alpha_3",
             ),
             (
+                "ALTER TABLE public . country_country DROP COLUMN alpha_3",
+                "column country_country.alpha_3",
+            ),
+            (
+                (
+                    "ALTER TABLE country_country -- the old code\n"
+                    "DROP COLUMN /* obsolete */ alpha_3"
+                ),
+                "column country_country.alpha_3",
+            ),
+            (
                 "ALTER TABLE country_country RENAME TO nation",
                 "table country_country",
             ),
@@ -321,6 +332,10 @@ class TestContractMigrations:
             "ALTER TABLE page_config_navigationmenu ALTER slot DROP DEFAULT",
             "ALTER TABLE page_config_navigationmenu DROP CONSTRAINT foo",
             "ALTER TABLE page_config_navigationmenu RENAME CONSTRAINT a TO b",
+            (
+                "ALTER TABLE page_config_navigationmenu ALTER note SET "
+                "DEFAULT 'it''s a DROP COLUMN slot' /* DROP COLUMN slot */"
+            ),
         ],
     )
     def test_sql_that_removes_nothing_needs_no_declaration(self, sql):

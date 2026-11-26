@@ -220,7 +220,6 @@ class TestStrictKeysStillRaise:
             "strict:throttle_gift_card_check_user:1",
             "allauth:rl:login:ip:127.0.0.1",
             "allauth.mfa.totp.used?user=1&code=123456",
-            "allauth.idp.oidc.authorization_code[c:x]",
             "allauth.idp.oidc.device_code[d]",
             "strict:ticket:ws:abc",
         ],

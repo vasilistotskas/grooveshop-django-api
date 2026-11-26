@@ -352,41 +352,32 @@ class TestTheZoneBecomesRequired(TestCase):
                     cursor, "shipping_shippingrate"
                 )
             }
-        self.assertFalse(columns["zone_id"])
-        # Kept for the release still serving, and free to be NULL.
-        self.assertTrue(columns["country_id"])
-
-
-class TestTheCountryColumnIsDropped(TestCase):
-    """``0028``, and its reverse, which a rollback of it needs."""
-
-    def _columns(self) -> set[str]:
-        with connection.cursor() as cursor:
-            return {
-                column.name
-                for column in connection.introspection.get_table_description(
-                    cursor, "shipping_shippingrate"
-                )
-            }
-
-    def _constraints(self) -> set[str]:
-        with connection.cursor() as cursor:
-            return set(
+            constraints = set(
                 connection.introspection.get_constraints(
                     cursor, "shipping_shippingrate"
                 )
             )
-
-    def test_the_column_its_unique_and_its_index_go_and_come_back(self):
-        old = {
-            "shipping_rate_provider_country_kind_unique",
-            "shipping_rate_country_active_ix",
-        }
-        apps = migrate_to(
-            ("shipping", "0028_shipping_rate_drop_country_column")
+            cursor.execute(
+                "SELECT count(*) FROM shipping_shippingrate "
+                "WHERE country_id IS NOT NULL"
+            )
+            (carrying_a_country,) = cursor.fetchone()
+        self.assertFalse(columns["zone_id"])
+        # Kept for the release still serving, NULL, and held by nothing.
+        self.assertTrue(columns["country_id"])
+        self.assertEqual(carrying_a_country, 0)
+        self.assertFalse(
+            {
+                "shipping_rate_provider_country_kind_unique",
+                "shipping_rate_country_active_ix",
+            }
+            & constraints
         )
-        self.assertNotIn("country_id", self._columns())
-        self.assertFalse(old & self._constraints())
+
+    def test_the_reverse_gives_the_country_its_unique_and_its_index_back(self):
+        apps = migrate_to(
+            ("shipping", "0027_shipping_rate_country_out_of_state")
+        )
         Rate = apps.get_model("shipping", "ShippingRate")
         Zone = apps.get_model("shipping", "ShippingZone")
         Region = apps.get_model("region", "Region")
@@ -412,9 +403,8 @@ class TestTheCountryColumnIsDropped(TestCase):
             )
         _settle_deferred_constraints()
 
-        migrate_to(("shipping", "0027_shipping_rate_country_out_of_state"))
+        migrate_to(("shipping", "0025_shipping_rate_zone_required"))
 
-        self.assertTrue(old <= self._constraints())
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT zone_id, country_id FROM shipping_shippingrate"
@@ -422,3 +412,39 @@ class TestTheCountryColumnIsDropped(TestCase):
             self.assertEqual(
                 set(cursor.fetchall()), {(base.pk, "GR"), (crete.pk, None)}
             )
+            constraints = set(
+                connection.introspection.get_constraints(
+                    cursor, "shipping_shippingrate"
+                )
+            )
+        self.assertTrue(
+            {
+                "shipping_rate_provider_country_kind_unique",
+                "shipping_rate_country_active_ix",
+            }
+            <= constraints
+        )
+
+
+class TestTheCountryColumnIsDropped(TestCase):
+    """``0028``, and its reverse, which a rollback of it needs."""
+
+    def _columns(self) -> set[str]:
+        with connection.cursor() as cursor:
+            return {
+                column.name
+                for column in connection.introspection.get_table_description(
+                    cursor, "shipping_shippingrate"
+                )
+            }
+
+    def test_the_column_goes_and_comes_back(self):
+        migrate_to(("shipping", "0028_shipping_rate_drop_country_column"))
+        self.assertNotIn("country_id", self._columns())
+
+        migrate_to(("shipping", "0027_shipping_rate_country_out_of_state"))
+        self.assertIn("country_id", self._columns())
+
+        # The rollback goes on through 0027's own reverse.
+        migrate_to(("shipping", "0025_shipping_rate_zone_required"))
+        self.assertIn("country_id", self._columns())

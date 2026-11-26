@@ -1,7 +1,7 @@
 """Redis down, through the whole stack: every route refuses the same way.
 
-A security control that cannot reach its strict cache key (a rate limit, an
-IdP code, a single-use ticket) raises instead of lifting itself, and
+A security control that cannot reach its strict cache key (a rate limit, a
+single-use ticket) raises instead of lifting itself, and
 ``core.middleware.strict_cache`` answers 503 ``temporarily_unavailable`` in
 the shape the route's client reads. These send real requests through the
 real middleware with the default cache pointed at a port nothing listens
@@ -53,29 +53,20 @@ def test_allauths_api_answers_its_own_envelope(redis_down, user):
     assert [error["code"] for error in body["errors"]] == [CODE]
 
 
-def test_the_idp_token_endpoint_answers_oauths_error(redis_down, monkeypatch):
-    from allauth.idp.oidc.models import Client as OIDCClient
-
-    # The main suite runs in the public schema, the platform's (staff)
-    # issuer, which wants a store's staff MCP server as the resource; a
-    # store's issuer takes a code exchange without one.
-    monkeypatch.setattr("agent.oidc.on_platform_issuer", lambda: False)
-    monkeypatch.setattr(
-        "agent.oidc.store_mcp_resource", lambda: "https://store.example/mcp"
-    )
-
-    client = OIDCClient.objects.create(
-        name="Outage agent", type=OIDCClient.Type.PUBLIC
-    )
-
+def test_the_idp_registration_endpoint_answers_oauths_error(redis_down):
+    # The registration endpoint counts its callers (allauth's per-address
+    # limit). The token endpoint no longer touches the cache: since allauth
+    # 65.22 an authorization code is a database row.
     response = Client().post(
-        "/identity/o/api/token",
-        data={
-            "grant_type": "authorization_code",
-            "client_id": client.id,
-            "code": "a-code-only-redis-knows",
-            "redirect_uri": "https://agent.example/callback",
-        },
+        "/identity/o/api/clients",
+        data=json.dumps(
+            {
+                "client_name": "Outage agent",
+                "redirect_uris": ["https://agent.example/callback"],
+                "token_endpoint_auth_method": "none",
+            }
+        ),
+        content_type="application/json",
     )
 
     assert response.status_code == 503

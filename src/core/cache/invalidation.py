@@ -39,6 +39,11 @@ Design notes
   an operator edits the Greek description — which is precisely the edit
   that goes stale. Surfaces declare the translation model explicitly.
 
+* **A shared row is every store's.** A model whose app is in
+  ``SHARED_APPS`` alone (``Country``, ``Region``) has one table, which the
+  platform edits in the public schema, while each store caches its own
+  responses: such a write queues the purge in every schema.
+
 * **Coalesced, and after commit.** Saving a model plus three
   translations in one transaction is one logical edit; it purges once,
   and only if the transaction actually commits. Purging inside the
@@ -56,7 +61,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from django.apps import apps
@@ -82,6 +87,15 @@ def _pending_codes() -> set[str]:
     return codes
 
 
+def _pending_everywhere() -> set[str]:
+    """The surfaces this transaction made stale in every store."""
+    codes = getattr(_pending, "everywhere", None)
+    if codes is None:
+        codes = set()
+        _pending.everywhere = codes
+    return codes
+
+
 #: How long commits are gathered before one purge runs.
 PURGE_DELAY_SECONDS = 10
 
@@ -100,7 +114,31 @@ def _flush(schema_name: str) -> None:
     # the next transaction on this thread to retry forever.
     ordered = sorted(codes)
     codes.clear()
+    _queue(ordered, schema_name)
 
+
+def _flush_everywhere() -> None:
+    """:func:`_flush` in every schema, for a row every store reads: the
+    Django caches are per schema, so a purge in ``public`` alone would
+    clear the storefront's copy of them and leave Django's."""
+    from django_tenants.utils import get_public_schema_name, schema_context
+
+    from tenant.models import Tenant
+
+    codes = _pending_everywhere()
+    if not codes:
+        return
+    ordered = sorted(codes)
+    codes.clear()
+    for schema_name in (
+        get_public_schema_name(),
+        *Tenant.objects.stores().values_list("schema_name", flat=True),
+    ):
+        with schema_context(schema_name):
+            _queue(ordered, schema_name)
+
+
+def _queue(ordered: list[str], schema_name: str) -> None:
     from django.core.cache import cache
 
     try:
@@ -187,6 +225,12 @@ def _mark_stale(code: str) -> None:
     transaction.on_commit(lambda: _flush(schema_name))
 
 
+def _mark_stale_everywhere(code: str) -> None:
+    """:func:`_mark_stale` for every store: a shared row changed."""
+    _pending_everywhere().add(code)
+    transaction.on_commit(_flush_everywhere)
+
+
 def mark_surface_stale(code: str) -> None:
     """Queue a purge of surface ``code`` for a change no signal reports.
 
@@ -216,6 +260,7 @@ def _make_receiver(
     ignored_update_fields: frozenset[str],
     *,
     platform_rows_in_public: bool,
+    shared: bool = False,
 ):
     def receiver(sender, **kwargs):
         # ``raw`` is a loaddata/fixture load. The cache is irrelevant
@@ -236,7 +281,10 @@ def _make_receiver(
             and not _is_significant(sender, kwargs.get("instance"))
         ):
             return
-        _mark_stale(code)
+        if shared:
+            _mark_stale_everywhere(code)
+        else:
+            _mark_stale(code)
 
     return receiver
 
@@ -280,19 +328,33 @@ def _in_public_schema() -> bool:
     return connection.schema_name == get_public_schema_name()
 
 
+def _in_apps(model, installed: Iterable[str]) -> bool:
+    app_config = model._meta.app_config
+    return not {
+        app_config.name,
+        f"{type(app_config).__module__}.{type(app_config).__name__}",
+    }.isdisjoint(installed)
+
+
 def _has_platform_rows(model) -> bool:
     """Whether ``model``'s app is both shared and per store: it then has a
     table in the public schema too, holding the platform's own rows."""
 
     from django.conf import settings
 
-    app_config = model._meta.app_config
-    names = {
-        app_config.name,
-        f"{type(app_config).__module__}.{type(app_config).__name__}",
-    }
-    return bool(names & set(settings.SHARED_APPS)) and bool(
-        names & set(settings.TENANT_APPS)
+    return _in_apps(model, settings.SHARED_APPS) and _in_apps(
+        model, settings.TENANT_APPS
+    )
+
+
+def _is_shared(model) -> bool:
+    """Whether ``model`` has one table, in the public schema, that every
+    store reads (``Country``, ``Region``)."""
+
+    from django.conf import settings
+
+    return _in_apps(model, settings.SHARED_APPS) and not _in_apps(
+        model, settings.TENANT_APPS
     )
 
 
@@ -366,6 +428,7 @@ def connect_surface_invalidation(*, force: bool = False) -> None:
             surface.code,
             surface.ignored_update_fields,
             platform_rows_in_public=_has_platform_rows(model),
+            shared=_is_shared(model),
         )
         _receivers.append(receiver)
         uid = _dispatch_uid(surface.code, label)

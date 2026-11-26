@@ -54,6 +54,7 @@ from order.checkout.quote import (
     OrderQuoteService,
     ShippingChoice,
 )
+from order.checkout.resume import quantities_of
 from order.exceptions import (
     CartStockUnavailableError,
     InvalidGiftCardError,
@@ -632,13 +633,10 @@ class CartViewSet(BaseModelViewSet):
 
         # The cart's holds are replaced as a whole: its own earlier holds
         # never count against it, and a product it no longer wants is freed.
-        quantities: dict[int, int] = {}
-        for item in cart_items:
-            quantities[item.product_id] = (
-                quantities.get(item.product_id, 0) + item.quantity
-            )
         try:
-            reservations = StockManager.reserve_cart_stock(cart, quantities)
+            reservations = StockManager.reserve_cart_stock(
+                cart, quantities_of(cart_items)
+            )
         except Cart.DoesNotExist:
             return Response(
                 {"detail": "Cart not found", "code": "cart_not_found"},

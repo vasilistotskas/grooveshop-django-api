@@ -1823,8 +1823,8 @@ msgstr "An unexpected error occurred during XML export: %s"
 msgid "Analytics"
 msgstr "Analytics"
 
-msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
-msgstr "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
+msgstr "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
 
 msgid "Anonymous"
 msgstr "Anonymous"
@@ -9536,6 +9536,9 @@ msgstr "Not set"
 msgid "Not shipped yet"
 msgstr "Not shipped yet"
 
+msgid "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+msgstr "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+
 msgid "Not the order's owner, and no matching order UUID was given."
 msgstr "Not the order's owner, and no matching order UUID was given."
 
@@ -14757,6 +14760,12 @@ msgstr "The address submitted on the newsletter form. The recipient of a guest s
 msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 msgstr "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 
+msgid "The allauth app session the customer signed in with, where it confirmed it is them."
+msgstr "The allauth app session the customer signed in with, where it confirmed it is them."
+
+msgid "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+msgstr "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "The amount due in minor units (cents): 1999 for 19.99."
 
@@ -15359,6 +15368,9 @@ msgstr "The same value as ``reason``."
 
 msgid "The scheduled database backup failed with this error:"
 msgstr "The scheduled database backup failed with this error:"
+
+msgid "The second factors the customer has."
+msgstr "The second factors the customer has."
 
 msgid "The selected payment method is not available for this order."
 msgstr "The selected payment method is not available for this order."
@@ -17462,6 +17474,9 @@ msgstr "Window"
 
 msgid "Wishlist"
 msgstr "Wishlist"
+
+msgid "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
+msgstr "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
 
 msgid "Without a category"
 msgstr "Without a category"

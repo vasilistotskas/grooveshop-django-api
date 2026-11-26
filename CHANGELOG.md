@@ -3,6 +3,62 @@
 
 
 
+## v3.275.0 (2026-11-26)
+
+### Bug fixes
+
+* fix(auth): bump django-allauth to 65.22.1, keep reauthentication by code off until the storefront has it
+
+65.22 carries security fixes (IdP authorization code reuse, S256-only PKCE,
+scoped token revocation, TOTP reuse inside the tolerance window, the Apple
+forged email) and adds reauthentication by a code mailed to a verified
+address, on by default. That flow is a new Flow.id the storefront live today
+rejects, so ACCOUNT_REAUTHENTICATION_METHODS leaves out "code" until a
+storefront that completes the flow is in production.
+
+- allauth-schema.yml regenerated: the three /auth/reauthenticate/code/*
+  endpoints (403 while the method is off), X-Session-Token as a security
+  scheme, Flow.recipients; Flow.id leaves out reauthenticate_by_code while
+  the setting does, and AuthenticationMethod keeps its pre-65.22 entry titles,
+  so the document passes the API contract against the live storefront.
+- The totp/svg correction copies the security of the status operation.
+- Authorization codes are rows of allauth_idp_oidc.Token now (no migration):
+  the codes leave the strict cache keys, and the Redis-outage test of the
+  IdP exercises the registration endpoint, which still counts in Redis.
+- TenantAwareUserSessionsMiddleware tracks through allauth's
+  usersessionkit.track_activity.
+- Per-address limits on the three code endpoints.
+- 65.22 refuses a customer with no way to reauthenticate (no password, no
+  authenticator) instead of skipping the check: covered for account deletion. ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
+* fix(emails): a one-time code reads in dark mode, in every code mail
+
+The four code mails (sign-up confirmation, sign-in, password reset, reauthentication) coloured the code inline with the dark-mode card's own colour. The code is now .email-code in the base template, light text in dark mode. The reauthentication contract test checks the 401 against the operation it called and requires the protected action to succeed after the code. ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
+* fix(emails): the code keeps its size inline; only its colour moves to the class
+
+A client that drops the style block still shows the code large; the colour is the one thing the dark-mode rule must be able to change. ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
+### Documentation
+
+* docs(tenant): allauth.idp.oidc is in both app lists, say so where the code explains it ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
+### Features
+
+* feat(user): confirm it is you with a code mailed to you, and a mail of its own (#837) ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
+* feat(auth): reauthenticate by a code mailed to a verified address
+
+Deletes the setting that kept allauth 65.22's reauthentication by code off
+(ACCOUNT_REAUTHENTICATION_METHODS), so the default (password, code, mfa)
+applies: a customer with a verified address, one without a password
+included, gets the reauthenticate_by_code flow in a reauthentication 401 and
+completes it through /auth/reauthenticate/code/{request,confirm,resend}. The
+mail is the store's account.login_code type. Flow.id declares the value again
+(the only change in allauth-schema.yml).
+
+Ships after the storefront that completes the flow is live in production. ([`a93278e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93278eba4b5445d1ca925d8bcc07f630d22783a))
+
 ## v3.274.1 (2026-11-26)
 
 ### Bug fixes

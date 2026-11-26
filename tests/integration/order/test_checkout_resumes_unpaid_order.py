@@ -141,7 +141,8 @@ class TestTheStorefrontReservesBeforeEveryOrder:
         checkout.reserve()
         earlier = checkout.order()
 
-        checkout.reserve()
+        # Nothing is held again: the order already took the units.
+        assert checkout.reserve() == []
         assert checkout.order().pk == earlier.pk
 
         assert checkout.stock() == STOCK - 1
@@ -174,6 +175,20 @@ class TestTheStorefrontReservesBeforeEveryOrder:
                 Cart.objects.create(user=None),
                 {checkout.product.pk: STOCK - 1 - 3 + 1},
             )
+
+    def test_a_changed_checkout_needs_the_stock_left(self):
+        """The earlier order keeps its units, so they are not the new
+        one's: a change the stock left cannot cover is refused here."""
+        checkout = _Checkout()
+        type(checkout.product).objects.filter(pk=checkout.product.pk).update(
+            stock=3
+        )
+        checkout.order()
+        CartItem.objects.filter(pk=checkout.item.pk).update(quantity=3)
+        checkout.item.refresh_from_db()
+
+        with pytest.raises(CartStockUnavailableError):
+            checkout.reserve()
 
     def test_a_hold_left_from_before_is_released(self):
         """A hold made while the order was not yet there (another tab)."""

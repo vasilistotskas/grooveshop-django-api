@@ -29,6 +29,8 @@ from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from django.db.models import QuerySet
 
     from cart.models import Cart
@@ -187,22 +189,23 @@ def payment_undecided(order: Order) -> bool:
     )
 
 
-def units_held_for_cart(cart: Cart) -> dict[int, int]:
-    """Product id -> the units the cart's unpaid orders already
-    took from the stock: the most any one of them holds, since a repeat
-    resumes one. A checkout of this cart needs no second hold of them."""
+def lines_of_an_unpaid_order(cart: Cart, quantities: Mapping[int, int]) -> bool:
+    """Whether one of the cart's unpaid orders holds exactly these units
+    (product id -> quantity): a checkout of them is that order's again,
+    and resuming it needs no hold, since the order already took them."""
     from order.models.item import OrderItem
 
-    held: dict[int, int] = {}
+    wanted = dict(quantities)
+    lines: dict[int, dict[int, int]] = {}
     rows = (
         OrderItem.objects.filter(order__in=unpaid_orders_of_cart(cart))
         .values("order_id", "product_id")
         .annotate(units=Sum("quantity"))
-        .values_list("product_id", "units")
+        .values_list("order_id", "product_id", "units")
     )
-    for product_id, units in rows:
-        held[product_id] = max(held.get(product_id, 0), units)
-    return held
+    for order_id, product_id, units in rows:
+        lines.setdefault(order_id, {})[product_id] = units
+    return any(order_lines == wanted for order_lines in lines.values())
 
 
 def _hmac(content: dict[str, Any]) -> str:

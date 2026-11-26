@@ -446,10 +446,12 @@ caller:
     changed checkout, answered by the creation that follows. Two identical
     checkouts racing end with one order.
   - **The stock.** The storefront reserves before every order
-    (`StockManager.reserve_cart_stock`), which does not hold again the units
-    the cart's unpaid order already took (`units_held_for_cart`), so a
-    repeat of the last units is not refused there; a resume releases any hold
-    left. The storefront still marks a line whose product has no stock left, so
+    (`StockManager.reserve_cart_stock`). A cart whose lines are exactly those
+    of one of its unpaid orders (`lines_of_an_unpaid_order`) gets no hold,
+    since that order already took the units, so a repeat of the last units is
+    not refused there; a resume releases any hold left from before. Any other
+    checkout is a new order and is held in full against the stock as it is:
+    the earlier order keeps its units. The storefront still marks a line whose product has no stock left, so
     that shopper's way back is the order's own "Pay now".
   - **The answer.** The order, `201`, as for a repeat of an agent checkout,
     with the repeat's own ads consent and browser data, language and newly

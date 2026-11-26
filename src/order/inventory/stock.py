@@ -118,14 +118,9 @@ class StockManager:
         quantity: int,
         session_id: str,
         user_id: int | None = None,
-        own_units: int = 0,
     ) -> StockReservation:
         """
         Reserve stock for one product.
-
-        ``own_units`` are units the caller's own unpaid order already took
-        from the stock (``reserve_cart_stock``): available to it, since the
-        same checkout resumes that order and a changed one may take them.
 
         Counts EVERY active hold, the caller's own included. A cart reserves
         through ``reserve_cart_stock``, which replaces its holds first.
@@ -195,7 +190,7 @@ class StockManager:
         reserved_quantity = sum(r.quantity for r in active_reservations)
 
         # Calculate available stock
-        available_stock = product.stock - reserved_quantity + own_units
+        available_stock = product.stock - reserved_quantity
 
         # Validate sufficient stock
         if available_stock < quantity:
@@ -253,12 +248,12 @@ class StockManager:
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
 
-        Units the cart's own unpaid order already took count as available
-        to it (``order.checkout.resume.units_held_for_cart``): the same
-        checkout made again resumes that order, which has them (and the
-        resume releases these holds), and a changed one is held in full, so
-        nobody takes what it needs before it is created. Creating it still
-        needs the units in stock: the earlier order keeps its own.
+        A cart whose lines are exactly those of one of its unpaid orders
+        (``order.checkout.resume.lines_of_an_unpaid_order``) gets no hold:
+        the same checkout made again resumes that order, which already took
+        the units. Any other checkout places a new order and is held in
+        full against the stock as it is, the earlier order keeping its own
+        units, so nobody takes what the new one needs before it is created.
 
         The first statement locks the ``Cart`` row (``select_for_update``),
         the lock checkout takes first, so the order is cart, then products,
@@ -292,7 +287,7 @@ class StockManager:
             raise ValueError("Quantity must be positive")
 
         from cart.models import Cart
-        from order.checkout.resume import units_held_for_cart
+        from order.checkout.resume import lines_of_an_unpaid_order
 
         locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
         session_id = str(locked_cart.uuid)
@@ -314,7 +309,8 @@ class StockManager:
         ):
             cls.release_reservation(reservation_id)
 
-        held = units_held_for_cart(locked_cart) if quantities else {}
+        if quantities and lines_of_an_unpaid_order(locked_cart, quantities):
+            return []
         reservations: list[StockReservation] = []
         shortfalls: list[InsufficientStockError] = []
         for product_id, quantity in sorted(quantities.items()):
@@ -325,7 +321,6 @@ class StockManager:
                         quantity=quantity,
                         session_id=session_id,
                         user_id=user_id,
-                        own_units=held.get(product_id, 0),
                     )
                 )
             except InsufficientStockError as exc:

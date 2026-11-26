@@ -3,6 +3,24 @@
 
 
 
+## v3.274.1 (2026-11-26)
+
+### Bug fixes
+
+* fix(shipping): the column's rollback brings back the foreign key's own indexes
+
+0010 gave country_id a btree and a varchar_pattern_ops index that 0027 kept; 0028's reverse now recreates both, and the test checks the FK and its two indexes. ([`a77ae73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a77ae73cddb1cabb272a7afd30de3a0d50213c0a))
+
+### Refactoring
+
+* refactor(shipping): drop the country column of a shipping rate (#840) ([`a77ae73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a77ae73cddb1cabb272a7afd30de3a0d50213c0a))
+
+* refactor(shipping): a rate's zone is required and its country leaves the code
+
+The second of three releases that move ShippingRate.country onto its zone. migration_preflight also refuses SQL that drops what the serving state still holds, and a base zone no address resolves to delivers home nowhere. ([`a77ae73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a77ae73cddb1cabb272a7afd30de3a0d50213c0a))
+
+* refactor(shipping): drop the country column of a shipping rate ([`a77ae73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a77ae73cddb1cabb272a7afd30de3a0d50213c0a))
+
 ## v3.274.0 (2026-11-26)
 
 ### Bug fixes

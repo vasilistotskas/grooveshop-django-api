@@ -18,9 +18,8 @@ def _label(entry: str) -> str:
 
     The label is the AppConfig's, not the entry's last dotted part:
     ``allauth.idp.oidc`` registers ``allauth_idp_oidc``. Reading it off
-    the dotted path gave ``oidc``, so that app's tables were not known
-    as tenant-only, and deleting a platform identity reached them in the
-    public schema, where they do not exist.
+    the dotted path gave ``oidc``, which names no app, so the comparison
+    of the two lists went wrong for that app.
     """
     for config in apps.get_app_configs():
         dotted = f"{type(config).__module__}.{type(config).__qualname__}"
@@ -56,9 +55,9 @@ def shared_only_app_labels() -> list[str]:
 
     Derived, not enumerated, and that matters here:
     ``role_scopes.PLATFORM_ONLY_APP_LABELS`` looks like the same set but
-    is not — it also lists ``allauth_idp_oidc``, whose tables are
-    TENANT-only. Hiding that from a tenant host would remove the OIDC
-    clients a store genuinely owns. Membership of ``TENANT_APPS`` is the
+    is not — it also lists ``allauth_idp_oidc``, which every store has
+    its own copy of (it is in ``TENANT_APPS`` as well). Hiding that from
+    a tenant host would remove the OIDC clients a store genuinely owns. Membership of ``TENANT_APPS`` is the
     honest test of "does this store have its own copy".
 
     The comparison is on the app LABELS the entries register

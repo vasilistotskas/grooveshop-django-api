@@ -444,6 +444,22 @@ class TestTheCountryColumnIsDropped(TestCase):
 
         migrate_to(("shipping", "0027_shipping_rate_country_out_of_state"))
         self.assertIn("country_id", self._columns())
+        with connection.cursor() as cursor:
+            on_the_column = [
+                info
+                for info in connection.introspection.get_constraints(
+                    cursor, "shipping_shippingrate"
+                ).values()
+                if info["columns"] == ["country_id"]
+            ]
+        # The foreign key and its two indexes, as 0010 made them.
+        self.assertEqual(
+            sorted(
+                ("fk" if info["foreign_key"] else "index")
+                for info in on_the_column
+            ),
+            ["fk", "index", "index"],
+        )
 
         # The rollback goes on through 0027's own reverse.
         migrate_to(("shipping", "0025_shipping_rate_zone_required"))

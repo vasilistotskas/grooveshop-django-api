@@ -1803,6 +1803,9 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επεξεργα
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορά του προϊόντος στο απόθεμα. Δοκιμάστε ξανά αργότερα."
 
+msgid "An impression's id is minted when it is recorded."
+msgstr "Το αναγνωριστικό μιας προβολής δημιουργείται όταν αυτή καταγράφεται."
+
 msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 msgstr "Ένα αδιαφανές αποτύπωμα του τι θα περιέχει η παραγγελία: οι γραμμές, οι προωθητικές ενέργειες και η αποστολή με το σημείο παραλαβής της, όχι ο τρόπος πληρωμής. Null μέχρι να επιλεγεί αποστολή. Στείλτε το πίσω ως ``expectedCartDigest`` κατά τη δημιουργία της παραγγελίας: η παραγγελία δημιουργείται μόνο αν το καλάθι της είναι ακόμη αυτό."
 
@@ -1825,8 +1828,8 @@ msgstr "Παρουσιάστηκε μη αναμενόμενο σφάλμα κα
 msgid "Analytics"
 msgstr "Αναλυτικά"
 
-msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
-msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ο καλών πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του χρονικού παραθύρου που ορίζεται από το ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
+msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστη (διατηρούνται για φορολογικούς/λογιστικούς λόγους) και διαγράφει οριστικά κάθε άλλη συνδεδεμένη εγγραφή. Μη αναστρέψιμο. Ένας πελάτης που διαγράφει τον δικό του λογαριασμό πρέπει να έχει επανα-ταυτοποιηθεί μέσω allauth εντός του ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, στη συνεδρία allauth που ορίζει με το ``X-Session-Token``· η άρνηση αναφέρει τους τρόπους με τους οποίους μπορεί."
 
 msgid "Anonymous"
 msgstr "Ανώνυμος"
@@ -9539,6 +9542,9 @@ msgstr "Δεν έχει οριστεί"
 msgid "Not shipped yet"
 msgstr "Δεν έχει αποσταλεί"
 
+msgid "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+msgstr "Δεν είναι ο λογαριασμός του καλούντος, ή ο καλών δεν επιβεβαίωσε πρόσφατα ότι είναι ο ίδιος (``reauthentication_required``, με τους τρόπους που μπορεί)"
+
 msgid "Not the order's owner, and no matching order UUID was given."
 msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας και δεν δόθηκε το UUID της."
 
@@ -13479,9 +13485,6 @@ msgstr "Κοινοποιήθηκε από (προσωπικό)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Κοινό σε όλα τα μερίδια μιας επιστροφής ανά γραμμή, ώστε η επανάληψή της να τα βρίσκει μαζί."
 
-msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
-
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
 
@@ -14759,6 +14762,12 @@ msgstr "Η διεύθυνση που δόθηκε στη φόρμα ενημερ
 msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 msgstr "Η ολοκλήρωση αγοράς του agent gateway που δημιούργησε αυτή την παραγγελία. Μια ολοκλήρωση αγοράς δημιουργεί μία παραγγελία: μια επανάληψη της δημιουργίας της απαντάται με αυτή την παραγγελία."
 
+msgid "The allauth app session the customer signed in with, where it confirmed it is them."
+msgstr "Η συνεδρία εφαρμογής allauth με την οποία συνδέθηκε ο πελάτης, όπου επιβεβαίωσε ότι είναι ο ίδιος."
+
+msgid "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+msgstr "Η ροή του allauth: ``reauthenticate`` (ο κωδικός πρόσβασης), ``mfa_reauthenticate`` (δεύτερος παράγοντας), ``reauthenticate_by_code`` (κωδικός που του στέλνεται με email)."
+
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "Το οφειλόμενο ποσό σε υποδιαιρέσεις του νομίσματος (λεπτά): 1999 για 19,99."
 
@@ -15362,6 +15371,9 @@ msgstr "Η ίδια τιμή με το ``reason``."
 msgid "The scheduled database backup failed with this error:"
 msgstr "Το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε με αυτό το σφάλμα:"
 
+msgid "The second factors the customer has."
+msgstr "Οι δεύτεροι παράγοντες που έχει ο πελάτης."
+
 msgid "The selected payment method is not available for this order."
 msgstr "Η επιλεγμένη μέθοδος πληρωμής δεν είναι διαθέσιμη για αυτή την παραγγελία."
 
@@ -15383,8 +15395,8 @@ msgstr "Η αποστολή της οποίας το αίτημα voucher επέ
 msgid "The shipping of this order was already refunded."
 msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
 
-msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
-msgstr "Το αναγνωριστικό της εμφάνισης. Μην το στέλνετε σε μια προβολή: η απόκριση αναφέρει το αναγνωριστικό που καταγράφηκε για αυτή την εμφάνιση, το οποίο φέρουν στη συνέχεια τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί. Ένα κλικ πρέπει να το φέρει."
+msgid "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
+msgstr "Το αναγνωριστικό της εμφάνισης, που φέρει ένα κλικ. Μια προβολή δεν έχει: η απόκρισή της αναφέρει το αναγνωριστικό που δημιουργήθηκε για αυτή την εμφάνιση, το οποίο φέρουν τα κλικ της και η προσθήκη στο καλάθι που ακολουθεί."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
@@ -17464,6 +17476,9 @@ msgstr "Παράθυρο"
 
 msgid "Wishlist"
 msgstr "Λίστα επιθυμιών"
+
+msgid "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
+msgstr "Με το ``reauthentication_required``: οι τρόποι με τους οποίους αυτός ο πελάτης μπορεί να επιβεβαιώσει ότι είναι ο ίδιος, στη συνεδρία allauth που ορίζει το αίτημα (``X-Session-Token``)."
 
 msgid "Without a category"
 msgstr "Χωρίς κατηγορία"
@@ -19796,6 +19811,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"
 #~ msgstr "Όνομα κλειδιού ρύθμισης (π.χ. CHECKOUT_SHIPPING_PRICE)"
+
+#~ msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+#~ msgstr "Κοινό για όλους όσοι βλέπουν ένα αποθηκευμένο αντίγραφο αυτής της απόκρισης. Μην το στέλνετε στο συμβάν προβολής και χρησιμοποιήστε το αναγνωριστικό που αναφέρει η απόκρισή του."
 
 #~ msgid "Shipment Summary"
 #~ msgstr "Σύνοψη Αποστολής"

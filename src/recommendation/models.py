@@ -311,12 +311,11 @@ class RecommendationEvent(models.Model):
         blank=True,
         default="",
     )
-    # What makes two rows one event (``events.record_events``):
-    # ``dispatch_key`` over the task id, the kind, the impression id, the
-    # product and the position, one per row, which every copy of one dispatch
-    # makes again, so a second copy inserts nothing. Two beacons are two
-    # tasks, so two rows, even for one impression id. Empty for ``attach``
-    # rows, whose own constraint below makes them once per order.
+    # What makes two rows one event (``events.record_events``): the kind,
+    # the showing (``impression_id``) and the item, so a click sent twice
+    # and another copy of a task insert nothing. Empty for
+    # ``attach`` rows, whose own constraint below makes them once per order,
+    # and for rows written before showings had ids of their own.
     event_key = models.UUIDField(
         _("Event key"), null=True, blank=True, editable=False
     )

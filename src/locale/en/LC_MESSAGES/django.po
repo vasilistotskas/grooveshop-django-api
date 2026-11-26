@@ -1798,6 +1798,9 @@ msgstr "An error occurred while processing your request."
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
 
+msgid "An impression's id is minted when it is recorded."
+msgstr "An impression's id is minted when it is recorded."
+
 msgid "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 msgstr "An opaque digest of what the order would be made of: the lines, the promotions and the delivery with its pickup point, not the pay way. Null until a delivery is chosen. Send it back as ``expectedCartDigest`` when creating the order: the order is created only if its cart is still this one."
 
@@ -1820,8 +1823,8 @@ msgstr "An unexpected error occurred during XML export: %s"
 msgid "Analytics"
 msgstr "Analytics"
 
-msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
-msgstr "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+msgid "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
+msgstr "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. A customer deleting their own account must have re-authenticated via allauth within ``ACCOUNT_REAUTHENTICATION_TIMEOUT``, in the allauth session it names with ``X-Session-Token``; the refusal lists the ways it can."
 
 msgid "Anonymous"
 msgstr "Anonymous"
@@ -9533,6 +9536,9 @@ msgstr "Not set"
 msgid "Not shipped yet"
 msgstr "Not shipped yet"
 
+msgid "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+msgstr "Not the caller's account, or the caller has not confirmed it is them recently (``reauthentication_required``, with the ways it can)"
+
 msgid "Not the order's owner, and no matching order UUID was given."
 msgstr "Not the order's owner, and no matching order UUID was given."
 
@@ -13473,9 +13479,6 @@ msgstr "Shared by (staff)"
 msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 msgstr "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
 
-msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
-
 msgid "Shared text"
 msgstr "Shared text"
 
@@ -14757,6 +14760,12 @@ msgstr "The address submitted on the newsletter form. The recipient of a guest s
 msgid "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 msgstr "The agent gateway's checkout that placed this order. A checkout places one order: a repeat of its order creation is answered with this order."
 
+msgid "The allauth app session the customer signed in with, where it confirmed it is them."
+msgstr "The allauth app session the customer signed in with, where it confirmed it is them."
+
+msgid "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+msgstr "The allauth flow: ``reauthenticate`` (the password), ``mfa_reauthenticate`` (a second factor), ``reauthenticate_by_code`` (a code mailed to them)."
+
 msgid "The amount due in minor units (cents): 1999 for 19.99."
 msgstr "The amount due in minor units (cents): 1999 for 19.99."
 
@@ -15360,6 +15369,9 @@ msgstr "The same value as ``reason``."
 msgid "The scheduled database backup failed with this error:"
 msgstr "The scheduled database backup failed with this error:"
 
+msgid "The second factors the customer has."
+msgstr "The second factors the customer has."
+
 msgid "The selected payment method is not available for this order."
 msgstr "The selected payment method is not available for this order."
 
@@ -15381,8 +15393,8 @@ msgstr "The shipment whose voucher request returned this voucher after another o
 msgid "The shipping of this order was already refunded."
 msgstr "The shipping of this order was already refunded."
 
-msgid "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
-msgstr "The showing's id. Leave it out of an impression: the response names the id recorded for that showing, which its clicks and the add to cart that follows one then carry. A click must carry it."
+msgid "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
+msgstr "The showing's id, which a click carries. An impression has none: its response names the id minted for that showing, which its clicks and the add to cart that follows one carry."
 
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
@@ -17463,6 +17475,9 @@ msgstr "Window"
 msgid "Wishlist"
 msgstr "Wishlist"
 
+msgid "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
+msgstr "With ``reauthentication_required``: the ways this customer can confirm it is them, in allauth's session the request names (``X-Session-Token``)."
+
 msgid "Without a category"
 msgstr "Without a category"
 
@@ -19165,6 +19180,9 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Setting '%(key)s' not found"
+
+#~ msgid "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
+#~ msgstr "Shared by every viewer of a cached copy of this body. Leave it out of the impression event and use the id its response names."
 
 #~ msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
 #~ msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."

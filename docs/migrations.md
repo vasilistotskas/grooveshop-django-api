@@ -179,7 +179,10 @@ What it decides:
 - operations the router keeps out of a schema are ignored there (a
   TENANT_APPS drop never blocks `public`);
 - `RunSQL` that drops, renames or sets NOT NULL needs `contract_of`, and
-  every migration it names must have been applied by an EARLIER deploy;
+  every migration it names must have been applied by an EARLIER deploy. A
+  table or column it drops or renames must also be out of the applied state:
+  an expand that dual-writes the old column keeps it in the state, so its
+  contract is one release further away (`shipping` 0025, 0027);
 - `RunPython` and column type changes are not classified: review them.
 
 **Escape hatch.** `accepted_downtime = "<reason>"` on a migration prints
@@ -260,3 +263,8 @@ clients read the new name, removes it together with the old columns (the
 
 After a contract migration runs, the image can roll back to N, not to
 N-1: N-1 still reads the dropped columns.
+
+The preflight takes the applied migrations for the release that serves. A
+rollback breaks that: after N+1 -> N, N+1's migrations stay applied while N's
+pods serve. Deploy N+1 again before N+2, or a contract N+2 carries passes the
+preflight while N still names its column.

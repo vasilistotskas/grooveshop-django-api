@@ -449,7 +449,7 @@ class TestAccountIdentity:
 class TestPublicSchemaWrites:
     """An app that is both shared and per store keeps the platform's own
     rows in the public schema; writing one changes no storefront, while a
-    shared-only model (the tenant rows every store reads) still purges."""
+    shared-only model (a row every store reads) purges in every schema."""
 
     def test_a_store_model_written_in_public_marks_nothing(self):
         from core.cache import invalidation
@@ -479,7 +479,7 @@ class TestPublicSchemaWrites:
             )(sender=None)
         mark.assert_called_once_with("settings")
 
-    def test_a_shared_model_written_in_public_still_marks_the_surface(self):
+    def test_a_shared_model_marks_the_surface_in_every_schema(self):
         from core.cache import invalidation
 
         with (
@@ -487,11 +487,30 @@ class TestPublicSchemaWrites:
                 invalidation, "_in_public_schema", return_value=True
             ),
             mock.patch.object(invalidation, "_mark_stale") as mark,
+            mock.patch.object(
+                invalidation, "_mark_stale_everywhere"
+            ) as everywhere,
         ):
             invalidation._make_receiver(
-                "tenant_config", frozenset(), platform_rows_in_public=False
+                "regions_countries",
+                frozenset(),
+                platform_rows_in_public=False,
+                shared=True,
             )(sender=None)
-        mark.assert_called_once_with("tenant_config")
+        everywhere.assert_called_once_with("regions_countries")
+        mark.assert_not_called()
+
+    def test_only_models_of_shared_apps_alone_are_shared(self):
+        from django.apps import apps
+
+        from core.cache import invalidation
+
+        assert invalidation._is_shared(apps.get_model("region.Region"))
+        assert invalidation._is_shared(apps.get_model("country.Country"))
+        assert not invalidation._is_shared(
+            apps.get_model("extra_settings.Setting")
+        )
+        assert not invalidation._is_shared(apps.get_model("pay_way.PayWay"))
 
     def test_only_shared_and_per_store_apps_have_platform_rows(self):
         from django.apps import apps

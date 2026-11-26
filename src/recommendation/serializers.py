@@ -104,12 +104,6 @@ class RecommendationItemSerializer(serializers.Serializer):
 class RecommendationResponseSerializer(serializers.Serializer):
     surface = serializers.ChoiceField(choices=Surface.choices)
     items = RecommendationItemSerializer(many=True, read_only=True)
-    impression_id = serializers.UUIDField(
-        help_text=_(
-            "Shared by every viewer of a cached copy of this body. Leave it "
-            "out of the impression event and use the id its response names."
-        )
-    )
 
 
 class RecommendationEventItemSerializer(serializers.Serializer):
@@ -122,10 +116,9 @@ class RecommendationEventRequestSerializer(serializers.Serializer):
     impression_id = serializers.UUIDField(
         required=False,
         help_text=_(
-            "The showing's id. Leave it out of an impression: the response "
-            "names the id recorded for that showing, which its clicks and "
-            "the add to cart that follows one then carry. A click must "
-            "carry it."
+            "The showing's id, which a click carries. An impression has "
+            "none: its response names the id minted for that showing, "
+            "which its clicks and the add to cart that follows one carry."
         ),
     )
     surface = serializers.ChoiceField(choices=Surface.choices)
@@ -148,6 +141,15 @@ class RecommendationEventRequestSerializer(serializers.Serializer):
                     )
                 },
                 code="impression_id_required",
+            )
+        if attrs["kind"] == EventKind.IMPRESSION and "impression_id" in attrs:
+            raise serializers.ValidationError(
+                {
+                    "impression_id": _(
+                        "An impression's id is minted when it is recorded."
+                    )
+                },
+                code="impression_id_minted",
             )
         return attrs
 

@@ -66,9 +66,13 @@ does any other rate.
   product estimate takes the cheapest, the free-shipping line their
   thresholds, and each policy row names its regions (`regionCodes`, empty
   for a base zone).
-- **A zone's regions are written by `ShippingZone.set_regions`** (the
-  admin writes them before the inline rates), which syncs its rates'
-  `country` once for the set written; a rate is written through `save`.
+- **A zone's regions are written by `ShippingZone.set_regions`**, which
+  refuses a set that breaks the zones' rules (`zone_errors`).
+- **A base zone some address resolves to** (`reaching`): where region zones
+  hold every region of a country, no home address is priced by its base
+  zone, so the base zone's home-delivery rates count nowhere: not for a
+  quote without a region, the shippable countries, the standing
+  destinations or `HomeCoverage`. Its pickup points still apply.
 
 ### Served destinations
 
@@ -153,6 +157,9 @@ carrier gate (`carrier_offers`), so the `shipping` and `regions_countries`
 surfaces both declare, in `invalidated_by`:
 
 - `ShippingZone` and `ShippingZoneRegion`;
+- `Region` (and `Country`, for the pickers): shared rows, so a platform edit
+  purges these surfaces in every schema (`core.cache.invalidation`). A region added to a country, or removed, decides
+  whether its base zone delivers home anywhere (`reaching`);
 - `ShippingProvider`: a carrier switched on or off changes what is
   shippable;
 - `shipping_acs.AcsStation`: ACS offers lockers in a country only while it
@@ -179,32 +186,33 @@ Django's response cache keys on the full URL, so `?shippable=` and
 
 ### Release history
 
-Release N (expand, `shipping` `0022`-`0025`): the zone tables; one base zone
-per country a store had rates for (the oldest, if it already had two), named
-after the country (with its code added when another zone has that name),
-each rate put in it, so nothing a store serves or charges changed. `zone` is
-required in the state and nullable in the database for the release still
-serving during the rollout, or back in a rollback. `ShippingRate.country`
-is nullable and not editable: `ShippingRate.save` writes the zone's country
-on a base zone's rate and leaves it empty on a region zone's
-(`ShippingZone.rate_country_id`), and a zone's country or region-set change
-rewrites its rates (`ShippingZone.save`, `shipping.signals`). So the release
-before, which prices by `country` alone, finds exactly the rates it can
-price. Its unique constraint and index leave the state only; in the
-database the constraint still refuses that release a duplicate of a base
-zone's rate.
+`ShippingRate.country` moves onto `ShippingRate.zone` in three releases:
 
-Release N+1 (contract, `contract_of` `0025`), in this order: rerun `0024`'s
-`zone_every_rate`, set `zone` NOT NULL, then drop `country`, the old
-constraint and its index ([`docs/migrations.md`](../migrations.md)). The
-rerun puts in its country's base zone every rate the release before wrote
-during the rollout: one it inserted without a zone, and one whose `country`
-its admin changed. **Where the base zone already has a rate for the same
-carrier and kind, the zone's rate wins**: the other is deleted, and its id
-logged at WARNING with the schema and the zone. The zone's rate is the one
-this release has charged all along (a rate without a zone is not
-chargeable, and a re-pointed rate was still charged in its old zone), so
-what shoppers were quoted stays what they are charged; the old release's
-edit there is the price to set again by hand, from the logged ids. The backfill's reverse refuses a
-store whose region zones hold rates: the old shape has one rate per
-`(provider, country, kind)`.
+1. **N (expand, `shipping` `0022`-`0025`).** The zone tables; one base zone
+   per country a store had rates for (the oldest, if it already had two),
+   named after the country (with its code added when another zone has that
+   name), each rate put in it, so nothing a store serves or charges changed.
+   `zone` was required in the state and nullable in the database, and
+   `country` stayed in the state, dual-written for the release before.
+2. **N+1 (`0026`, `0027`).** `0026` runs `0024`'s `zone_every_rate` again,
+   with `zone` nullable in the state while it reads (required there, the ORM
+   inner-joins the rates without a zone away). It puts in its country's base
+   zone every rate the release before N wrote during the rollout: one it
+   inserted without a zone, and one whose `country` its admin changed.
+   **Where the base zone already has a rate for the same carrier and kind,
+   the zone's rate wins**: the other is deleted, and its id logged at WARNING
+   with the schema and the zone. The zone's rate is the one charged all
+   along, so what shoppers were quoted stays what they are charged. `0027`
+   sets `zone` NOT NULL (`contract_of` `0025`) and takes `country` out of the
+   state: the code writes and reads the zone alone. It also drops the old
+   unique `(provider, country, kind)` and its index and empties the column,
+   which nothing keeps true any more; release N reads none of them.
+3. **N+2 (contract, `contract_of` `0027`).** Drops the rate's `country_id`
+   column. It cannot be part of N+1: release N names the column in every
+   SELECT and INSERT, and serves until its last pod exits
+   ([`docs/migrations.md`](../migrations.md)). The history table keeps its
+   column in the database: a history row whose country never had a base zone
+   has only that to say where it applied.
+
+The backfill's reverse refuses a store whose region zones hold rates: the
+old shape has one rate per `(provider, country, kind)`.

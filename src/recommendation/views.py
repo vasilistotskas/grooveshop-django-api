@@ -16,17 +16,14 @@ the response returns, and the showing's clicks and the add to cart that
 follows one carry it. Nothing upstream of that request can mint it per
 viewer: the storefront caches the suggestions body per (surface, seed)
 and the edge caches the page the strip is drawn into, so one body
-reaches every viewer while it is cached, and so does the
-``impression_id`` in it. The beacon is the first request that is one
+reaches every viewer while it is cached (the id it once carried was
+every viewer's). The beacon is the first request that is one
 viewer's and passes no cache, and its own session, cart and customer are
 what the impression is recorded with, so an ``attach`` matched through
-the id is the viewer's own. The id is a random UUID Django minted, so an
-id a client made up matches no impression it could attach to.
-
-Transitional: an impression that names an id of its own, as a storefront
-that still reads the body's id does, is recorded under that id, so neither
-statement holds for it. The release that stops accepting one (#794) deletes
-this paragraph.
+the id is the viewer's own. The id is a random UUID Django minted, so an id a
+client made up matches no impression it could attach to, and an
+impression that brings an id of its own is refused. The suggestions body
+names no impression at all.
 """
 
 from __future__ import annotations
@@ -116,7 +113,6 @@ def recommendations(request):
         )
     )
     pairs = hydrate_pairs(suggestions, context={"request": request})
-    impression_id = uuid.uuid4()
 
     items = [
         {
@@ -134,7 +130,6 @@ def recommendations(request):
         {
             "surface": data["surface"],
             "items": items,
-            "impression_id": impression_id,
         },
         status=status.HTTP_200_OK,
     )

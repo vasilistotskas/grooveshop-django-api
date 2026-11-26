@@ -171,9 +171,8 @@ class ShippingZoneAdmin(BaseModelAdmin):
     )
 
     def save_related(self, request, form, formsets, change) -> None:
-        # The regions first: a rate takes its country from them
-        # (``ShippingZone.rate_country_id``), and one saved while a new
-        # region zone has none yet would carry the base zone's country.
+        # The admin cannot write an M2M with its own through model, so the
+        # form's ``covered_regions`` is written here.
         form.instance.set_regions(form.cleaned_data["covered_regions"])
         super().save_related(request, form, formsets, change)
 

@@ -90,13 +90,11 @@
             line-height: 1.6;
         }
 
-        /* A one-time code the customer types */
+        /* A one-time code the customer types: its size is inline, for
+           clients that drop this block, its colour here, so the dark rule
+           below can change it */
         .email-body .email-code {
-            font-size: 32px;
-            font-weight: 700;
-            letter-spacing: 4px;
             color: #1f2937;
-            margin: 0;
         }
 
         /* Cards */
@@ -358,7 +356,7 @@
 
 <p>Your email verification code is listed below. Please enter it in your open browser window.</p>
 <div class="email-card text-center">
-    <p class="email-code">123456</p>
+    <p class="email-code" style="font-size: 32px; font-weight: 700; letter-spacing: 4px; margin: 0;">123456</p>
 </div>
 
 

@@ -45,6 +45,16 @@ class CouponService:
             raise CouponError(dead_window_reason(code.promotion))
 
         with transaction.atomic():
+            # Lock the cart row before touching CartPromotionCode so applying
+            # a coupon takes locks in the same Cart -> CartPromotionCode order
+            # as checkout and payment settlement's cart cleanup (#839).
+            from cart.models import Cart
+
+            if (
+                Cart.objects.select_for_update().filter(pk=cart.pk).first()
+                is None
+            ):
+                raise CouponError(CouponRejectionReason.INVALID)
             # v1 policy: one coupon per cart — applying a new code
             # replaces the previous one (schema supports several).
             CartPromotionCode.objects.filter(cart=cart).delete()

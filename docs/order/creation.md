@@ -244,7 +244,8 @@ caller:
 - Sets `status=PENDING`, `payment_status=PENDING`.
 - **Every online pay way is order-first.** An order for Stripe or
   Viva is created PENDING with nothing charged and no `payment_id`, the cart
-  kept (`Order.awaits_online_payment`; it clears on `order_paid`), the
+  kept (`Order.awaits_online_payment`; it clears inside payment settlement via
+  `order.payments.cart_clear`), the
   courier voucher deferred to the payment, and the payment opened
   afterwards on the provider's hosted page by `create_checkout_session`
   (or, for an agent's delegated card, `confirm_agent_payment`), which
@@ -449,7 +450,14 @@ caller:
     order holds the cart's stock. The quote is priced only when the cart has
     such an order. A quote that refuses, another total or other contents are a
     changed checkout, answered by the creation that follows. Two identical
-    checkouts racing end with one order.
+    checkouts racing end with one order. Every online payment settlement
+    (`order.payments.cart_clear`: Stripe webhooks and read-back, Viva 1796 and
+    read-back, and `confirm_agent_payment`) locks the order's cart before the
+    order row — the same lock order as checkout — and removes the paid order's
+    lines inside the settlement transaction, so no checkout can land between a
+    payment's commit and its cart cleanup (#839). A checkout waiting on a cart
+    deleted by settlement is refused cleanly with `CartNotReadyError` (empty
+    cart).
   - **The stock.** The storefront reserves before every order
     (`StockManager.reserve_cart_stock`), and only the creation can tell a
     repeat from a new order, so every checkout is held against the stock as it

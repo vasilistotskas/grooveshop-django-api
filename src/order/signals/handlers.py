@@ -43,6 +43,11 @@ from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import RefundAttempt
+from order.payments.cart_clear import (
+    clear_cart_for_order,
+    lock_cart_for_order_fields,
+    lock_cart_for_order_id,
+)
 from order.payments.disputes import announce_chargeback
 from order.payments.payment import StripePaymentProvider, money_from_minor_units
 from order.payments.payment_fees import (
@@ -218,86 +223,11 @@ def handle_order_post_save(
         record_order_changed(instance.id)
 
 
-def _cart_for_order(order: Order):
-    """The cart this order was built from, or None."""
-    from cart.models import Cart
-
-    if order.user:
-        return Cart.objects.filter(user=order.user).first()
-
-    # For guest orders, read the cart UUID from the cart snapshot both
-    # creation paths write into order metadata
-    # (OrderService.create_order_from_cart[_offline]). The integer PK is
-    # internal only, so the lookup uses the UUID.
-    cart_uuid = (
-        order.metadata.get("cart_snapshot", {}).get("cart_uuid")
-        if order.metadata
-        else None
-    )
-    if not cart_uuid:
-        logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
-        return None
-    return Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
-
-
-def _clear_cart_for_order(order: Order) -> None:
-    """Take THIS ORDER's lines out of the cart, and drop the cart if that
-    empties it.
-
-    Not "delete the cart": an online order deliberately leaves the cart
-    standing until the payment lands (``handle_order_created`` skips the
-    clear while ``awaits_online_payment``, so a shopper who presses Back
-    still has a basket), and a hosted session can stay open for hours.
-    Anything the shopper puts in the cart during that window is theirs,
-    not part of the order being paid for, and deleting the row took it
-    with no trace. The cart is a per-user singleton, so matching it by
-    id would not have helped — only the LINES distinguish the two.
-
-    Lines the order has but the cart does not (promotion gifts injected
-    at creation) simply find nothing to remove.
-    """
+def _clear_cart_on_commit(order: Order) -> None:
     try:
-        cart = _cart_for_order(order)
-        if cart is None:
-            return
-
-        for item in order.items.all():
-            cart_item = cart.items.filter(product_id=item.product_id).first()
-            if cart_item is None:
-                continue
-            if cart_item.quantity > item.quantity:
-                cart_item.quantity -= item.quantity
-                cart_item.save(update_fields=["quantity"])
-            else:
-                cart_item.delete()
-
-        if cart.items.exists():
-            logger.info(
-                "Cart %s kept after order %s — it holds items the order "
-                "did not include",
-                cart.uuid,
-                order.id,
-            )
-            return
-
-        cart.delete()
-        logger.debug("Cleared cart %s after order %s", cart.uuid, order.id)
+        clear_cart_for_order(order)
     except Exception:
         logger.exception("Error clearing cart for order %s", order.id)
-
-
-@receiver(order_paid, dispatch_uid="order.clear_cart_on_paid")
-def handle_order_paid_clear_cart(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Clear the cart once a hosted payment actually completes.
-
-    Counterpart to the ``Order.awaits_online_payment`` skip in
-    ``handle_order_created``. Idempotent: cash-on-delivery orders have
-    already had their cart removed at creation, so this is a no-op for
-    them.
-    """
-    transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
 
 
 @receiver(order_created, dispatch_uid="order.handle_order_created")
@@ -316,9 +246,10 @@ def handle_order_created(
     OrderLifecycleService.confirm(order)
 
     # Clear the cart — but NOT while the shopper still owes an online
-    # payment. See ``Order.awaits_online_payment``.
+    # payment. See ``Order.awaits_online_payment``; an online order's lines
+    # are cleared inside its payment settlement transaction (#839).
     if not order.awaits_online_payment:
-        transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
+        transaction.on_commit(lambda o=order: _clear_cart_on_commit(o))
 
 
 @receiver(order_confirmed, dispatch_uid="order.handle_order_confirmed")
@@ -829,45 +760,55 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
         )
         return
 
-    # Atomic idempotency check-and-mark with row lock to prevent
-    # duplicate processing from parallel webhook deliveries.
-    already_processed = False
+    # Lock the order's cart BEFORE the order row (same lock order as
+    # checkout, #839), then idempotency-mark and settle in one atomic
+    # transaction so the paid order and its cleared cart commit together.
+    # NO try/except around the processing section: any error must
+    # propagate so dj-stripe's outer atomic rolls back the mark + Event
+    # row and Stripe redelivers (G0231).
+    intent_metadata = payment_intent.get("metadata")
     with transaction.atomic():
-        order = (
-            Order.objects.select_for_update()
-            .filter(payment_id=payment_intent_id)
-            .first()
+        target = OrderService._order_target_for_stripe_intent(
+            payment_intent_id, intent_metadata
         )
-        if order:
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
-                logger.info(
-                    "Webhook %s already processed for order %s, skipping",
-                    event_id,
-                    order.id,
-                )
-                # The payment this event reports may be on an order still
-                # unconfirmed: confirm it (a no-op otherwise).
-                OrderLifecycleService.confirm(order)
-                already_processed = True
-            else:
+        if target is not None:
+            cart = lock_cart_for_order_fields(
+                user_id=target["user_id"], metadata=target["metadata"]
+            )
+            order = (
+                Order.objects.select_for_update()
+                .filter(pk=target["pk"])
+                .first()
+            )
+            if order:
+                if order.metadata and order.metadata.get(
+                    f"webhook_processed_{event_id}"
+                ):
+                    logger.info(
+                        "Webhook %s already processed for order %s, skipping",
+                        event_id,
+                        order.id,
+                    )
+                    # The payment this event reports may be on an order still
+                    # unconfirmed: confirm it (a no-op otherwise).
+                    OrderLifecycleService.confirm(order)
+                    return
                 if not order.metadata:
                     order.metadata = {}
                 order.metadata[f"webhook_processed_{event_id}"] = True
                 order.save(update_fields=["metadata"])
-
-    if already_processed:
-        return
-
-    # NO try/except around the processing section: any error must
-    # propagate so dj-stripe's outer atomic rolls back the mark + Event
-    # row and Stripe redelivers (G0231).
-    outcome = OrderService.handle_payment_succeeded(
-        payment_intent_id,
-        captured=captured,
-        metadata=payment_intent.get("metadata"),
-    )
+            outcome = OrderService.handle_payment_succeeded(
+                payment_intent_id,
+                captured=captured,
+                metadata=intent_metadata,
+                cart=cart,
+            )
+        else:
+            outcome = OrderService.handle_payment_succeeded(
+                payment_intent_id,
+                captured=captured,
+                metadata=intent_metadata,
+            )
 
     announce_stripe_payment_applied(outcome, payment_intent_id)
     record_stripe_fee_for_intent(payment_intent_id, latest_charge_id)
@@ -1779,10 +1720,13 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         logger.warning("No order_id in session metadata: %s", session_id)
         return
 
-    # Atomic idempotency check-and-mark with row lock, then perform all
-    # state mutations inside the same transaction to prevent double-save
-    # and parallel duplicate processing.
+    # Lock the cart BEFORE the order row (same lock order as checkout,
+    # #839) when settling a paid session, then perform all state mutations
+    # inside the same transaction so the paid order and its cleared cart
+    # commit together.
     with transaction.atomic():
+        settling = payment_status == "paid" and bool(payment_intent_id)
+        cart = lock_cart_for_order_id(order_id) if settling else None
         try:
             order = Order.objects.select_for_update().get(id=order_id)
         except Order.DoesNotExist:
@@ -1814,6 +1758,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 session_id=session_id,
                 payment_intent_id=payment_intent_id,
                 captured=captured,
+                cart=cart,
             )
 
         elif payment_status == "unpaid":

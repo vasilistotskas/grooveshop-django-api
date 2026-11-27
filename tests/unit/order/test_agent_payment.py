@@ -193,6 +193,55 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
 
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     @mock.patch("order.views.order.get_payment_provider")
+    def test_successful_charge_clears_orders_cart_lines_once(
+        self, mock_get
+    ) -> None:
+        from cart.models import Cart, CartItem
+        from order.models.item import OrderItem
+        from order.services import OrderService
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+        cart = Cart.objects.create(user=None)
+        CartItem.objects.create(cart=cart, product=product, quantity=2)
+        order = self._guest_stripe_order()
+        order.items.all().delete()
+        order.metadata = {"cart_snapshot": {"cart_uuid": str(cart.uuid)}}
+        order.save(update_fields=["metadata"])
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=1,
+            price=Money(Decimal("10.00"), settings.DEFAULT_CURRENCY),
+            sort_order=1,
+        )
+        total = order.calculate_order_total_amount()
+        mock_get.return_value.confirm_delegated_payment.return_value = (
+            True,
+            {
+                "payment_id": "pi_agent_clear_1",
+                "status": PaymentStatus.COMPLETED,
+                "amount": str(total.amount),
+                "currency": str(total.currency),
+                "provider": "stripe",
+            },
+        )
+
+        response = self.client.post(
+            self._url(order), {"sharedPaymentToken": SPT}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(cart.items.get(product=product).quantity, 1)
+
+        # Follow-up payment_intent.succeeded webhook must not remove the
+        # remaining unit.
+        OrderService.handle_payment_succeeded(
+            "pi_agent_clear_1", captured=total
+        )
+        self.assertEqual(cart.items.get(product=product).quantity, 1)
+
+    @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
+    @mock.patch("order.views.order.get_payment_provider")
     def test_a_charge_on_an_order_canceled_meanwhile_is_booked_not_confirmed(
         self, mock_get
     ) -> None:

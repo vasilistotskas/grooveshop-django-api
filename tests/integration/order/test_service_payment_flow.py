@@ -196,7 +196,7 @@ class TestCreateOrderFromCart:
     def test_cart_clears_at_creation_for_an_offline_pay_way(self):
         """Pins ``settlement``: the factory randomises it, and cart
         clearing depends on whether the shopper still owes money online
-        (hosted flows keep the cart until ``order_paid``)."""
+        (hosted flows keep the cart until payment settles)."""
         offline_pay_way = PayWayFactory.create(
             provider_code="cash_on_delivery",
             settlement=PaySettlement.COURIER_CASH,
@@ -213,21 +213,24 @@ class TestCreateOrderFromCart:
         pressing Back — silently emptied the shopper's basket and
         stranded a PENDING order (2026-08-08: 35 Viva orders ended
         CANCELED with payment PENDING against 27 COMPLETED).
-        ``order_paid`` is what clears it."""
-        from order.signals import order_paid
-
+        Payment settlement clears it inside its transaction (#839)."""
         hosted_pay_way = PayWayFactory.create(
-            provider_code="viva_wallet", settlement=PaySettlement.ONLINE
+            provider_code="stripe", settlement=PaySettlement.ONLINE
         )
 
         order = self._create(pay_way=hosted_pay_way)
+        order.payment_id = "pi_hosted_clear_1"
+        order.save(update_fields=["payment_id"])
 
         assert not order.is_paid
         assert self.cart.items.count() == 2, (
             "cart was destroyed before the shopper paid"
         )
 
-        order_paid.send(sender=type(order), order=order)
+        OrderService.handle_payment_succeeded(
+            "pi_hosted_clear_1",
+            captured=order.calculate_order_total_amount(),
+        )
 
         assert self.cart.items.count() == 0
 

@@ -15,7 +15,11 @@ webhook has not landed (see **A lost webhook** below).
 Differences from the Stripe path that are easy to miss:
 
 - **Row lock** is acquired in `viva_settlement.apply_event`, not inside
-  a service method. The whole event runs inside one
+  a service method. For 1796 (`handle_payment_created`), `apply_event` locks
+  the order's cart first (`order.payments.cart_clear.lock_cart_for_order_id`,
+  matching checkout's `Cart → Order` lock order) before locking the order row,
+  and `handle_payment_created` clears the order's lines from the locked cart
+  inside the same transaction (#839). The whole event runs inside one
   ``select_for_update`` block, and no Viva call is made inside it: each
   event's ``EventRead`` (`_EVENT_HANDLERS` pairs each handler with one)
   retrieves what the handler needs before the lock (the transaction; for

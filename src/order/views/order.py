@@ -93,6 +93,10 @@ from order.lifecycle.service import OrderLifecycleService
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold, settlement
+from order.payments.cart_clear import (
+    clear_locked_cart_for_order,
+    lock_cart_for_order_id,
+)
 from order.payments.payment import (
     OpenPayment,
     VivaWalletPaymentProvider,
@@ -1822,14 +1826,17 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Persist under a row lock: a concurrent webhook for the same
-        # intent must not lose-update.
+        # Lock the cart BEFORE the order row (same lock order as checkout,
+        # #839) when settling synchronously, so a concurrent webhook or
+        # checkout cannot lose-update or see a paid order with an uncleared
+        # cart.
         # A synchronous "succeeded" marks the order paid inline so the
         # agent gets a definitive answer; the payment_intent.succeeded
         # webhook remains the idempotent backstop.
         with transaction.atomic():
-            locked = Order.objects.select_for_update().get(pk=order.pk)
             paid = payment_response["status"] == PaymentStatus.COMPLETED
+            cart = lock_cart_for_order_id(order.pk) if paid else None
+            locked = Order.objects.select_for_update().get(pk=order.pk)
             if paid and OrderService.is_payment_after_cancel(locked):
                 # Canceled while the token was charged: the money is
                 # booked and staff are paged; the order stays canceled.
@@ -1839,10 +1846,13 @@ class OrderViewSet(BaseModelViewSet):
                     payment_method="stripe_agent_spt",
                 )
             elif paid:
+                was_paid = locked.payment_status == PaymentStatus.COMPLETED
                 locked.mark_as_paid(
                     payment_id=payment_response["payment_id"],
                     payment_method="stripe_agent_spt",
                 )
+                if not was_paid:
+                    clear_locked_cart_for_order(locked, cart)
                 # The webhook that follows is a backstop that may not
                 # come: confirmed now, once.
                 OrderLifecycleService.confirm(locked)

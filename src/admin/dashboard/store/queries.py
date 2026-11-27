@@ -283,7 +283,7 @@ def funnel(key: str) -> dict[str, int]:
     """Carts started → orders placed → orders paid, over the period.
 
     Placing an order deletes the cart it came from
-    (``order.signals.handlers._clear_cart_for_order``), so the carts
+    (``order.payments.cart_clear``), so the carts
     still in the table are the ones that did NOT become orders. Every
     cart started is therefore an order placed or a cart still holding
     items; empty carts (a visitor who added nothing) are not a start.

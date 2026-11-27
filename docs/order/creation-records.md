@@ -91,7 +91,7 @@ Orders made outside checkout — the demo seed (`src/devtools/demo_account.py`,
   an account cart brings no source, so the merged cart has none either.
   The cart response does not expose it; the storefront never reads it.
 - **Cart source on the order.** The cart is deleted once its lines
-  become an order (`_clear_cart_for_order`), so order creation copies
+  become an order (`order.payments.cart_clear`), so order creation copies
   the cart's first touch into `OrderAttribution.cart_source_type` /
   `cart_source` (`OrderAttributionService.record(..., cart=cart)`), next
   to the checkout source on the same row. Empty strings mean the cart

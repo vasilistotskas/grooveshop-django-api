@@ -4954,6 +4954,9 @@ msgstr "Enter how many units of at least one line came back."
 msgid "Enter how many units of at least one line to refund, or a goodwill amount."
 msgstr "Enter how many units of at least one line to refund, or a goodwill amount."
 
+msgid "Enter the API key for the new AI provider."
+msgstr "Enter the API key for the new AI provider."
+
 #, python-format
 msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
 msgstr "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
@@ -16562,6 +16565,9 @@ msgstr "Update multiple category images at once. Can update active status and so
 
 msgid "Update on your business account application"
 msgstr "Update on your business account application"
+
+msgid "Update the API key on the AI tab instead of the legacy Chat API Key field."
+msgstr "Update the API key on the AI tab instead of the legacy Chat API Key field."
 
 msgid "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
 msgstr "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."

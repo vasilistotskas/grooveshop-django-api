@@ -32,7 +32,7 @@ from user.factories.account import UserAccountFactory
 
 
 def _request(user):
-    request = RequestFactory().get("/admin/")
+    request = RequestFactory().get(reverse("admin:index"))
     request.user = user
     return request
 
@@ -179,10 +179,10 @@ class TestTenantResolveAIProfile:
             tenant=tenant, domain="ai-openai.example", is_primary=True
         )
         client = Client()
-        url = "/api/v1/tenant/resolve?domain=ai-openai.example"
+        url = f"{reverse('tenant:tenant-resolve')}?domain=ai-openai.example"
 
         public = client.get(url)
-        assert public.status_code == 200
+        assert public.status_code == status.HTTP_200_OK
         assert "aiProfile" not in public.json()
         assert "sk-openai-resolve-secret" not in public.content.decode()
 
@@ -190,7 +190,7 @@ class TestTenantResolveAIProfile:
         assert "aiProfile" not in forged.json()
 
         gateway = client.get(url, HTTP_X_INTERNAL_TOKEN="gw-secret")
-        assert gateway.status_code == 200
+        assert gateway.status_code == status.HTTP_200_OK
         assert gateway["Cache-Control"] == "private, no-store"
         assert "X-Internal-Token" in gateway["Vary"]
         payload = gateway.json()
@@ -222,10 +222,10 @@ class TestTenantResolveAIProfile:
             tenant=tenant, domain="ai-none.example", is_primary=True
         )
         response = Client().get(
-            "/api/v1/tenant/resolve?domain=ai-none.example",
+            f"{reverse('tenant:tenant-resolve')}?domain=ai-none.example",
             HTTP_X_INTERNAL_TOKEN="gw-secret",
         )
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["aiProfile"] is None
 
     def test_legacy_chat_api_key_bridge_mirrors_only_gemini(self):
@@ -457,7 +457,7 @@ class TestTenantAdminWriteOnlyAIKey:
             response = client.get(
                 reverse("admin:tenant_tenant_change", args=[tenant.pk])
             )
-            assert response.status_code == 200
+            assert response.status_code == status.HTTP_200_OK
             html = response.content.decode()
             assert secret not in html
             assert 'name="ai_api_key"' in html
@@ -599,6 +599,95 @@ class TestTenantAdminWriteOnlyAIKey:
         assert not overlong.is_valid()
         assert len(overlong.errors["ai_api_key"]) == 1
 
+    def test_provider_change_requires_new_key_and_legacy_chat_key_edit_refused(
+        self, bind_tenant_and_schema
+    ):
+        tenant = store_tenant(
+            "ai_admin_provider_switch",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="sk-gemini-orig",
+            chat_api_key="sk-gemini-orig",
+        )
+        user = _superuser()
+        bind_tenant_and_schema(None)
+        request = _request(user)
+        form_class = self._admin().get_form(
+            request,
+            tenant,
+            fields=[
+                "ai_provider",
+                "ai_model",
+                "ai_api_key",
+                "clear_ai_api_key",
+                "chat_api_key",
+            ],
+        )
+
+        # Switching provider while leaving ai_api_key blank is refused so
+        # the old Gemini key is never paired with OpenAI's endpoint.
+        switch_no_key = form_class(
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "",
+                "clear_ai_api_key": False,
+                "chat_api_key": "sk-gemini-orig",
+            },
+            instance=tenant,
+        )
+        assert not switch_no_key.is_valid()
+        assert "ai_api_key" in switch_no_key.errors
+
+        # Editing legacy chat_api_key while a profile is configured is refused.
+        legacy_edit = form_class(
+            {
+                "ai_provider": AIProvider.GEMINI,
+                "ai_model": "gemini-3.5-flash-lite",
+                "ai_api_key": "",
+                "clear_ai_api_key": False,
+                "chat_api_key": "sk-legacy-diverged",
+            },
+            instance=tenant,
+        )
+        assert not legacy_edit.is_valid()
+        assert "chat_api_key" in legacy_edit.errors
+
+        # Rotating the Gemini key via the AI tab mirrors to legacy chat_api_key.
+        rotate_gemini = form_class(
+            {
+                "ai_provider": AIProvider.GEMINI,
+                "ai_model": "gemini-3.5-flash-lite",
+                "ai_api_key": "sk-gemini-rotated",
+                "clear_ai_api_key": False,
+                "chat_api_key": "sk-gemini-orig",
+            },
+            instance=tenant,
+        )
+        assert rotate_gemini.is_valid(), rotate_gemini.errors
+        rotate_gemini.save()
+        tenant.refresh_from_db()
+        assert tenant.ai_api_key == "sk-gemini-rotated"
+        assert tenant.chat_api_key == "sk-gemini-rotated"
+
+        # Switching to OpenAI with a new key clears legacy chat_api_key.
+        switch_ok = form_class(
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "sk-openai-new",
+                "clear_ai_api_key": False,
+                "chat_api_key": "sk-gemini-rotated",
+            },
+            instance=tenant,
+        )
+        assert switch_ok.is_valid(), switch_ok.errors
+        switch_ok.save()
+        tenant.refresh_from_db()
+        assert tenant.ai_provider == AIProvider.OPENAI
+        assert tenant.ai_api_key == "sk-openai-new"
+        assert tenant.chat_api_key == ""
+
 
 @pytest.mark.django_db
 @pytest.mark.urls("tenant.urls_public")
@@ -652,9 +741,40 @@ class TestTenantAdminSerializerAIProfile:
         tenant.refresh_from_db()
         assert tenant.ai_api_key == "sk-api-write-only"
 
+        # Switching provider without supplying a new key is refused.
+        bad_switch = operator_client.patch(
+            url,
+            {"aiProvider": "mistral", "aiModel": "mistral-small-latest"},
+            format="json",
+        )
+        assert bad_switch.status_code == status.HTTP_400_BAD_REQUEST
+        assert "ai_api_key" in bad_switch.data
+
+        # Editing legacy chat_api_key while a profile is configured is refused.
+        bad_legacy = operator_client.patch(
+            url,
+            {"chatApiKey": "sk-legacy-only"},
+            format="json",
+        )
+        assert bad_legacy.status_code == status.HTTP_400_BAD_REQUEST
+        assert "chat_api_key" in bad_legacy.data
+
+        # Rotating to Gemini mirrors ai_api_key into legacy chat_api_key.
+        to_gemini = operator_client.patch(
+            url,
+            {
+                "aiProvider": "gemini",
+                "aiModel": "gemini-3.5-flash-lite",
+                "aiApiKey": "sk-gem-api",
+            },
+            format="json",
+        )
+        assert to_gemini.status_code == status.HTTP_200_OK
+        tenant.refresh_from_db()
+        assert tenant.ai_api_key == "sk-gem-api"
+        assert tenant.chat_api_key == "sk-gem-api"
+
         # Clearing the AI profile via PATCH also clears legacy chat_api_key.
-        tenant.chat_api_key = "legacy-chat-key"
-        tenant.save(update_fields=["chat_api_key"])
         cleared = operator_client.patch(
             url,
             {"aiProvider": "", "aiModel": "", "aiApiKey": ""},

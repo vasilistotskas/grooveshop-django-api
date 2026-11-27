@@ -162,10 +162,15 @@ class TenantAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        has_pk = bool(self.instance and self.instance.pk)
+        self._existing_ai_provider = (
+            (self.instance.ai_provider or "") if has_pk else ""
+        )
         self._existing_ai_api_key = (
-            (self.instance.ai_api_key or "")
-            if self.instance and self.instance.pk
-            else ""
+            (self.instance.ai_api_key or "") if has_pk else ""
+        )
+        self._existing_chat_api_key = (
+            (self.instance.chat_api_key or "") if has_pk else ""
         )
         if self.instance is not None:
             # Snapshot the persisted state before Django's _post_clean()
@@ -191,11 +196,27 @@ class TenantAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if cleaned is None:
+            return cleaned
+        submitted_provider = (
+            cleaned.get("ai_provider") or ""
+            if "ai_provider" in cleaned
+            else self._existing_ai_provider
+        )
         if (
-            cleaned is None
-            or "ai_api_key" not in self.fields
-            or "ai_api_key" in self.errors
+            "chat_api_key" in cleaned
+            and (cleaned.get("chat_api_key") or "")
+            != self._existing_chat_api_key
+            and (self._existing_ai_provider or submitted_provider)
         ):
+            self.add_error(
+                "chat_api_key",
+                _(
+                    "Update the API key on the AI tab instead of the legacy "
+                    "Chat API Key field."
+                ),
+            )
+        if "ai_api_key" not in self.fields or "ai_api_key" in self.errors:
             return cleaned
         new_key = cleaned.get("ai_api_key") or ""
         clear_key = bool(cleaned.get("clear_ai_api_key"))
@@ -211,7 +232,19 @@ class TenantAdminForm(forms.ModelForm):
             cleaned["ai_api_key"] = ""
             self._cleared_ai_api_key = True
         elif not new_key:
-            cleaned["ai_api_key"] = self._existing_ai_api_key
+            if (
+                self._existing_ai_api_key
+                and self._existing_ai_provider
+                and submitted_provider
+                and submitted_provider != self._existing_ai_provider
+            ):
+                self.add_error(
+                    "ai_api_key",
+                    _("Enter the API key for the new AI provider."),
+                )
+                cleaned["ai_api_key"] = ""
+            else:
+                cleaned["ai_api_key"] = self._existing_ai_api_key
         return cleaned
 
     def _post_clean(self):
@@ -228,12 +261,26 @@ class TenantAdminForm(forms.ModelForm):
             self.errors["ai_api_key"] = self.error_class(prior_key_errors)
 
     def save(self, commit=True):
+        from tenant.enum import AIProvider
+
         instance = super().save(commit=False)
-        if self._cleared_ai_api_key and "chat_api_key" not in self.changed_data:
-            # Expand-release bridge: clearing the AI profile also clears
-            # the legacy chat_api_key so older gateway pods stop serving
-            # chat immediately.
-            instance.chat_api_key = ""
+        if (
+            "ai_api_key" in self.fields
+            and "chat_api_key" not in self.changed_data
+        ):
+            # Expand-release bridge: keep legacy chat_api_key aligned for
+            # older gateway pods and rollback safety. Mirror Gemini keys;
+            # clear legacy key on non-Gemini profiles or explicit clear.
+            if (
+                instance.ai_provider == AIProvider.GEMINI
+                and instance.ai_api_key
+            ):
+                instance.chat_api_key = instance.ai_api_key
+            elif self._cleared_ai_api_key or (
+                instance.ai_provider
+                and instance.ai_provider != AIProvider.GEMINI
+            ):
+                instance.chat_api_key = ""
         if commit:
             instance.save()
             self.save_m2m()

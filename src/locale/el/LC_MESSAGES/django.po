@@ -4959,6 +4959,9 @@ msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μ
 msgid "Enter how many units of at least one line to refund, or a goodwill amount."
 msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μίας γραμμής θα επιστραφούν ή ένα ποσό καλής θελήσεως."
 
+msgid "Enter the API key for the new AI provider."
+msgstr "Εισαγάγετε το κλειδί API για τον νέο πάροχο AI."
+
 #, python-format
 msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
 msgstr "Εισαγάγετε τη διεύθυνση URL του προφίλ σας στο %(hosts)s: https://, ένας από αυτούς τους ιστότοπους και μια διαδρομή που δείχνει το προφίλ, όχι μόνο την αρχική σελίδα."
@@ -16564,6 +16567,9 @@ msgstr "Ενημέρωση πολλαπλών εικόνων κατηγορία�
 
 msgid "Update on your business account application"
 msgstr "Ενημέρωση για την αίτηση εταιρικού λογαριασμού"
+
+msgid "Update the API key on the AI tab instead of the legacy Chat API Key field."
+msgstr "Ενημερώστε το κλειδί API στην καρτέλα AI αντί για το παλιό πεδίο Κλειδί API Chat."
 
 msgid "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
 msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας. Η κατάσταση CANCELED απορρίπτεται: η ακύρωση παραγγελίας γίνεται μέσω της ενέργειας ακύρωσης."

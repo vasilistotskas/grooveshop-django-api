@@ -1,7 +1,7 @@
 """The docs name files that exist, and nothing cites a private note.
 
-Agents and people navigate this repository from ``AGENTS.md`` (linked from
-``CLAUDE.md``), the ``.claude/`` rules, skills and agents, and ``docs/``. A path in
+Agents and people navigate this repository from ``AGENTS.md`` (``CLAUDE.md``
+imports it), the ``.claude/`` rules, skills and agents, and ``docs/``. A path in
 backticks there is an instruction to open that file, so a path that no
 longer exists sends the reader nowhere, and a moved module leaves one
 behind unless the same change updates the page.
@@ -69,24 +69,14 @@ _SOURCE_SUFFIXES = frozenset({".py", ".yml", ".yaml", ".toml", ".sh", ".mjs"})
 
 
 def _doc_files() -> list[Path]:
-    candidates = [
+    files = [
         REPO_ROOT / "AGENTS.md",
         REPO_ROOT / "CLAUDE.md",
         REPO_ROOT / "README.md",
     ]
-    candidates += sorted((REPO_ROOT / "docs").rglob("*.md"))
-    candidates += sorted((REPO_ROOT / ".claude").rglob("*.md"))
-    seen: set[Path] = set()
-    files: list[Path] = []
-    for path in candidates:
-        if not path.is_file():
-            continue
-        resolved = path.resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        files.append(path)
-    return files
+    files += sorted((REPO_ROOT / "docs").rglob("*.md"))
+    files += sorted((REPO_ROOT / ".claude").rglob("*.md"))
+    return [path for path in files if path.is_file()]
 
 
 def _first_party_roots() -> frozenset[str]:
@@ -406,9 +396,7 @@ def test_a_root_file_moved_under_a_source_root_is_still_checked(
     assert _missing_paths() == {"CLAUDE.md: settings.py"}
 
 
-def test_agents_md_is_scanned_and_symlinked_claude_md_is_deduplicated(
-    tmp_path, monkeypatch
-):
+def test_agents_md_is_scanned(tmp_path, monkeypatch):
     (tmp_path / "src" / "order").mkdir(parents=True)
     (tmp_path / "src" / "order" / "services.py").touch()
     (tmp_path / "AGENTS.md").write_text(
@@ -416,7 +404,6 @@ def test_agents_md_is_scanned_and_symlinked_claude_md_is_deduplicated(
         "path.md`.\n",
         encoding="utf-8",
     )
-    (tmp_path / "CLAUDE.md").symlink_to("AGENTS.md")
     monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
 
     assert _doc_files() == [tmp_path / "AGENTS.md"]

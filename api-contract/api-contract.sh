@@ -209,7 +209,7 @@ gateway_levels() {
 # answered "Store not found" (2026-10-27). Flattened, the same pair is two
 # errors. The gateway's contract is generated from Go types, so the same
 # flattening applies, and its own levels file decides what a Go client can
-# and cannot notice (see the gateway's CLAUDE.md).
+# and cannot notice (see the gateway's AGENTS.md).
 #
 # The storefront parses every 2xx of an operation with the one Zod schema
 # generated for it, so a success status Django adds is a body the live

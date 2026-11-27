@@ -647,7 +647,7 @@ jobs:
     # both for speed), so schema-binding regressions the 6000+ test suite
     # can never see — a cross-schema FK, a cache-key leak, a seed migration
     # that silently stops reaching new tenants — fail here instead. See
-    # ``tests_mt/conftest.py`` and CLAUDE.md's test section.
+    # ``tests_mt/conftest.py`` and AGENTS.md's test section.
     services:
       redis:
         image: redis:8-alpine

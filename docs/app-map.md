@@ -92,7 +92,7 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 - middleware (`src/core/middleware/`), the email templates
   (`src/core/templates/`) and the root URL conf.
 
-Read `CLAUDE.md` ("Core Base Classes and Patterns"), `docs/client-ip.md`,
+Read `AGENTS.md` ("Core Base Classes and Patterns"), `docs/client-ip.md`,
 `docs/error-contract.md`, `docs/image-uploads.md`, `docs/rich-text.md`,
 `docs/safe-fetch.md`, `docs/celery-results.md` and `docs/migrations.md`
 for the part you touch.
@@ -329,7 +329,7 @@ lists the imports that still break that rule.
   It has no doc of its own.
 - `contact/`: `Contact`, `ContactAttachment` and `Feedback`, with the
   attachment scan and the retention sweeps in `src/contact/tasks.py`. Read
-  `CLAUDE.md` ("Celery": the tasks and data retention); the retention
+  `AGENTS.md` ("Celery": the tasks and data retention); the retention
   table is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
 ### `page_config/`
@@ -374,7 +374,7 @@ the engine (`src/recommendation/engine.py`) and its strategies
 (`src/notification/consumers.py`), the per-user group names and the
 send to them, bounded by `NOTIFICATION_PUSH_TIMEOUT_SECONDS`
 (`src/notification/groups.py`), and the single-use WebSocket ticket
-endpoint (`src/notification/views/websocket.py`). Read `CLAUDE.md`
+endpoint (`src/notification/views/websocket.py`). Read `AGENTS.md`
 ("WebSocket / Real-time"), and
 `docs/order/emails-and-notifications.md` (section 6.4) for the order
 toasts.

@@ -145,7 +145,7 @@ configuration, `tests/` and `docs/` stay at the repository root, and
 | Search | `search`, `meili` |
 | Accounts and real-time | `user`, `notification`, `agent` |
 
-[CLAUDE.md](CLAUDE.md) describes the base classes, patterns and conventions in
+[AGENTS.md](AGENTS.md) describes the base classes, patterns and conventions in
 detail.
 
 ## Deployment and release

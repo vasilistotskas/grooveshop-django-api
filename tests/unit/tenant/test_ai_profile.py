@@ -1,5 +1,6 @@
-"""Per-store AI profile: provider catalog, validation, resolve payload,
-write-only admin form, platform API serializer, and chat-key backfill."""
+"""Per-store AI profile: provider base URLs, validation, the resolve
+payload, the write-only admin key, the platform API, and the move of the
+old chat key into the profile."""
 
 from __future__ import annotations
 
@@ -16,11 +17,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from tenant.ai_providers import (
-    AI_PROVIDERS,
-    LEGACY_CHAT_DEFAULT_MODEL,
-    LEGACY_CHAT_DEFAULT_PROVIDER,
-    get_ai_provider,
-    legacy_chat_api_key,
+    AI_PROVIDER_BASE_URLS,
     serialize_ai_profile,
 )
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
@@ -52,26 +49,12 @@ def _superuser():
     return user
 
 
-class TestAIProviderCatalog:
-    def test_every_enum_choice_has_an_https_spec(self):
-        assert set(AI_PROVIDERS) == set(AIProvider)
-        for code, spec in AI_PROVIDERS.items():
-            assert spec.code is code
-            assert spec.base_url.startswith("https://")
-            assert spec.base_url.endswith("/")
-            assert isinstance(spec.supports_tool_calling, bool)
-            assert isinstance(spec.supports_structured_outputs, bool)
-
-    def test_get_ai_provider_returns_none_for_unknown_or_empty(self):
-        assert get_ai_provider("") is None
-        assert get_ai_provider("https://evil.example/v1/") is None
-        assert get_ai_provider("custom") is None
-        gemini = get_ai_provider("gemini")
-        assert gemini is not None
-        assert (
-            gemini.base_url
-            == "https://generativelanguage.googleapis.com/v1beta/openai/"
-        )
+class TestAIProviderBaseURLs:
+    def test_every_provider_has_an_https_base_url(self):
+        assert set(AI_PROVIDER_BASE_URLS) == set(AIProvider)
+        for base_url in AI_PROVIDER_BASE_URLS.values():
+            assert base_url.startswith("https://")
+            assert base_url.endswith("/")
 
 
 @pytest.mark.django_db
@@ -95,8 +78,6 @@ class TestAIProfileValidation:
             "base_url": "https://openrouter.ai/api/v1/",
             "model": "anthropic/claude-sonnet-4:beta",
             "api_key": "sk-or-v1-secret-token",
-            "supports_tool_calling": True,
-            "supports_structured_outputs": True,
         }
 
     @pytest.mark.parametrize(
@@ -127,7 +108,7 @@ class TestAIProfileValidation:
         tenant.ai_model = "gpt-4.1-mini"
         tenant.ai_api_key = "sk-key"
         with pytest.raises(ValidationError) as exc:
-            tenant.clean()
+            tenant.full_clean()
         assert "ai_provider" in exc.value.message_dict
 
     @pytest.mark.parametrize(
@@ -199,11 +180,8 @@ class TestTenantResolveAIProfile:
             "baseUrl": "https://api.openai.com/v1/",
             "model": "gpt-4.1-mini",
             "apiKey": "sk-openai-resolve-secret",
-            "supportsToolCalling": True,
-            "supportsStructuredOutputs": True,
         }
-        # Never forward an OpenAI key on the legacy Gemini-only chatApiKey field.
-        assert payload["chatApiKey"] == ""
+        assert "chatApiKey" not in payload
 
         # Public cache entry must stay free of the AI profile.
         tenant.refresh_from_db()
@@ -228,29 +206,13 @@ class TestTenantResolveAIProfile:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["aiProfile"] is None
 
-    def test_legacy_chat_api_key_bridge_mirrors_only_gemini(self):
-        gemini = store_tenant(
-            "ai_bridge_gemini",
-            ai_provider=AIProvider.GEMINI,
-            ai_model="gemini-3.5-flash-lite",
-            ai_api_key="gem-key",
-        )
-        assert legacy_chat_api_key(gemini) == "gem-key"
 
-        mistral = store_tenant(
-            "ai_bridge_mistral",
-            ai_provider=AIProvider.MISTRAL,
-            ai_model="mistral-small-latest",
-            ai_api_key="mis-key",
-            chat_api_key="old-gem-key",
-        )
-        assert legacy_chat_api_key(mistral) == ""
-
-        legacy_only = store_tenant(
-            "ai_bridge_legacy",
-            chat_api_key="only-old-key",
-        )
-        assert legacy_chat_api_key(legacy_only) == "only-old-key"
+def _ai_tab_fields(admin_, request, obj):
+    return [
+        field
+        for _name, options in admin_.get_fieldsets(request, obj)
+        for field in options["fields"]
+    ]
 
 
 @pytest.mark.django_db
@@ -258,103 +220,83 @@ class TestTenantAdminWriteOnlyAIKey:
     def _admin(self):
         return admin_site._registry[Tenant]
 
-    def test_ai_fields_are_editable_by_store_owner(
-        self, bind_tenant_and_schema
-    ):
+    def _form(self, request, tenant, data=None):
+        form_class = self._admin().get_form(
+            request,
+            tenant,
+            fields=["store_name", "ai_provider", "ai_model", "ai_api_key"],
+        )
+        if data is None:
+            return form_class(instance=tenant)
+        return form_class(
+            {"store_name": tenant.store_name or "Store", **data},
+            instance=tenant,
+        )
+
+    def test_store_owner_edits_the_profile(self, bind_tenant_and_schema):
         tenant = store_tenant("ai_admin_scope")
         owner = _store_owner(tenant)
         bind_tenant_and_schema(tenant)
         request = _request(owner)
 
         readonly = set(self._admin().get_readonly_fields(request, tenant))
-        assert "ai_provider" not in readonly
-        assert "ai_model" not in readonly
-        assert "ai_api_key" not in readonly
-        assert "ai_api_key_is_set" in readonly
+        assert {"ai_provider", "ai_model", "ai_api_key"}.isdisjoint(readonly)
+        listed = _ai_tab_fields(self._admin(), request, tenant)
+        assert {"ai_provider", "ai_model", "ai_api_key"} <= set(listed)
+        assert "ai_api_key_is_set" not in listed
 
-        listed = [
-            field
-            for _name, options in self._admin().get_fieldsets(request, tenant)
-            for field in options["fields"]
-        ]
-        assert "ai_provider" in listed
-        assert "ai_model" in listed
-        assert "ai_api_key" in listed
-        assert "ai_api_key_is_set" in listed
-        # No saved key yet, so the clear checkbox is omitted.
-        assert "clear_ai_api_key" not in listed
-
-    def test_clear_checkbox_shown_only_when_key_is_saved(
+    def test_view_only_page_shows_whether_a_key_is_set(
         self, bind_tenant_and_schema
     ):
         tenant = store_tenant(
-            "ai_admin_clear_vis",
+            "ai_admin_viewonly",
             ai_provider=AIProvider.GEMINI,
             ai_model="gemini-3.5-flash-lite",
-            ai_api_key="secret-saved-key",
+            ai_api_key="sk-viewonly-secret",
         )
         owner = _store_owner(tenant)
         bind_tenant_and_schema(tenant)
-        listed = [
-            field
-            for _name, options in self._admin().get_fieldsets(
-                _request(owner), tenant
-            )
-            for field in options["fields"]
-        ]
-        assert "clear_ai_api_key" in listed
+        with patch.object(
+            self._admin(), "has_change_permission", return_value=False
+        ):
+            listed = _ai_tab_fields(self._admin(), _request(owner), tenant)
+        assert "ai_api_key" not in listed
+        assert "ai_api_key_is_set" in listed
+        assert self._admin().ai_api_key_is_set(tenant) is True
 
-    def test_admin_form_never_renders_stored_key_and_preserves_it_when_blank(
-        self, bind_tenant_and_schema
-    ):
+    def test_blank_input_keeps_the_saved_key(self, bind_tenant_and_schema):
         secret = "sk-never-render-this-plaintext-ai-key"
         tenant = store_tenant(
-            "ai_admin_writeonly",
+            "ai_admin_keep",
             ai_provider=AIProvider.OPENAI,
             ai_model="gpt-4.1-mini",
             ai_api_key=secret,
         )
-        owner = _store_owner(tenant)
-        bind_tenant_and_schema(tenant)
-        request = _request(owner)
+        bind_tenant_and_schema(None)
+        request = _request(_superuser())
 
-        form_class = self._admin().get_form(
-            request,
-            tenant,
-            fields=[
-                "store_name",
-                "ai_provider",
-                "ai_model",
-                "ai_api_key",
-                "clear_ai_api_key",
-            ],
-        )
-        unbound = form_class(instance=tenant)
-        rendered = unbound.as_p()
+        rendered = self._form(request, tenant).as_p()
         assert 'type="password"' in rendered
         assert secret not in rendered
-        assert unbound.initial["ai_api_key"] == ""
 
-        # Editing an unrelated field (or model) with blank key input keeps the key.
-        bound = form_class(
+        form = self._form(
+            request,
+            tenant,
             {
                 "store_name": "Updated Store",
                 "ai_provider": AIProvider.OPENAI,
                 "ai_model": "gpt-4.1",
                 "ai_api_key": "",
-                "clear_ai_api_key": False,
             },
-            instance=tenant,
         )
-        assert bound.is_valid(), bound.errors
-        bound.save()
-
+        assert form.is_valid(), form.errors
+        form.save()
         tenant.refresh_from_db()
         assert tenant.store_name == "Updated Store"
         assert tenant.ai_model == "gpt-4.1"
         assert tenant.ai_api_key == secret
 
-    def test_admin_form_replaces_key_encrypted_and_clears_explicitly(
+    def test_a_new_key_replaces_the_saved_one_encrypted(
         self, bind_tenant_and_schema
     ):
         tenant = store_tenant(
@@ -362,80 +304,105 @@ class TestTenantAdminWriteOnlyAIKey:
             ai_provider=AIProvider.GEMINI,
             ai_model="gemini-3.5-flash-lite",
             ai_api_key="old-key",
-            chat_api_key="old-key",
         )
-        user = _superuser()
         bind_tenant_and_schema(None)
-        request = _request(user)
-        form_class = self._admin().get_form(
-            request,
+        form = self._form(
+            _request(_superuser()),
             tenant,
-            fields=[
-                "ai_provider",
-                "ai_model",
-                "ai_api_key",
-                "clear_ai_api_key",
-            ],
-        )
-
-        # Cannot both enter a new key and tick clear.
-        conflict = form_class(
             {
-                "ai_provider": AIProvider.OPENAI,
-                "ai_model": "gpt-4.1-mini",
+                "ai_provider": AIProvider.GEMINI,
+                "ai_model": "gemini-3.5-flash-lite",
                 "ai_api_key": "new-key",
-                "clear_ai_api_key": True,
             },
-            instance=tenant,
         )
-        assert not conflict.is_valid()
-        assert "clear_ai_api_key" in conflict.errors
-        assert "old-key" not in conflict.as_p()
-        assert "new-key" not in conflict.as_p()
-
-        # Replace with a new key: stored as ciphertext.
-        rotate = form_class(
-            {
-                "ai_provider": AIProvider.MISTRAL,
-                "ai_model": "mistral-small-latest",
-                "ai_api_key": "sk-mistral-new",
-                "clear_ai_api_key": False,
-            },
-            instance=tenant,
-        )
-        assert rotate.is_valid(), rotate.errors
-        rotate.save()
-
+        assert form.is_valid(), form.errors
+        form.save()
+        tenant.refresh_from_db()
+        assert tenant.ai_api_key == "new-key"
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT ai_api_key FROM tenant_tenant WHERE id = %s",
                 [tenant.pk],
             )
-            raw = cursor.fetchone()[0]
-        assert raw and "sk-mistral-new" not in raw
-        tenant.refresh_from_db()
-        assert tenant.ai_api_key == "sk-mistral-new"
+            stored = cursor.fetchone()[0]
+        assert stored
+        assert "new-key" not in stored
 
-        # Clear key + provider + model disables AI and clears legacy chat_api_key.
-        clear_form = form_class(
-            {
-                "ai_provider": "",
-                "ai_model": "",
-                "ai_api_key": "",
-                "clear_ai_api_key": True,
-            },
-            instance=tenant,
+    def test_clearing_provider_and_model_removes_the_key(
+        self, bind_tenant_and_schema
+    ):
+        tenant = store_tenant(
+            "ai_admin_off",
+            ai_provider=AIProvider.MISTRAL,
+            ai_model="mistral-small-latest",
+            ai_api_key="mis-key",
         )
-        assert clear_form.is_valid(), clear_form.errors
-        clear_form.save()
-
+        bind_tenant_and_schema(None)
+        form = self._form(
+            _request(_superuser()),
+            tenant,
+            {"ai_provider": "", "ai_model": "", "ai_api_key": ""},
+        )
+        assert form.is_valid(), form.errors
+        form.save()
         tenant.refresh_from_db()
-        assert tenant.ai_provider == ""
-        assert tenant.ai_model == ""
-        assert tenant.ai_api_key == ""
-        assert tenant.chat_api_key == ""
+        assert (tenant.ai_provider, tenant.ai_model, tenant.ai_api_key) == (
+            "",
+            "",
+            "",
+        )
 
-    def test_change_view_html_never_leaks_saved_ai_api_key(
+    def test_a_provider_change_needs_a_new_key(self, bind_tenant_and_schema):
+        tenant = store_tenant(
+            "ai_admin_switch",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="gem-key",
+        )
+        bind_tenant_and_schema(None)
+        request = _request(_superuser())
+
+        kept_key = self._form(
+            request,
+            tenant,
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "",
+            },
+        )
+        assert not kept_key.is_valid()
+        assert "ai_api_key" in kept_key.errors
+
+        new_key = self._form(
+            request,
+            tenant,
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "sk-openai",
+            },
+        )
+        assert new_key.is_valid(), new_key.errors
+        new_key.save()
+        tenant.refresh_from_db()
+        assert tenant.ai_provider == AIProvider.OPENAI
+        assert tenant.ai_api_key == "sk-openai"
+
+    def test_a_key_without_provider_and_model_is_refused(
+        self, bind_tenant_and_schema
+    ):
+        tenant = store_tenant("ai_admin_partial")
+        bind_tenant_and_schema(None)
+        form = self._form(
+            _request(_superuser()),
+            tenant,
+            {"ai_provider": "", "ai_model": "", "ai_api_key": "lonely-key"},
+        )
+        assert not form.is_valid()
+        assert {"ai_provider", "ai_model"} <= set(form.errors)
+
+    def test_change_view_never_renders_the_saved_key(
         self, bind_tenant_and_schema
     ):
         secret = "sk-html-secret-must-never-appear"
@@ -462,231 +429,6 @@ class TestTenantAdminWriteOnlyAIKey:
             assert secret not in html
             assert 'name="ai_api_key"' in html
             assert 'type="password"' in html
-            assert 'name="clear_ai_api_key"' in html
-
-    def test_ai_api_key_is_set_reflects_persisted_state_after_failed_post(
-        self, bind_tenant_and_schema
-    ):
-        empty_tenant = store_tenant("ai_admin_failed_add")
-        saved_tenant = store_tenant(
-            "ai_admin_failed_clear",
-            ai_provider=AIProvider.GEMINI,
-            ai_model="gemini-3.5-flash-lite",
-            ai_api_key="sk-still-saved",
-        )
-        owner = _store_owner(empty_tenant)
-        owner2 = _store_owner(saved_tenant)
-
-        # No saved key + failed validation after pasting a key must NOT flip
-        # ai_api_key_is_set to True.
-        bind_tenant_and_schema(empty_tenant)
-        request = _request(owner)
-        form_class = self._admin().get_form(
-            request,
-            empty_tenant,
-            fields=["ai_provider", "ai_model", "ai_api_key"],
-        )
-        failed = form_class(
-            {
-                "ai_provider": AIProvider.OPENAI,
-                "ai_model": "bad model with spaces",
-                "ai_api_key": "sk-not-persisted",
-            },
-            instance=empty_tenant,
-        )
-        assert not failed.is_valid()
-        assert self._admin().ai_api_key_is_set(failed.instance) is False
-
-        # Saved key + failed clear (provider/model still set) must keep
-        # ai_api_key_is_set True.
-        bind_tenant_and_schema(saved_tenant)
-        request2 = _request(owner2)
-        form_class2 = self._admin().get_form(
-            request2,
-            saved_tenant,
-            fields=[
-                "ai_provider",
-                "ai_model",
-                "ai_api_key",
-                "clear_ai_api_key",
-            ],
-        )
-        failed_clear = form_class2(
-            {
-                "ai_provider": AIProvider.GEMINI,
-                "ai_model": "gemini-3.5-flash-lite",
-                "ai_api_key": "",
-                "clear_ai_api_key": True,
-            },
-            instance=saved_tenant,
-        )
-        assert not failed_clear.is_valid()
-        assert self._admin().ai_api_key_is_set(failed_clear.instance) is True
-
-    def test_view_only_admin_omits_ai_api_key_and_clear_fields(
-        self, bind_tenant_and_schema
-    ):
-        tenant = store_tenant(
-            "ai_admin_viewonly",
-            ai_provider=AIProvider.GEMINI,
-            ai_model="gemini-3.5-flash-lite",
-            ai_api_key="sk-viewonly-secret",
-        )
-        owner = _store_owner(tenant)
-        bind_tenant_and_schema(tenant)
-        request = _request(owner)
-
-        with patch.object(
-            self._admin(), "has_change_permission", return_value=False
-        ):
-            listed = [
-                field
-                for _name, options in self._admin().get_fieldsets(
-                    request, tenant
-                )
-                for field in options["fields"]
-            ]
-
-        assert "ai_api_key" not in listed
-        assert "clear_ai_api_key" not in listed
-        assert "ai_api_key_is_set" in listed
-
-    def test_partial_form_and_overlong_key_error(self, bind_tenant_and_schema):
-        tenant = store_tenant("ai_admin_partial_form", chat_api_key="legacy-k")
-        user = _superuser()
-        bind_tenant_and_schema(None)
-        request = _request(user)
-
-        partial_cls = self._admin().get_form(
-            request, tenant, fields=["store_name"]
-        )
-        partial = partial_cls({"store_name": "X"}, instance=tenant)
-        assert "clear_ai_api_key" not in partial.fields
-
-        keyless_cls = self._admin().get_form(
-            request,
-            tenant,
-            fields=[
-                "ai_provider",
-                "ai_model",
-                "ai_api_key",
-                "clear_ai_api_key",
-            ],
-        )
-        keyless = keyless_cls(
-            {
-                "ai_provider": "",
-                "ai_model": "",
-                "ai_api_key": "",
-                "clear_ai_api_key": True,
-            },
-            instance=tenant,
-        )
-        assert "clear_ai_api_key" not in keyless.fields
-        assert keyless.is_valid(), keyless.errors
-        keyless.save()
-        tenant.refresh_from_db()
-        assert tenant.chat_api_key == "legacy-k"
-
-        overlong = keyless_cls(
-            {
-                "ai_provider": AIProvider.OPENAI,
-                "ai_model": "gpt-4.1-mini",
-                "ai_api_key": "k" * 300,
-            },
-            instance=tenant,
-        )
-        assert not overlong.is_valid()
-        assert len(overlong.errors["ai_api_key"]) == 1
-
-    def test_provider_change_requires_new_key_and_legacy_chat_key_edit_refused(
-        self, bind_tenant_and_schema
-    ):
-        tenant = store_tenant(
-            "ai_admin_provider_switch",
-            ai_provider=AIProvider.GEMINI,
-            ai_model="gemini-3.5-flash-lite",
-            ai_api_key="sk-gemini-orig",
-            chat_api_key="sk-gemini-orig",
-        )
-        user = _superuser()
-        bind_tenant_and_schema(None)
-        request = _request(user)
-        form_class = self._admin().get_form(
-            request,
-            tenant,
-            fields=[
-                "ai_provider",
-                "ai_model",
-                "ai_api_key",
-                "clear_ai_api_key",
-                "chat_api_key",
-            ],
-        )
-
-        # Switching provider while leaving ai_api_key blank is refused so
-        # the old Gemini key is never paired with OpenAI's endpoint.
-        switch_no_key = form_class(
-            {
-                "ai_provider": AIProvider.OPENAI,
-                "ai_model": "gpt-4.1-mini",
-                "ai_api_key": "",
-                "clear_ai_api_key": False,
-                "chat_api_key": "sk-gemini-orig",
-            },
-            instance=tenant,
-        )
-        assert not switch_no_key.is_valid()
-        assert "ai_api_key" in switch_no_key.errors
-
-        # Editing legacy chat_api_key while a profile is configured is refused.
-        legacy_edit = form_class(
-            {
-                "ai_provider": AIProvider.GEMINI,
-                "ai_model": "gemini-3.5-flash-lite",
-                "ai_api_key": "",
-                "clear_ai_api_key": False,
-                "chat_api_key": "sk-legacy-diverged",
-            },
-            instance=tenant,
-        )
-        assert not legacy_edit.is_valid()
-        assert "chat_api_key" in legacy_edit.errors
-
-        # Rotating the Gemini key via the AI tab mirrors to legacy chat_api_key.
-        rotate_gemini = form_class(
-            {
-                "ai_provider": AIProvider.GEMINI,
-                "ai_model": "gemini-3.5-flash-lite",
-                "ai_api_key": "sk-gemini-rotated",
-                "clear_ai_api_key": False,
-                "chat_api_key": "sk-gemini-orig",
-            },
-            instance=tenant,
-        )
-        assert rotate_gemini.is_valid(), rotate_gemini.errors
-        rotate_gemini.save()
-        tenant.refresh_from_db()
-        assert tenant.ai_api_key == "sk-gemini-rotated"
-        assert tenant.chat_api_key == "sk-gemini-rotated"
-
-        # Switching to OpenAI with a new key clears legacy chat_api_key.
-        switch_ok = form_class(
-            {
-                "ai_provider": AIProvider.OPENAI,
-                "ai_model": "gpt-4.1-mini",
-                "ai_api_key": "sk-openai-new",
-                "clear_ai_api_key": False,
-                "chat_api_key": "sk-gemini-rotated",
-            },
-            instance=tenant,
-        )
-        assert switch_ok.is_valid(), switch_ok.errors
-        switch_ok.save()
-        tenant.refresh_from_db()
-        assert tenant.ai_provider == AIProvider.OPENAI
-        assert tenant.ai_api_key == "sk-openai-new"
-        assert tenant.chat_api_key == ""
 
 
 @pytest.mark.django_db
@@ -703,19 +445,19 @@ class TestTenantAdminSerializerAIProfile:
         ):
             yield client
 
-    def test_patch_sets_profile_write_only_and_refuses_partial(
+    def test_patch_sets_profile_write_only_and_runs_the_store_rules(
         self, operator_client
     ):
         tenant = store_tenant("ai_api_patch")
         url = reverse("tenant-admin-detail", args=[tenant.pk])
 
-        bad = operator_client.patch(
+        partial = operator_client.patch(
             url,
             {"aiProvider": "openai", "aiModel": "gpt-4.1-mini"},
             format="json",
         )
-        assert bad.status_code == status.HTTP_400_BAD_REQUEST
-        assert "ai_api_key" in bad.data
+        assert partial.status_code == status.HTTP_400_BAD_REQUEST
+        assert "ai_api_key" in partial.data
 
         ok = operator_client.patch(
             url,
@@ -727,98 +469,69 @@ class TestTenantAdminSerializerAIProfile:
             format="json",
         )
         assert ok.status_code == status.HTTP_200_OK
-        assert ok.data["ai_provider"] == "openai"
-        assert ok.data["ai_model"] == "gpt-4.1-mini"
         assert ok.data["ai_api_key_set"] is True
         assert "ai_api_key" not in ok.data
 
-        get_resp = operator_client.get(url)
-        assert get_resp.status_code == status.HTTP_200_OK
-        assert get_resp.data["ai_api_key_set"] is True
-        assert "ai_api_key" not in get_resp.data
-        assert "sk-api-write-only" not in get_resp.content.decode()
+        read = operator_client.get(url)
+        assert read.data["ai_api_key_set"] is True
+        assert "sk-api-write-only" not in read.content.decode()
 
-        tenant.refresh_from_db()
-        assert tenant.ai_api_key == "sk-api-write-only"
-
-        # Switching provider without supplying a new key is refused.
-        bad_switch = operator_client.patch(
-            url,
-            {"aiProvider": "mistral", "aiModel": "mistral-small-latest"},
-            format="json",
+        switched = operator_client.patch(
+            url, {"aiProvider": "mistral"}, format="json"
         )
-        assert bad_switch.status_code == status.HTTP_400_BAD_REQUEST
-        assert "ai_api_key" in bad_switch.data
+        assert switched.status_code == status.HTTP_400_BAD_REQUEST
+        assert "ai_api_key" in switched.data
 
-        # Editing legacy chat_api_key while a profile is configured is refused.
-        bad_legacy = operator_client.patch(
-            url,
-            {"chatApiKey": "sk-legacy-only"},
-            format="json",
-        )
-        assert bad_legacy.status_code == status.HTTP_400_BAD_REQUEST
-        assert "chat_api_key" in bad_legacy.data
-
-        # Rotating to Gemini mirrors ai_api_key into legacy chat_api_key.
-        to_gemini = operator_client.patch(
-            url,
-            {
-                "aiProvider": "gemini",
-                "aiModel": "gemini-3.5-flash-lite",
-                "aiApiKey": "sk-gem-api",
-            },
-            format="json",
-        )
-        assert to_gemini.status_code == status.HTTP_200_OK
-        tenant.refresh_from_db()
-        assert tenant.ai_api_key == "sk-gem-api"
-        assert tenant.chat_api_key == "sk-gem-api"
-
-        # Clearing the AI profile via PATCH also clears legacy chat_api_key.
-        cleared = operator_client.patch(
+        off = operator_client.patch(
             url,
             {"aiProvider": "", "aiModel": "", "aiApiKey": ""},
             format="json",
         )
-        assert cleared.status_code == status.HTTP_200_OK
-        assert cleared.data["ai_api_key_set"] is False
-        tenant.refresh_from_db()
-        assert tenant.ai_api_key == ""
-        assert tenant.chat_api_key == ""
+        assert off.status_code == status.HTTP_200_OK
+        assert off.data["ai_api_key_set"] is False
 
 
 @pytest.mark.django_db
-class TestBackfillAIProfileMigration:
-    def test_backfill_copies_chat_key_and_is_idempotent(self):
+class TestChatKeyMovesIntoTheProfile:
+    def test_0077_copies_the_key_and_blanks_the_old_column(self):
         from importlib import import_module
 
-        mod = import_module("tenant.migrations.0077_backfill_tenant_ai_profile")
-        legacy = store_tenant("ai_bf_legacy", chat_api_key="legacy-gem-key")
-        empty = store_tenant("ai_bf_empty")
-        custom = store_tenant(
-            "ai_bf_custom",
-            chat_api_key="old-key",
-            ai_provider=AIProvider.OPENAI,
-            ai_model="gpt-4.1-mini",
-            ai_api_key="custom-openai-key",
+        migration = import_module(
+            "tenant.migrations.0077_chat_api_key_into_ai_profile"
         )
+        copy_sql, params = migration.Migration.operations[1].sql[0]
+        with_key = store_tenant("ai_move_with_key")
+        without_key = store_tenant("ai_move_without_key")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT ai_api_key FROM tenant_tenant WHERE id = %s",
+                [
+                    store_tenant(
+                        "ai_move_token_source",
+                        ai_provider="gemini",
+                        ai_model="m",
+                        ai_api_key="old-chat-key",
+                    ).pk
+                ],
+            )
+            token = cursor.fetchone()[0]
+            cursor.execute(
+                "UPDATE tenant_tenant SET chat_api_key_encrypted = %s"
+                " WHERE id = %s",
+                [token, with_key.pk],
+            )
+            cursor.execute(copy_sql, params)
+            cursor.execute(
+                "SELECT chat_api_key_encrypted FROM tenant_tenant"
+                " WHERE id IN (%s, %s)",
+                [with_key.pk, without_key.pk],
+            )
+            assert {row[0] for row in cursor.fetchall()} == {""}
 
-        with connection.schema_editor() as schema_editor:
-            mod.backfill_ai_profile_from_chat_key(None, schema_editor)
-            # Re-running is a no-op.
-            mod.backfill_ai_profile_from_chat_key(None, schema_editor)
-
-        legacy.refresh_from_db()
-        assert legacy.ai_provider == LEGACY_CHAT_DEFAULT_PROVIDER
-        assert legacy.ai_model == LEGACY_CHAT_DEFAULT_MODEL
-        assert legacy.ai_api_key == "legacy-gem-key"
-
-        empty.refresh_from_db()
-        assert empty.ai_provider == ""
-        assert empty.ai_model == ""
-        assert empty.ai_api_key == ""
-
-        custom.refresh_from_db()
-        assert custom.ai_provider == AIProvider.OPENAI
-        assert custom.ai_model == "gpt-4.1-mini"
-        assert custom.ai_api_key == "custom-openai-key"
+        with_key.refresh_from_db()
+        assert with_key.ai_provider == AIProvider.GEMINI
+        assert with_key.ai_model == "gemini-3.5-flash-lite"
+        assert with_key.ai_api_key == "old-chat-key"
+        without_key.refresh_from_db()
+        assert without_key.ai_provider == ""
+        assert without_key.ai_api_key == ""

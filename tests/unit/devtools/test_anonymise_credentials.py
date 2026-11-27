@@ -88,7 +88,6 @@ def test_the_tenant_row_loses_every_integration_field():
         "mydata_user_id",
         "meta_pixel_id",
         "ga_tracking_id",
-        "chat_api_key",
         "ai_provider",
         "ai_model",
         "ai_api_key",

@@ -846,8 +846,8 @@ msgstr "Το σημείο εστίασης είναι μεταξύ 0 και 1."
 msgid "A heartbeat can name at most %(limit)s documents."
 msgstr "Ένας παλμός μπορεί να αναφέρει το πολύ %(limit)s έγγραφα."
 
-msgid "A key is already saved. Leave blank to keep it, paste a new key to replace it, or tick Clear saved AI API key below."
-msgstr "Έχει ήδη αποθηκευτεί ένα κλειδί. Αφήστε το κενό για να το διατηρήσετε, επικολλήστε νέο κλειδί για αντικατάσταση ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI παρακάτω."
+msgid "A key is saved. Leave this blank to keep it, or enter a new key to replace it."
+msgstr "Υπάρχει αποθηκευμένο κλειδί. Αφήστε το πεδίο κενό για να το κρατήσετε ή εισαγάγετε νέο κλειδί για να το αντικαταστήσετε."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
@@ -1338,9 +1338,6 @@ msgstr "AI"
 
 msgid "AI API Key"
 msgstr "Κλειδί API AI"
-
-msgid "AI API key saved"
-msgstr "Αποθηκευμένο κλειδί API AI"
 
 msgid "AI Model"
 msgstr "Μοντέλο AI"
@@ -3247,9 +3244,6 @@ msgstr "Χρεώσεις"
 msgid "Chart measure"
 msgstr "Μέγεθος γραφήματος"
 
-msgid "Chat API Key"
-msgstr "Κλειδί API Chat"
-
 msgid "ChatGPT Ads Pixel ID"
 msgstr "Αναγνωριστικό ChatGPT Ads Pixel"
 
@@ -3349,9 +3343,6 @@ msgstr "Επιλέξτε σημείο παραλαβής."
 msgid "Choose a time in the future."
 msgstr "Διάλεξε μια ώρα στο μέλλον."
 
-msgid "Choose an AI provider from the platform's list."
-msgstr "Επιλέξτε έναν πάροχο AI από τη λίστα της πλατφόρμας."
-
 msgid "Choose at least one document to publish."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
 
@@ -3394,9 +3385,6 @@ msgstr "Καθαρό"
 
 msgid "Clear discount from selected products"
 msgstr "Αφαίρεση έκπτωσης από τα επιλεγμένα προϊόντα"
-
-msgid "Clear saved AI API key"
-msgstr "Εκκαθάριση αποθηκευμένου κλειδιού API AI"
 
 msgid "Clearance (>50%)"
 msgstr "Εκποίηση (>50%)"
@@ -4902,9 +4890,6 @@ msgstr "Αγγλικά"
 msgid "Enhanced performance and faster loading times"
 msgstr "Καλύτερη απόδοση και πιο γρήγορους χρόνους φόρτωσης"
 
-msgid "Enter a new API key or tick Clear saved AI API key, not both."
-msgstr "Εισαγάγετε νέο κλειδί API ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI, όχι και τα δύο."
-
 msgid "Enter a phone number, using digits and + ( ) - only."
 msgstr "Εισαγάγετε αριθμό τηλεφώνου, χρησιμοποιώντας μόνο ψηφία και + ( ) -."
 
@@ -4928,9 +4913,6 @@ msgstr "Εισαγάγετε έγκυρο email"
 
 msgid "Enter a valid email address."
 msgstr "Εισαγάγετε έγκυρο email."
-
-msgid "Enter a valid model identifier without spaces or control characters (e.g. 'gemini-3.5-flash-lite')."
-msgstr "Εισαγάγετε έγκυρο αναγνωριστικό μοντέλου χωρίς κενά ή χαρακτήρες ελέγχου (π.χ. 'gemini-3.5-flash-lite')."
 
 msgid "Enter a valid phone number"
 msgstr "Εισαγάγετε έγκυρο τηλέφωνο"
@@ -4993,6 +4975,9 @@ msgstr "Εισαγάγετε το όνομα host χωρίς θύρα."
 
 msgid "Enter the host name without a trailing dot."
 msgstr "Εισαγάγετε το όνομα host χωρίς τελεία στο τέλος."
+
+msgid "Enter the model ID exactly as the provider names it, without spaces or a URL."
+msgstr "Εισαγάγετε το αναγνωριστικό του μοντέλου ακριβώς όπως το ονομάζει ο πάροχος, χωρίς κενά ή διεύθυνση URL."
 
 msgid "Enter the provider's reference of the refund, or, for cash paid back, how it was paid back."
 msgstr "Εισαγάγετε την αναφορά της επιστροφής από τον πάροχο ή, για μετρητά που επιστράφηκαν, τον τρόπο επιστροφής."
@@ -8262,9 +8247,6 @@ msgstr "Αφήστε το κενό για να καλύψετε ολόκληρη
 msgid "Ledger"
 msgstr "Καθολικό"
 
-msgid "Legacy chat-only LLM API key. Superseded by the AI tab (AI Provider, AI Model, AI API Key). Empty disables the legacy path."
-msgstr "Παλαιό κλειδί API LLM μόνο για τη συνομιλία. Αντικαταστάθηκε από την καρτέλα AI (Πάροχος AI, Μοντέλο AI, Κλειδί API AI). Κενό απενεργοποιεί την παλιά διαδρομή."
-
 msgid "Legal acceptance"
 msgstr "Αποδοχή νομικών όρων"
 
@@ -9040,9 +9022,6 @@ msgstr "Μικτό"
 
 msgid "Mode"
 msgstr "Λειτουργία"
-
-msgid "Model identifier accepted by the chosen provider (for example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or 'anthropic/claude-sonnet-4'). Leave empty to disable AI features."
-msgstr "Αναγνωριστικό μοντέλου που αποδέχεται ο επιλεγμένος πάροχος (για παράδειγμα 'gemini-3.5-flash-lite', 'gpt-4.1-mini' ή 'anthropic/claude-sonnet-4'). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
 msgid "Moderation"
 msgstr "Έλεγχος"
@@ -12954,9 +12933,6 @@ msgstr "Αποθηκεύστε τους κωδικούς ανάκτησης"
 msgid "Saved"
 msgstr "Αποθηκεύτηκε"
 
-msgid "Saved — leave blank to keep, or enter a new key to replace"
-msgstr "Αποθηκευμένο — αφήστε κενό για διατήρηση ή εισαγάγετε νέο κλειδί για αντικατάσταση"
-
 msgid "Saved."
 msgstr "Αποθηκεύτηκε."
 
@@ -14810,8 +14786,8 @@ msgstr "Το κλειδί API AI πρέπει να περιέχει μόνο ε�
 msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 msgstr "Ο πάροχος AI που χρησιμοποιείται από τον βοηθό συνομιλίας και τα εργαλεία AI του δημιουργού σελίδων αυτού του καταστήματος. Επιλέγεται από τη λίστα της πλατφόρμας (ποτέ αυθαίρετη διεύθυνση URL). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
-msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Leave all fields empty to disable AI features (there is no platform fallback). The saved API key is never shown again."
-msgstr "Ο πάροχος AI, το μοντέλο και το κλειδί API που χρησιμοποιούνται από τον βοηθό συνομιλίας του storefront και τα εργαλεία AI του δημιουργού σελίδων. Αφήστε όλα τα πεδία κενά για να απενεργοποιήσετε τις λειτουργίες AI (δεν υπάρχει προεπιλογή της πλατφόρμας). Το αποθηκευμένο κλειδί API δεν εμφανίζεται ξανά."
+msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Clear the provider and the model to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
+msgstr "Ο πάροχος AI, το μοντέλο και το κλειδί API που χρησιμοποιούν ο βοηθός συνομιλίας του καταστήματος και τα εργαλεία AI του δημιουργού σελίδων. Αδειάστε τον πάροχο και το μοντέλο για να απενεργοποιήσετε τις λειτουργίες AI· το αποθηκευμένο κλειδί αφαιρείται μαζί τους. Δεν υπάρχει εναλλακτική ρύθμιση της πλατφόρμας. Ένα αποθηκευμένο κλειδί δεν εμφανίζεται ποτέ ξανά."
 
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "Τα πεδία Cloudflare αφορούν μόνο κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε τα κενά αν χρησιμοποιείτε hostname της πλατφόρμας."
@@ -15164,6 +15140,9 @@ msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή
 
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη."
+
+msgid "The model ID exactly as the chosen provider names it. Leave empty to disable AI features."
+msgstr "Το αναγνωριστικό του μοντέλου ακριβώς όπως το ονομάζει ο επιλεγμένος πάροχος. Αφήστε κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
 msgid "The money beyond the receipt and the goods short of it are acknowledged."
 msgstr "Τα χρήματα πέρα από την απόδειξη και τα εμπορεύματα που λείπουν από αυτήν επιβεβαιώθηκαν."
@@ -15982,9 +15961,6 @@ msgstr "Εικόνα μικρογραφίας"
 msgid "Tick ONLY once this store's sending domain is authenticated on the platform mail relay — SPF and DKIM published and confirmed by the relay. Until then From Email is ignored and the platform address is used, because that is the only domain the relay can sign for. Ticking this early makes every message from this store fail DMARC and land in spam."
 msgstr "Επιλέξτε το ΜΟΝΟ αφού πιστοποιηθεί το domain αποστολής αυτού του καταστήματος στο mail relay της πλατφόρμας — με SPF και DKIM δημοσιευμένα και επιβεβαιωμένα από το relay. Μέχρι τότε το Email Αποστολέα αγνοείται και χρησιμοποιείται η διεύθυνση της πλατφόρμας, επειδή αυτό είναι το μόνο domain για το οποίο μπορεί να υπογράψει το relay. Αν το επιλέξετε νωρίτερα, κάθε μήνυμα από αυτό το κατάστημα αποτυγχάνει στον έλεγχο DMARC και καταλήγει στα spam."
 
-msgid "Tick to remove the saved AI API key. Clear AI Provider and AI Model as well to disable AI features for this store."
-msgstr "Επιλέξτε το για να αφαιρέσετε το αποθηκευμένο κλειδί API AI. Εκκαθαρίστε επίσης τον Πάροχο AI και το Μοντέλο AI για να απενεργοποιήσετε τις λειτουργίες AI για αυτό το κατάστημα."
-
 msgid "Tier"
 msgstr "Βαθμίδα"
 
@@ -16567,9 +16543,6 @@ msgstr "Ενημέρωση πολλαπλών εικόνων κατηγορία�
 
 msgid "Update on your business account application"
 msgstr "Ενημέρωση για την αίτηση εταιρικού λογαριασμού"
-
-msgid "Update the API key on the AI tab instead of the legacy Chat API Key field."
-msgstr "Ενημερώστε το κλειδί API στην καρτέλα AI αντί για το παλιό πεδίο Κλειδί API Chat."
 
 msgid "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
 msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας. Η κατάσταση CANCELED απορρίπτεται: η ακύρωση παραγγελίας γίνεται μέσω της ενέργειας ακύρωσης."
@@ -17917,8 +17890,8 @@ msgstr "Η παραγγελία σου εστάλη. Τα στοιχεία πα�
 msgid "Your order status has been updated."
 msgstr "Η κατάσταση της παραγγελίας σας έχει ενημερωθεί."
 
-msgid "Your own API key for the chosen AI provider. Stored encrypted and write-only in the admin — never shown again after saving. Empty disables AI features (no platform fallback)."
-msgstr "Το δικό σας κλειδί API για τον επιλεγμένο πάροχο AI. Αποθηκεύεται κρυπτογραφημένο και είναι μόνο για εγγραφή στη διαχείριση — δεν εμφανίζεται ξανά μετά την αποθήκευση. Κενό απενεργοποιεί τις λειτουργίες AI (χωρίς προεπιλογή της πλατφόρμας)."
+msgid "Your own API key for the chosen AI provider. Stored encrypted and never shown again after saving. Leave empty to disable AI features."
+msgstr "Το δικό σας κλειδί API για τον επιλεγμένο πάροχο AI. Αποθηκεύεται κρυπτογραφημένο και δεν εμφανίζεται ποτέ ξανά μετά την αποθήκευση. Αφήστε κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
 msgid "Your own sender address, e.g. orders@your-domain.gr. It takes effect only once the platform ticks From Email Verified, which happens after your domain is authenticated on the mail relay. Until then mail goes out from the platform address with your store name as the display name. Set Contact Email too: that is the reply-to address customers actually reach you on."
 msgstr "Η δική σας διεύθυνση αποστολέα, π.χ. orders@your-domain.gr. Ισχύει μόνο αφού η πλατφόρμα επιλέξει το Επαληθευμένο Email Αποστολέα, κάτι που γίνεται αφού πιστοποιηθεί το domain σας στο mail relay. Μέχρι τότε τα μηνύματα αποστέλλονται από τη διεύθυνση της πλατφόρμας με το όνομα του καταστήματός σας ως εμφανιζόμενο όνομα. Ορίστε και το Email Επικοινωνίας: αυτή είναι η διεύθυνση απάντησης (reply-to) στην οποία σας βρίσκουν πραγματικά οι πελάτες."
@@ -18605,6 +18578,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "A draft was edited."
 #~ msgstr "Ένα προσχέδιο έχει επεξεργαστεί."
 
+#~ msgid "A key is already saved. Leave blank to keep it, paste a new key to replace it, or tick Clear saved AI API key below."
+#~ msgstr "Έχει ήδη αποθηκευτεί ένα κλειδί. Αφήστε το κενό για να το διατηρήσετε, επικολλήστε νέο κλειδί για αντικατάσταση ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI παρακάτω."
+
 #~ msgid "A publication is scheduled."
 #~ msgstr "Υπάρχει προγραμματισμένη δημοσίευση."
 
@@ -18632,6 +18608,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
 #~ msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», όχι για τον παραλήπτη αυτής της παραγγελίας. Ελέγξτε τον αριθμό στην πύλη της ACS."
+
+#~ msgid "AI API key saved"
+#~ msgstr "Αποθηκευμένο κλειδί API AI"
 
 #~ msgid "About Content"
 #~ msgstr "Περιεχόμενο «Σχετικά με εμάς»"
@@ -18806,8 +18785,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Category Analytics"
 #~ msgstr "Αναλυτικά κατηγοριών"
 
+#~ msgid "Chat API Key"
+#~ msgstr "Κλειδί API Chat"
+
+#~ msgid "Choose an AI provider from the platform's list."
+#~ msgstr "Επιλέξτε έναν πάροχο AI από τη λίστα της πλατφόρμας."
+
 #~ msgid "City name"
 #~ msgstr "Όνομα πόλης"
+
+#~ msgid "Clear saved AI API key"
+#~ msgstr "Εκκαθάριση αποθηκευμένου κλειδιού API AI"
 
 #~ msgid "Clear search"
 #~ msgstr "Καθαρισμός αναζήτησης"
@@ -18990,8 +18978,14 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "End-to-end"
 #~ msgstr "Συνολικά"
 
+#~ msgid "Enter a new API key or tick Clear saved AI API key, not both."
+#~ msgstr "Εισαγάγετε νέο κλειδί API ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI, όχι και τα δύο."
+
 #~ msgid "Enter a valid hex color (e.g., #003DFF)."
 #~ msgstr "Εισαγάγετε έγκυρο χρώμα hex (π.χ. #003DFF)."
+
+#~ msgid "Enter a valid model identifier without spaces or control characters (e.g. 'gemini-3.5-flash-lite')."
+#~ msgstr "Εισαγάγετε έγκυρο αναγνωριστικό μοντέλου χωρίς κενά ή χαρακτήρες ελέγχου (π.χ. 'gemini-3.5-flash-lite')."
 
 #~ msgid "Entries"
 #~ msgstr "Καταχωρήσεις"
@@ -19261,6 +19255,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Leave empty for a page link to use the page's own title, which is already translated."
 #~ msgstr "Αφήστε το κενό ώστε ένας σύνδεσμος σελίδας να χρησιμοποιεί τον τίτλο της ίδιας της σελίδας, ο οποίος είναι ήδη μεταφρασμένος."
 
+#~ msgid "Legacy chat-only LLM API key. Superseded by the AI tab (AI Provider, AI Model, AI API Key). Empty disables the legacy path."
+#~ msgstr "Παλαιό κλειδί API LLM μόνο για τη συνομιλία. Αντικαταστάθηκε από την καρτέλα AI (Πάροχος AI, Μοντέλο AI, Κλειδί API AI). Κενό απενεργοποιεί την παλιά διαδρομή."
+
 #~ msgid "Letters, digits and @/./+/-/_ only."
 #~ msgstr "Μόνο γράμματα, ψηφία και @/./+/-/_."
 
@@ -19365,6 +19362,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Mobile"
 #~ msgstr "Κινητό"
+
+#~ msgid "Model identifier accepted by the chosen provider (for example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or 'anthropic/claude-sonnet-4'). Leave empty to disable AI features."
+#~ msgstr "Αναγνωριστικό μοντέλου που αποδέχεται ο επιλεγμένος πάροχος (για παράδειγμα 'gemini-3.5-flash-lite', 'gpt-4.1-mini' ή 'anthropic/claude-sonnet-4'). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
 #~ msgid "Months"
 #~ msgstr "Μήνες"
@@ -20142,6 +20142,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Thumbnail for listings"
 #~ msgstr "Μικρογραφία για λίστες"
 
+#~ msgid "Tick to remove the saved AI API key. Clear AI Provider and AI Model as well to disable AI features for this store."
+#~ msgstr "Επιλέξτε το για να αφαιρέσετε το αποθηκευμένο κλειδί API AI. Εκκαθαρίστε επίσης τον Πάροχο AI και το Μοντέλο AI για να απενεργοποιήσετε τις λειτουργίες AI για αυτό το κατάστημα."
+
 #~ msgid "Time"
 #~ msgstr "Ώρα"
 
@@ -20191,6 +20194,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Unused"
 #~ msgstr "Δεν χρησιμοποιείται"
+
+#~ msgid "Update the API key on the AI tab instead of the legacy Chat API Key field."
+#~ msgstr "Ενημερώστε το κλειδί API στην καρτέλα AI αντί για το παλιό πεδίο Κλειδί API Chat."
 
 #~ msgid "Update the status of an existing order"
 #~ msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας"

@@ -396,9 +396,8 @@ def validate_box_now_partner_id(tenant: Tenant) -> None:
         )
 
 
-#: Model IDs accepted across the platform's OpenAI-compatible providers
-#: (including vendor/model:variant forms on OpenRouter). Rejects spaces,
-#: control characters, URLs and query strings.
+#: A provider's model ID, including OpenRouter's ``vendor/model:variant``
+#: form. Refuses spaces, control characters, URLs and query strings.
 AI_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 
 
@@ -407,9 +406,9 @@ def validate_ai_profile(tenant: Tenant) -> None:
 
     There is no platform fallback: a half-configured profile would look
     armed in the admin while leaving every AI feature off in the gateway.
+    A saved key belongs to its provider: changing the provider needs a new
+    key, so a store's key is never sent to another company.
     """
-    from tenant.ai_providers import get_ai_provider
-
     provider = tenant.ai_provider or ""
     model = tenant.ai_model or ""
     api_key = tenant.ai_api_key or ""
@@ -417,20 +416,13 @@ def validate_ai_profile(tenant: Tenant) -> None:
         return
 
     errors: dict[str, list[StrOrPromise]] = {}
-    if provider and get_ai_provider(provider) is None:
-        errors.setdefault("ai_provider", []).append(
-            _("Choose an AI provider from the platform's list.")
-        )
     if model and (
-        not AI_MODEL_PATTERN.fullmatch(model)
-        or "://" in model
-        or "//" in model
-        or ".." in model
+        not AI_MODEL_PATTERN.fullmatch(model) or "//" in model or ".." in model
     ):
         errors.setdefault("ai_model", []).append(
             _(
-                "Enter a valid model identifier without spaces or "
-                "control characters (e.g. 'gemini-3.5-flash-lite')."
+                "Enter the model ID exactly as the provider names it, "
+                "without spaces or a URL."
             )
         )
     if api_key and any(not (0x21 <= ord(ch) <= 0x7E) for ch in api_key):
@@ -440,6 +432,18 @@ def validate_ai_profile(tenant: Tenant) -> None:
                 "characters with no spaces."
             )
         )
+
+    if provider and api_key and tenant.pk:
+        saved = (
+            type(tenant)
+            .objects.filter(pk=tenant.pk)
+            .values_list("ai_provider", "ai_api_key")
+            .first()
+        )
+        if saved and saved[1] == api_key and saved[0] not in ("", provider):
+            errors.setdefault("ai_api_key", []).append(
+                _("Enter the API key for the new AI provider.")
+            )
 
     incomplete = _(
         "Set the AI provider, model and API key together, or leave all "

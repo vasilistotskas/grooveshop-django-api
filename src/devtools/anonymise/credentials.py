@@ -45,7 +45,6 @@ INTEGRATION_PREFIXES: tuple[str, ...] = (
     "google_ads_",
     "cloudflare_",
     "acp_",
-    "chat_",
     "ai_",
 )
 

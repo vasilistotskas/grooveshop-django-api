@@ -1165,30 +1165,12 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Stripe Agentic Commerce."
         ),
     )
-    # Legacy chat-only key: superseded by the per-store AI profile below
-    # (``ai_provider``, ``ai_model``, ``ai_api_key``). Kept during the
-    # expand release while existing gateway pods still read ``chatApiKey``;
-    # removed in the contract release once the gateway reads ``aiProfile``.
-    chat_api_key = EncryptedCharField(
-        _("Chat API Key"),
-        max_length=255,
-        db_column="chat_api_key_encrypted",
-        blank=True,
-        default="",
-        help_text=_(
-            "Legacy chat-only LLM API key. Superseded by the AI tab "
-            "(AI Provider, AI Model, AI API Key). Empty disables the "
-            "legacy path."
-        ),
-    )
-
     # === AI Profile ===
-    # Shared by the storefront chat assistant and the page-builder AI
-    # tools. Served to the agent gateway ONLY on the internal-token-gated
-    # tenant/resolve response (never cached, never exposed to browsers).
-    # There is NO platform fallback: empty disables AI features for this
-    # store.
-
+    # The store's own model provider, model and key, shared by the
+    # storefront chat assistant and the page-builder AI tools. Served to
+    # the agent gateway only on the internal-token-gated tenant/resolve
+    # response. All three empty: the store has no AI features (there is
+    # no platform fallback).
     ai_provider = models.CharField(
         _("AI Provider"),
         max_length=32,
@@ -1209,10 +1191,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         db_default="",
         help_text=_(
-            "Model identifier accepted by the chosen provider (for "
-            "example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or "
-            "'anthropic/claude-sonnet-4'). Leave empty to disable AI "
-            "features."
+            "The model ID exactly as the chosen provider names it. "
+            "Leave empty to disable AI features."
         ),
     )
     ai_api_key = EncryptedCharField(
@@ -1223,9 +1203,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         db_default="",
         help_text=_(
             "Your own API key for the chosen AI provider. Stored "
-            "encrypted and write-only in the admin — never shown again "
-            "after saving. Empty disables AI features (no platform "
-            "fallback)."
+            "encrypted and never shown again after saving. Leave empty "
+            "to disable AI features."
         ),
     )
 
@@ -1257,7 +1236,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "box_now_client_secret",
             "box_now_webhook_secret",
             "acp_bearer_token",
-            "chat_api_key",
             "ai_api_key",
             "mydata_subscription_key",
             # A cache key component, not a fact about the store.

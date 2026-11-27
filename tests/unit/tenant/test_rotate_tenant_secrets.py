@@ -33,7 +33,7 @@ def rotated_setup(settings):
     tenant = store_tenant(
         "rotate_one",
         stripe_secret_key="sk_live_rotate",
-        chat_api_key="chat-rotate",
+        acp_bearer_token="chat-rotate",
     )
     settings.FIELD_ENCRYPTION_KEYS = [new, old]
     return tenant, old, new
@@ -53,7 +53,7 @@ def test_secrets_end_up_readable_with_only_the_new_key(settings, rotated_setup):
     settings.FIELD_ENCRYPTION_KEYS = [new]
     loaded = Tenant.objects.get(pk=tenant.pk)
     assert loaded.stripe_secret_key == "sk_live_rotate"
-    assert loaded.chat_api_key == "chat-rotate"
+    assert loaded.acp_bearer_token == "chat-rotate"
 
 
 def test_a_second_run_writes_nothing(rotated_setup):

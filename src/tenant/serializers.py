@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import copy
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -418,13 +420,12 @@ class TenantConfigSerializer(serializers.Serializer):
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
     # all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
-    # ``box_now_notify_phone``, ``stripe_secret_key``, ``chat_api_key``,
-    # ``ai_provider``, ``ai_model``, and ``ai_api_key`` are intentionally
-    # excluded — they are secrets or internal config that must never be
-    # served to anonymous callers. Only available via TenantAdminSerializer
-    # (``ai_profile`` and the legacy ``chat_api_key`` are additionally
-    # appended to tenant_resolve responses for the agent gateway only,
-    # after an X-Internal-Token check — never cached).
+    # ``box_now_notify_phone``, ``stripe_secret_key``, ``ai_provider``,
+    # ``ai_model`` and ``ai_api_key`` are intentionally excluded — they are
+    # secrets or internal config that must never be served to anonymous
+    # callers. Only available via TenantAdminSerializer (``ai_profile`` is
+    # additionally appended to tenant_resolve responses for the agent
+    # gateway only, after an X-Internal-Token check — never cached).
 
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()
@@ -474,88 +475,18 @@ class TenantAdminSerializer(serializers.ModelSerializer):
         return bool(obj.ai_api_key)
 
     def validate(self, attrs):
-        from django.core.exceptions import (
-            ValidationError as DjangoValidationError,
-        )
-        from django.utils.translation import gettext as _
+        """The store's own rules (``Tenant.clean``), as the admin form runs.
 
-        from tenant.models.tenant_rules import validate_ai_profile
-
+        A ``ModelSerializer`` never calls ``Model.clean``, so the rules run
+        on a copy of the row with the submitted values; DRF turns the
+        Django ``ValidationError`` into a 400 with the fields' errors.
+        """
         attrs = super().validate(attrs)
-        existing_provider = self.instance.ai_provider if self.instance else ""
-        existing_key = self.instance.ai_api_key if self.instance else ""
-        existing_chat_key = self.instance.chat_api_key if self.instance else ""
-        next_provider = attrs.get("ai_provider", existing_provider)
-
-        if (
-            "chat_api_key" in attrs
-            and (attrs["chat_api_key"] or "") != (existing_chat_key or "")
-            and (existing_provider or next_provider)
-        ):
-            raise serializers.ValidationError(
-                {
-                    "chat_api_key": _(
-                        "Update the API key on the AI tab instead of the "
-                        "legacy Chat API Key field."
-                    )
-                },
-                code="legacy_chat_api_key_superseded",
-            )
-
-        if (
-            existing_provider
-            and existing_key
-            and next_provider
-            and next_provider != existing_provider
-            and not attrs.get("ai_api_key")
-        ):
-            raise serializers.ValidationError(
-                {"ai_api_key": _("Enter the API key for the new AI provider.")},
-                code="ai_provider_key_required",
-            )
-
-        if any(
-            field in attrs
-            for field in ("ai_provider", "ai_model", "ai_api_key")
-        ):
-            candidate = Tenant(
-                ai_provider=next_provider,
-                ai_model=attrs.get(
-                    "ai_model",
-                    self.instance.ai_model if self.instance else "",
-                ),
-                ai_api_key=attrs.get("ai_api_key", existing_key),
-            )
-            try:
-                validate_ai_profile(candidate)
-            except DjangoValidationError as exc:
-                raise serializers.ValidationError(
-                    exc.message_dict, code="invalid_ai_profile"
-                ) from exc
+        candidate = copy(self.instance) if self.instance else Tenant()
+        for name, value in attrs.items():
+            setattr(candidate, name, value)
+        candidate.clean()
         return attrs
-
-    def update(self, instance: Tenant, validated_data):
-        from tenant.enum import AIProvider
-
-        if "chat_api_key" not in validated_data and any(
-            field in validated_data
-            for field in ("ai_provider", "ai_model", "ai_api_key")
-        ):
-            next_provider = validated_data.get(
-                "ai_provider", instance.ai_provider
-            )
-            next_key = validated_data.get("ai_api_key", instance.ai_api_key)
-            # Expand-release bridge: keep legacy chat_api_key aligned for
-            # older gateway pods and rollback safety.
-            if next_provider == AIProvider.GEMINI and next_key:
-                validated_data["chat_api_key"] = next_key
-            elif (
-                "ai_api_key" in validated_data
-                and validated_data["ai_api_key"] == ""
-                and instance.ai_api_key
-            ) or (next_provider and next_provider != AIProvider.GEMINI):
-                validated_data["chat_api_key"] = ""
-        return super().update(instance, validated_data)
 
     class Meta:
         model = Tenant
@@ -619,7 +550,6 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Authentication ---
             "totp_issuer",
             # --- Agentic Commerce ---
-            "chat_api_key",
             "ai_provider",
             "ai_model",
             "ai_api_key",

@@ -46,7 +46,7 @@ from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
-from unfold.widgets import UnfoldAdminPasswordWidget, UnfoldBooleanWidget
+from unfold.widgets import UnfoldAdminPasswordWidget
 
 from admin.base import BaseModelAdmin
 from admin.branding import store_mark_url
@@ -141,150 +141,37 @@ def _secret_is_set(field_name: str):
 
 
 class TenantAdminForm(forms.ModelForm):
-    """Store profile form with a write-only AI API key.
+    """The store form, with a write-only AI API key.
 
-    ``ai_api_key`` never renders its stored value back into the HTML
-    form (``UnfoldAdminPasswordWidget(render_value=False)``). Leaving
-    the password input blank preserves an already-saved key so editing
-    unrelated tabs never wipes it; ticking ``clear_ai_api_key`` clears
-    it explicitly.
+    The key's input never shows the saved key, so a blank input keeps it.
+    Clearing the provider and the model switches AI off, and the key goes
+    with them.
     """
-
-    clear_ai_api_key = forms.BooleanField(
-        label=_("Clear saved AI API key"),
-        required=False,
-        widget=UnfoldBooleanWidget,
-        help_text=_(
-            "Tick to remove the saved AI API key. Clear AI Provider and "
-            "AI Model as well to disable AI features for this store."
-        ),
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        has_pk = bool(self.instance and self.instance.pk)
-        self._existing_ai_provider = (
-            (self.instance.ai_provider or "") if has_pk else ""
-        )
-        self._existing_ai_api_key = (
-            (self.instance.ai_api_key or "") if has_pk else ""
-        )
-        self._existing_chat_api_key = (
-            (self.instance.chat_api_key or "") if has_pk else ""
-        )
-        if self.instance is not None:
-            # Snapshot the persisted state before Django's _post_clean()
-            # mutates form.instance.ai_api_key in place on failed POSTs,
-            # so ai_api_key_is_set always reflects what is actually saved.
-            self.instance._persisted_ai_api_key_set = bool(  # type: ignore[attr-defined]
-                self._existing_ai_api_key
+        self.saved_ai_api_key = self.instance.ai_api_key
+        field = self.fields.get("ai_api_key")
+        if field is not None and self.saved_ai_api_key:
+            field.help_text = _(
+                "A key is saved. Leave this blank to keep it, or enter a "
+                "new key to replace it."
             )
-        self._cleared_ai_api_key = False
-        if "ai_api_key" not in self.fields or not self._existing_ai_api_key:
-            self.fields.pop("clear_ai_api_key", None)
-        if "ai_api_key" in self.fields:
-            self.initial["ai_api_key"] = ""
-            if self._existing_ai_api_key:
-                self.fields["ai_api_key"].widget.attrs["placeholder"] = _(
-                    "Saved — leave blank to keep, or enter a new key to replace"
-                )
-                self.fields["ai_api_key"].help_text = _(
-                    "A key is already saved. Leave blank to keep it, paste a "
-                    "new key to replace it, or tick Clear saved AI API key "
-                    "below."
-                )
 
     def clean(self):
-        cleaned = super().clean()
-        if cleaned is None:
-            return cleaned
-        submitted_provider = (
-            cleaned.get("ai_provider") or ""
-            if "ai_provider" in cleaned
-            else self._existing_ai_provider
-        )
+        super().clean()
+        cleaned = self.cleaned_data
         if (
-            "chat_api_key" in cleaned
-            and (cleaned.get("chat_api_key") or "")
-            != self._existing_chat_api_key
-            and (self._existing_ai_provider or submitted_provider)
+            "ai_api_key" not in self.fields
+            or "ai_api_key" in self.errors
+            or cleaned.get("ai_api_key")
         ):
-            self.add_error(
-                "chat_api_key",
-                _(
-                    "Update the API key on the AI tab instead of the legacy "
-                    "Chat API Key field."
-                ),
-            )
-        if "ai_api_key" not in self.fields or "ai_api_key" in self.errors:
             return cleaned
-        new_key = cleaned.get("ai_api_key") or ""
-        clear_key = bool(cleaned.get("clear_ai_api_key"))
-        if new_key and clear_key:
-            self.add_error(
-                "clear_ai_api_key",
-                _(
-                    "Enter a new API key or tick Clear saved AI API key, "
-                    "not both."
-                ),
-            )
-        elif clear_key:
-            cleaned["ai_api_key"] = ""
-            self._cleared_ai_api_key = True
-        elif not new_key:
-            if (
-                self._existing_ai_api_key
-                and self._existing_ai_provider
-                and submitted_provider
-                and submitted_provider != self._existing_ai_provider
-            ):
-                self.add_error(
-                    "ai_api_key",
-                    _("Enter the API key for the new AI provider."),
-                )
-                cleaned["ai_api_key"] = ""
-            else:
-                cleaned["ai_api_key"] = self._existing_ai_api_key
+        switched_off = not (
+            cleaned.get("ai_provider") or cleaned.get("ai_model")
+        )
+        cleaned["ai_api_key"] = "" if switched_off else self.saved_ai_api_key
         return cleaned
-
-    def _post_clean(self):
-        had_key_error = "ai_api_key" in self.errors
-        prior_key_errors = (
-            list(self.errors["ai_api_key"].as_data()) if had_key_error else []
-        )
-        super()._post_clean()
-        if had_key_error:
-            # Field-level validation (e.g. max_length) kept the posted
-            # key out of cleaned_data, so Tenant.clean() saw the old
-            # empty value and may append a misleading "set all three"
-            # error. Keep only the original field-level error(s).
-            self.errors["ai_api_key"] = self.error_class(prior_key_errors)
-
-    def save(self, commit=True):
-        from tenant.enum import AIProvider
-
-        instance = super().save(commit=False)
-        if (
-            "ai_api_key" in self.fields
-            and "chat_api_key" not in self.changed_data
-        ):
-            # Expand-release bridge: keep legacy chat_api_key aligned for
-            # older gateway pods and rollback safety. Mirror Gemini keys;
-            # clear legacy key on non-Gemini profiles or explicit clear.
-            if (
-                instance.ai_provider == AIProvider.GEMINI
-                and instance.ai_api_key
-            ):
-                instance.chat_api_key = instance.ai_api_key
-            elif self._cleared_ai_api_key or (
-                instance.ai_provider
-                and instance.ai_provider != AIProvider.GEMINI
-            ):
-                instance.chat_api_key = ""
-        if commit:
-            instance.save()
-            self.save_m2m()
-        return instance
 
 
 @admin.register(Tenant)
@@ -319,7 +206,6 @@ class TenantAdmin(BaseModelAdmin):
         "suspended_reason",
         "billing_notice_stage",
         "billing_notice_term",
-        "ai_api_key_is_set",
     ]
     inlines = [TenantDomainInline]
 
@@ -399,20 +285,10 @@ class TenantAdmin(BaseModelAdmin):
             return qs
         return qs.filter(pk=scope.pk)
 
-    @admin.display(boolean=True, description=_("AI API key saved"))
-    def ai_api_key_is_set(self, obj):
-        if obj is None:
-            return False
-        persisted = getattr(obj, "_persisted_ai_api_key_set", None)
-        if persisted is not None:
-            return bool(persisted)
-        return bool(obj.ai_api_key)
-
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name == "ai_api_key":
             kwargs["widget"] = UnfoldAdminPasswordWidget(
-                attrs={"autocomplete": "new-password"},
-                render_value=False,
+                attrs={"autocomplete": "new-password"}
             )
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
@@ -437,29 +313,25 @@ class TenantAdmin(BaseModelAdmin):
                 for field in self.model._meta.fields
                 if field.name not in TENANT_SELF_EDITABLE_FIELDS
             ),
-            "ai_api_key_is_set",
             *(f"{name}_is_set" for name in _platform_secret_fields()),
         )
 
     def get_fieldsets(self, request, obj=None):
-        """A store role sees whether a platform secret is set, never it.
+        """A secret the viewer may not change shows as "set / not set".
 
-        The secret's own field is swapped for its "set / not set" column
-        in the fieldset, so its value is never rendered for a store role
-        (the platform operator still sees and edits the real field).
-        ``ai_api_key`` and ``clear_ai_api_key`` are omitted on view-only
-        pages (so Django's read-only view never renders the stored key
-        in plaintext), and ``clear_ai_api_key`` is only shown when a key
-        is already saved.
+        A read-only field is rendered decrypted, so a platform secret is
+        swapped for its "set / not set" column for a store role, and the
+        write-only AI key for anyone who can only view the store (the
+        platform operator still edits the real fields).
         """
         fieldsets = super().get_fieldsets(request, obj)
-        can_change = self.has_change_permission(request, obj)
-        has_ai_key = bool(obj and obj.ai_api_key)
         secrets = (
             set(_platform_secret_fields())
             if self_service_tenant(request) is not None
             else set()
         )
+        if obj is not None and not self.has_change_permission(request, obj):
+            secrets.add("ai_api_key")
         return [
             (
                 name,
@@ -468,11 +340,6 @@ class TenantAdmin(BaseModelAdmin):
                     "fields": [
                         f"{field}_is_set" if field in secrets else field
                         for field in options["fields"]
-                        if (field != "ai_api_key" or can_change)
-                        and (
-                            field != "clear_ai_api_key"
-                            or (can_change and has_ai_key)
-                        )
                     ],
                 },
             )
@@ -712,7 +579,6 @@ class TenantAdmin(BaseModelAdmin):
                     "agent_commerce_enabled",
                     "agent_hosted_payment_enabled",
                     "agent_stripe_delegated_enabled",
-                    "chat_api_key",
                     "acp_bearer_token",
                 ],
             },
@@ -819,15 +685,14 @@ class TenantAdmin(BaseModelAdmin):
                 "fields": [
                     "ai_provider",
                     "ai_model",
-                    "ai_api_key_is_set",
                     "ai_api_key",
-                    "clear_ai_api_key",
                 ],
                 "description": _(
                     "The AI provider, model and API key used by the "
                     "storefront chat assistant and page-builder AI tools. "
-                    "Leave all fields empty to disable AI features (there "
-                    "is no platform fallback). The saved API key is never "
+                    "Clear the provider and the model to switch AI "
+                    "features off; the saved key is removed with them. "
+                    "There is no platform fallback. A saved key is never "
                     "shown again."
                 ),
             },
@@ -1235,7 +1100,7 @@ class TenantAdmin(BaseModelAdmin):
         )
 
 
-for _secret in _platform_secret_fields():
+for _secret in (*_platform_secret_fields(), "ai_api_key"):
     setattr(TenantAdmin, f"{_secret}_is_set", _secret_is_set(_secret))
 
 

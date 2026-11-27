@@ -21,7 +21,7 @@ from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from tenant.ai_providers import legacy_chat_api_key, serialize_ai_profile
+from tenant.ai_providers import serialize_ai_profile
 from tenant.cache import tenant_resolve_key
 from tenant.legal_identity import (
     merchant_legal_identity,
@@ -139,7 +139,6 @@ def tenant_resolve(request: Request) -> Response:
     if is_gateway:
         data = {
             **data,
-            "chat_api_key": legacy_chat_api_key(tenant),
             "acp_bearer_token": tenant.acp_bearer_token or "",
             "ai_profile": serialize_ai_profile(tenant),
         }

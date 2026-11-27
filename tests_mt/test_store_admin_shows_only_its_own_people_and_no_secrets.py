@@ -24,7 +24,6 @@ OUTSIDER_NAME = "Zebulon Outsider"
 PLATFORM_NAME = "Quentin Platformer"
 PLATFORM_EMAIL = "mt-platform-staff@platform.example"
 SECRETS = {
-    "chat_api_key": "chat-key-value-1f3a9c",
     "acp_bearer_token": "acp-token-value-7d2e44",
     "cloudflare_api_token": "cf-token-value-b80c15",
 }

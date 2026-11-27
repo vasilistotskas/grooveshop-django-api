@@ -46,6 +46,7 @@ from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
+from unfold.widgets import UnfoldAdminPasswordWidget, UnfoldBooleanWidget
 
 from admin.base import BaseModelAdmin
 from admin.branding import store_mark_url
@@ -139,8 +140,83 @@ def _secret_is_set(field_name: str):
     return is_set
 
 
+class TenantAdminForm(forms.ModelForm):
+    """Store profile form with a write-only AI API key.
+
+    ``ai_api_key`` never renders its stored value back into the HTML
+    form (``UnfoldAdminPasswordWidget(render_value=False)``). Leaving
+    the password input blank preserves an already-saved key so editing
+    unrelated tabs never wipes it; ticking ``clear_ai_api_key`` clears
+    it explicitly.
+    """
+
+    clear_ai_api_key = forms.BooleanField(
+        label=_("Clear saved AI API key"),
+        required=False,
+        widget=UnfoldBooleanWidget,
+        help_text=_(
+            "Tick to remove the saved AI API key. Clear AI Provider and "
+            "AI Model as well to disable AI features for this store."
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._existing_ai_api_key = (
+            (self.instance.ai_api_key or "")
+            if self.instance and self.instance.pk
+            else ""
+        )
+        self._cleared_ai_api_key = False
+        if "ai_api_key" in self.fields:
+            self.initial["ai_api_key"] = ""
+            if self._existing_ai_api_key:
+                self.fields["ai_api_key"].widget.attrs["placeholder"] = _(
+                    "Saved — leave blank to keep, or enter a new key to replace"
+                )
+                self.fields["ai_api_key"].help_text = _(
+                    "A key is already saved. Leave blank to keep it, paste a "
+                    "new key to replace it, or tick Clear saved AI API key "
+                    "below."
+                )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned is None or "ai_api_key" not in self.fields:
+            return cleaned
+        new_key = cleaned.get("ai_api_key") or ""
+        clear_key = bool(cleaned.get("clear_ai_api_key"))
+        if new_key and clear_key:
+            self.add_error(
+                "clear_ai_api_key",
+                _(
+                    "Enter a new API key or tick Clear saved AI API key, "
+                    "not both."
+                ),
+            )
+        elif clear_key:
+            cleaned["ai_api_key"] = ""
+            self._cleared_ai_api_key = True
+        elif not new_key:
+            cleaned["ai_api_key"] = self._existing_ai_api_key
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self._cleared_ai_api_key and "chat_api_key" not in self.changed_data:
+            # Expand-release bridge: clearing the AI profile also clears
+            # the legacy chat_api_key so older gateway pods stop serving
+            # chat immediately.
+            instance.chat_api_key = ""
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
 @admin.register(Tenant)
 class TenantAdmin(BaseModelAdmin):
+    form = TenantAdminForm
     list_display = [
         "display_store",
         "display_plan",
@@ -170,6 +246,7 @@ class TenantAdmin(BaseModelAdmin):
         "suspended_reason",
         "billing_notice_stage",
         "billing_notice_term",
+        "ai_api_key_is_set",
     ]
     inlines = [TenantDomainInline]
 
@@ -249,6 +326,18 @@ class TenantAdmin(BaseModelAdmin):
             return qs
         return qs.filter(pk=scope.pk)
 
+    @admin.display(boolean=True, description=_("AI API key saved"))
+    def ai_api_key_is_set(self, obj):
+        return bool(obj and obj.ai_api_key)
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "ai_api_key":
+            kwargs["widget"] = UnfoldAdminPasswordWidget(
+                attrs={"autocomplete": "new-password"},
+                render_value=False,
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
     def get_readonly_fields(self, request, obj=None):
         """Everything except the merchant's own settings.
 
@@ -270,6 +359,7 @@ class TenantAdmin(BaseModelAdmin):
                 for field in self.model._meta.fields
                 if field.name not in TENANT_SELF_EDITABLE_FIELDS
             ),
+            "ai_api_key_is_set",
             *(f"{name}_is_set" for name in _platform_secret_fields()),
         )
 
@@ -279,11 +369,15 @@ class TenantAdmin(BaseModelAdmin):
         The secret's own field is swapped for its "set / not set" column
         in the fieldset, so its value is never rendered for a store role
         (the platform operator still sees and edits the real field).
+        ``clear_ai_api_key`` is only shown when a key is already saved.
         """
         fieldsets = super().get_fieldsets(request, obj)
-        if self_service_tenant(request) is None:
-            return fieldsets
-        secrets = set(_platform_secret_fields())
+        has_ai_key = bool(obj and obj.ai_api_key)
+        secrets = (
+            set(_platform_secret_fields())
+            if self_service_tenant(request) is not None
+            else set()
+        )
         return [
             (
                 name,
@@ -292,6 +386,7 @@ class TenantAdmin(BaseModelAdmin):
                     "fields": [
                         f"{field}_is_set" if field in secrets else field
                         for field in options["fields"]
+                        if field != "clear_ai_api_key" or has_ai_key
                     ],
                 },
             )
@@ -629,6 +724,26 @@ class TenantAdmin(BaseModelAdmin):
                     "mydata_user_id",
                     "mydata_subscription_key",
                 ],
+            },
+        ),
+        (
+            _("AI"),
+            {
+                "classes": ["tab"],
+                "fields": [
+                    "ai_provider",
+                    "ai_model",
+                    "ai_api_key_is_set",
+                    "ai_api_key",
+                    "clear_ai_api_key",
+                ],
+                "description": _(
+                    "The AI provider, model and API key used by the "
+                    "storefront chat assistant and page-builder AI tools. "
+                    "Leave all fields empty to disable AI features (there "
+                    "is no platform fallback). The saved API key is never "
+                    "shown again."
+                ),
             },
         ),
     ]

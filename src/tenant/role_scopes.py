@@ -291,6 +291,10 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "box_now_live_mode",
         "mydata_user_id",
         "mydata_subscription_key",
+        # Per-store AI profile (chat + builders; key is write-only in admin)
+        "ai_provider",
+        "ai_model",
+        "ai_api_key",
         # Security-adjacent but store-owned
         "totp_issuer",
     }

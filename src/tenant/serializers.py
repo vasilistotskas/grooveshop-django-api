@@ -418,12 +418,13 @@ class TenantConfigSerializer(serializers.Serializer):
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
     # all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
-    # ``box_now_notify_phone``, ``stripe_secret_key``, and
-    # ``chat_api_key`` are intentionally excluded — they are secrets or
-    # internal config that must never be served to anonymous callers.
-    # Only available via TenantAdminSerializer (``chat_api_key`` is
-    # additionally appended to tenant_resolve responses for the agent
-    # gateway only, after an X-Internal-Token check — never cached).
+    # ``box_now_notify_phone``, ``stripe_secret_key``, ``chat_api_key``,
+    # ``ai_provider``, ``ai_model``, and ``ai_api_key`` are intentionally
+    # excluded — they are secrets or internal config that must never be
+    # served to anonymous callers. Only available via TenantAdminSerializer
+    # (``ai_profile`` and the legacy ``chat_api_key`` are additionally
+    # appended to tenant_resolve responses for the agent gateway only,
+    # after an X-Internal-Token check — never cached).
 
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()
@@ -467,6 +468,42 @@ class TenantAdminSerializer(serializers.ModelSerializer):
     """
 
     domains = TenantDomainSerializer(many=True, read_only=True)
+    ai_api_key_set = serializers.SerializerMethodField()
+
+    def get_ai_api_key_set(self, obj: Tenant) -> bool:
+        return bool(obj.ai_api_key)
+
+    def validate(self, attrs):
+        from django.core.exceptions import (
+            ValidationError as DjangoValidationError,
+        )
+
+        from tenant.models.tenant_rules import validate_ai_profile
+
+        attrs = super().validate(attrs)
+        if any(
+            field in attrs
+            for field in ("ai_provider", "ai_model", "ai_api_key")
+        ):
+            candidate = Tenant(
+                ai_provider=attrs.get(
+                    "ai_provider",
+                    self.instance.ai_provider if self.instance else "",
+                ),
+                ai_model=attrs.get(
+                    "ai_model",
+                    self.instance.ai_model if self.instance else "",
+                ),
+                ai_api_key=attrs.get(
+                    "ai_api_key",
+                    self.instance.ai_api_key if self.instance else "",
+                ),
+            )
+            try:
+                validate_ai_profile(candidate)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.message_dict) from exc
+        return attrs
 
     class Meta:
         model = Tenant
@@ -531,6 +568,10 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "totp_issuer",
             # --- Agentic Commerce ---
             "chat_api_key",
+            "ai_provider",
+            "ai_model",
+            "ai_api_key",
+            "ai_api_key_set",
             "acp_bearer_token",
             "agent_hosted_payment_enabled",
             "agent_stripe_delegated_enabled",
@@ -614,7 +655,11 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "is_active",
             "suspended_at",
             "suspended_reason",
+            "ai_api_key_set",
         ]
+        extra_kwargs = {
+            "ai_api_key": {"write_only": True, "required": False},
+        }
 
 
 class TenantSuspendRequestSerializer(serializers.Serializer):

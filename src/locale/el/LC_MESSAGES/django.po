@@ -846,6 +846,9 @@ msgstr "Το σημείο εστίασης είναι μεταξύ 0 και 1."
 msgid "A heartbeat can name at most %(limit)s documents."
 msgstr "Ένας παλμός μπορεί να αναφέρει το πολύ %(limit)s έγγραφα."
 
+msgid "A key is already saved. Leave blank to keep it, paste a new key to replace it, or tick Clear saved AI API key below."
+msgstr "Έχει ήδη αποθηκευτεί ένα κλειδί. Αφήστε το κενό για να το διατηρήσετε, επικολλήστε νέο κλειδί για αντικατάσταση ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI παρακάτω."
+
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
 
@@ -1329,6 +1332,21 @@ msgstr "ACS_SHOP_STATION_ID_EN — ο κωδικός σταθμού ΠΕΡΙΟΧ
 
 msgid "ACS_Station_Branch_Destination value."
 msgstr "Τιμή ACS_Station_Branch_Destination."
+
+msgid "AI"
+msgstr "AI"
+
+msgid "AI API Key"
+msgstr "Κλειδί API AI"
+
+msgid "AI API key saved"
+msgstr "Αποθηκευμένο κλειδί API AI"
+
+msgid "AI Model"
+msgstr "Μοντέλο AI"
+
+msgid "AI Provider"
+msgstr "Πάροχος AI"
 
 msgctxt "order source type"
 msgid "AI agent"
@@ -1840,6 +1858,9 @@ msgstr "Μια άλλη επιστροφή αυτής της παραγγελί�
 
 msgid "Another zone already covers the whole of this country. Choose the regions this zone covers instead."
 msgstr "Μια άλλη ζώνη καλύπτει ήδη ολόκληρη τη χώρα. Επιλέξτε αντί γι' αυτό τις περιφέρειες που καλύπτει αυτή η ζώνη."
+
+msgid "Anthropic"
+msgstr "Anthropic"
 
 msgid "Any APM"
 msgstr "Οποιοδήποτε APM"
@@ -3328,6 +3349,9 @@ msgstr "Επιλέξτε σημείο παραλαβής."
 msgid "Choose a time in the future."
 msgstr "Διάλεξε μια ώρα στο μέλλον."
 
+msgid "Choose an AI provider from the platform's list."
+msgstr "Επιλέξτε έναν πάροχο AI από τη λίστα της πλατφόρμας."
+
 msgid "Choose at least one document to publish."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
 
@@ -3370,6 +3394,9 @@ msgstr "Καθαρό"
 
 msgid "Clear discount from selected products"
 msgstr "Αφαίρεση έκπτωσης από τα επιλεγμένα προϊόντα"
+
+msgid "Clear saved AI API key"
+msgstr "Εκκαθάριση αποθηκευμένου κλειδιού API AI"
 
 msgid "Clearance (>50%)"
 msgstr "Εκποίηση (>50%)"
@@ -4875,6 +4902,9 @@ msgstr "Αγγλικά"
 msgid "Enhanced performance and faster loading times"
 msgstr "Καλύτερη απόδοση και πιο γρήγορους χρόνους φόρτωσης"
 
+msgid "Enter a new API key or tick Clear saved AI API key, not both."
+msgstr "Εισαγάγετε νέο κλειδί API ή επιλέξτε Εκκαθάριση αποθηκευμένου κλειδιού API AI, όχι και τα δύο."
+
 msgid "Enter a phone number, using digits and + ( ) - only."
 msgstr "Εισαγάγετε αριθμό τηλεφώνου, χρησιμοποιώντας μόνο ψηφία και + ( ) -."
 
@@ -4898,6 +4928,9 @@ msgstr "Εισαγάγετε έγκυρο email"
 
 msgid "Enter a valid email address."
 msgstr "Εισαγάγετε έγκυρο email."
+
+msgid "Enter a valid model identifier without spaces or control characters (e.g. 'gemini-3.5-flash-lite')."
+msgstr "Εισαγάγετε έγκυρο αναγνωριστικό μοντέλου χωρίς κενά ή χαρακτήρες ελέγχου (π.χ. 'gemini-3.5-flash-lite')."
 
 msgid "Enter a valid phone number"
 msgstr "Εισαγάγετε έγκυρο τηλέφωνο"
@@ -7187,6 +7220,9 @@ msgstr "Αναγνωριστικό Παρακολούθησης Google Analytics
 msgid "Google Analytics tracking ID must start with 'G-' (GA4) or 'UA-' (Universal Analytics)."
 msgstr "Το αναγνωριστικό παρακολούθησης Google Analytics πρέπει να ξεκινά με 'G-' (GA4) ή 'UA-' (Universal Analytics)."
 
+msgid "Google Gemini"
+msgstr "Google Gemini"
+
 msgid "Google Pay"
 msgstr "Google Pay"
 
@@ -7221,6 +7257,9 @@ msgstr "Το ελληνικό ΑΦΜ πρέπει να έχει ακριβώς 9
 
 msgid "Greek ΑΦΜ — 9 digits, EL/GR prefix tolerated"
 msgstr "Ελληνικό ΑΦΜ — 9 ψηφία, το πρόθεμα EL/GR γίνεται δεκτό"
+
+msgid "Groq"
+msgstr "Groq"
 
 msgid "Gross"
 msgstr "Μικτό"
@@ -8063,9 +8102,6 @@ msgstr "Είδος"
 msgid "Kiosk"
 msgstr "Kiosk"
 
-msgid "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
-msgstr "Κλειδί API LLM για τον βοηθό συνομιλίας (chat assistant) του storefront (παρέχεται στο agent gateway μόνο μέσω του endpoint tenant resolve που προστατεύεται με internal token). Κάθε κατάστημα φέρνει το δικό του κλειδί — δικό του όριο χρήσης, συναίνεση και χρέωση. Δεν πρέπει ποτέ να εκτίθεται στον browser. Κενό → απενεργοποιεί τον βοηθό συνομιλίας για αυτό το κατάστημα."
-
 msgid "LOW STOCK ALERT"
 msgstr "ΕΙΔΟΠΟΙΗΣΗ ΧΑΜΗΛΟΥ ΑΠΟΘΕΜΑΤΟΣ"
 
@@ -8222,6 +8258,9 @@ msgstr "Αφήστε το κενό για να καλύψετε ολόκληρη
 
 msgid "Ledger"
 msgstr "Καθολικό"
+
+msgid "Legacy chat-only LLM API key. Superseded by the AI tab (AI Provider, AI Model, AI API Key). Empty disables the legacy path."
+msgstr "Παλαιό κλειδί API LLM μόνο για τη συνομιλία. Αντικαταστάθηκε από την καρτέλα AI (Πάροχος AI, Μοντέλο AI, Κλειδί API AI). Κενό απενεργοποιεί την παλιά διαδρομή."
 
 msgid "Legal acceptance"
 msgstr "Αποδοχή νομικών όρων"
@@ -8990,11 +9029,17 @@ msgstr "Λείπει το αναγνωριστικό συναλλαγής (t) ή
 msgid "Missing uuid."
 msgstr "Λείπει το uuid."
 
+msgid "Mistral AI"
+msgstr "Mistral AI"
+
 msgid "Mixed"
 msgstr "Μικτό"
 
 msgid "Mode"
 msgstr "Λειτουργία"
+
+msgid "Model identifier accepted by the chosen provider (for example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or 'anthropic/claude-sonnet-4'). Leave empty to disable AI features."
+msgstr "Αναγνωριστικό μοντέλου που αποδέχεται ο επιλεγμένος πάροχος (για παράδειγμα 'gemini-3.5-flash-lite', 'gpt-4.1-mini' ή 'anthropic/claude-sonnet-4'). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
 msgid "Moderation"
 msgstr "Έλεγχος"
@@ -9862,8 +9907,14 @@ msgstr "Άνοιγμα χρονολογίου της αποστολής"
 msgid "Open the unsubscribe confirmation page"
 msgstr "Άνοιγμα της σελίδας επιβεβαίωσης απεγγραφής"
 
+msgid "OpenAI"
+msgstr "OpenAI"
+
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "Αναγνωριστικό pixel μετατροπών OpenAI / ChatGPT Ads (π.χ. '8MktrqpXN1MRdD2NUfkXmU'). Μόνο αλφαριθμητικοί χαρακτήρες. Κενό → το pixel ChatGPT Ads απενεργοποιείται για αυτό το κατάστημα και το origin του εξαιρείται από το CSP."
+
+msgid "OpenRouter"
+msgstr "OpenRouter"
 
 msgid "Operating profit"
 msgstr "Λειτουργικό κέρδος"
@@ -12900,6 +12951,9 @@ msgstr "Αποθηκεύστε τους κωδικούς ανάκτησης"
 msgid "Saved"
 msgstr "Αποθηκεύτηκε"
 
+msgid "Saved — leave blank to keep, or enter a new key to replace"
+msgstr "Αποθηκευμένο — αφήστε κενό για διατήρηση ή εισαγάγετε νέο κλειδί για αντικατάσταση"
+
 msgid "Saved."
 msgstr "Αποθηκεύτηκε."
 
@@ -13408,6 +13462,9 @@ msgstr "Ορίζεται από το agent gateway: το αναγνωριστι�
 
 msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr "Ορίζεται σε επιστροφή ή chargeback: η χρέωση από την οποία αφαιρέθηκαν χρήματα."
+
+msgid "Set the AI provider, model and API key together, or leave all three empty to disable AI features."
+msgstr "Ορίστε μαζί τον πάροχο AI, το μοντέλο και το κλειδί API, ή αφήστε και τα τρία κενά για να απενεργοποιήσετε τις λειτουργίες AI."
 
 msgid "Set the Cloudflare zone ID and API token together."
 msgstr "Συμπληρώστε μαζί το αναγνωριστικό ζώνης και το token API του Cloudflare."
@@ -14744,6 +14801,15 @@ msgstr "Οι 50 πιο πρόσφατες κινήσεις"
 msgid "The ACS voucher was cancelled."
 msgstr "Το voucher ACS ακυρώθηκε."
 
+msgid "The AI API key must not contain control characters or leading/trailing spaces."
+msgstr "Το κλειδί API AI δεν πρέπει να περιέχει χαρακτήρες ελέγχου ή κενά στην αρχή/τέλος."
+
+msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
+msgstr "Ο πάροχος AI που χρησιμοποιείται από τον βοηθό συνομιλίας και τα εργαλεία AI του δημιουργού σελίδων αυτού του καταστήματος. Επιλέγεται από τη λίστα της πλατφόρμας (ποτέ αυθαίρετη διεύθυνση URL). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
+
+msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Leave all fields empty to disable AI features (there is no platform fallback). The saved API key is never shown again."
+msgstr "Ο πάροχος AI, το μοντέλο και το κλειδί API που χρησιμοποιούνται από τον βοηθό συνομιλίας του storefront και τα εργαλεία AI του δημιουργού σελίδων. Αφήστε όλα τα πεδία κενά για να απενεργοποιήσετε τις λειτουργίες AI (δεν υπάρχει προεπιλογή της πλατφόρμας). Το αποθηκευμένο κλειδί API δεν εμφανίζεται ξανά."
+
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "Τα πεδία Cloudflare αφορούν μόνο κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε τα κενά αν χρησιμοποιείτε hostname της πλατφόρμας."
 
@@ -15912,6 +15978,9 @@ msgstr "Εικόνα μικρογραφίας"
 
 msgid "Tick ONLY once this store's sending domain is authenticated on the platform mail relay — SPF and DKIM published and confirmed by the relay. Until then From Email is ignored and the platform address is used, because that is the only domain the relay can sign for. Ticking this early makes every message from this store fail DMARC and land in spam."
 msgstr "Επιλέξτε το ΜΟΝΟ αφού πιστοποιηθεί το domain αποστολής αυτού του καταστήματος στο mail relay της πλατφόρμας — με SPF και DKIM δημοσιευμένα και επιβεβαιωμένα από το relay. Μέχρι τότε το Email Αποστολέα αγνοείται και χρησιμοποιείται η διεύθυνση της πλατφόρμας, επειδή αυτό είναι το μόνο domain για το οποίο μπορεί να υπογράψει το relay. Αν το επιλέξετε νωρίτερα, κάθε μήνυμα από αυτό το κατάστημα αποτυγχάνει στον έλεγχο DMARC και καταλήγει στα spam."
+
+msgid "Tick to remove the saved AI API key. Clear AI Provider and AI Model as well to disable AI features for this store."
+msgstr "Επιλέξτε το για να αφαιρέσετε το αποθηκευμένο κλειδί API AI. Εκκαθαρίστε επίσης τον Πάροχο AI και το Μοντέλο AI για να απενεργοποιήσετε τις λειτουργίες AI για αυτό το κατάστημα."
 
 msgid "Tier"
 msgstr "Βαθμίδα"
@@ -17842,6 +17911,9 @@ msgstr "Η παραγγελία σου εστάλη. Τα στοιχεία πα�
 msgid "Your order status has been updated."
 msgstr "Η κατάσταση της παραγγελίας σας έχει ενημερωθεί."
 
+msgid "Your own API key for the chosen AI provider. Stored encrypted and write-only in the admin — never shown again after saving. Empty disables AI features (no platform fallback)."
+msgstr "Το δικό σας κλειδί API για τον επιλεγμένο πάροχο AI. Αποθηκεύεται κρυπτογραφημένο και είναι μόνο για εγγραφή στη διαχείριση — δεν εμφανίζεται ξανά μετά την αποθήκευση. Κενό απενεργοποιεί τις λειτουργίες AI (χωρίς προεπιλογή της πλατφόρμας)."
+
 msgid "Your own sender address, e.g. orders@your-domain.gr. It takes effect only once the platform ticks From Email Verified, which happens after your domain is authenticated on the mail relay. Until then mail goes out from the platform address with your store name as the display name. Set Contact Email too: that is the reply-to address customers actually reach you on."
 msgstr "Η δική σας διεύθυνση αποστολέα, π.χ. orders@your-domain.gr. Ισχύει μόνο αφού η πλατφόρμα επιλέξει το Επαληθευμένο Email Αποστολέα, κάτι που γίνεται αφού πιστοποιηθεί το domain σας στο mail relay. Μέχρι τότε τα μηνύματα αποστέλλονται από τη διεύθυνση της πλατφόρμας με το όνομα του καταστήματός σας ως εμφανιζόμενο όνομα. Ορίστε και το Email Επικοινωνίας: αυτή είναι η διεύθυνση απάντησης (reply-to) στην οποία σας βρίσκουν πραγματικά οι πελάτες."
 
@@ -19164,6 +19236,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Item quantity must be greater than zero."
 #~ msgstr "Η ποσότητα του είδους πρέπει να είναι μεγαλύτερη από μηδέν."
+
+#~ msgid "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
+#~ msgstr "Κλειδί API LLM για τον βοηθό συνομιλίας (chat assistant) του storefront (παρέχεται στο agent gateway μόνο μέσω του endpoint tenant resolve που προστατεύεται με internal token). Κάθε κατάστημα φέρνει το δικό του κλειδί — δικό του όριο χρήσης, συναίνεση και χρέωση. Δεν πρέπει ποτέ να εκτίθεται στον browser. Κενό → απενεργοποιεί τον βοηθό συνομιλίας για αυτό το κατάστημα."
 
 #~ msgid "Language code filter (e.g., en, el, de)"
 #~ msgstr "Φίλτρο κωδικού γλώσσας (π.χ. en, el, de)"

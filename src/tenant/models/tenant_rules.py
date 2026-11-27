@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 
 from tenant.validators import validate_reserved_schema_name
 
@@ -368,7 +369,7 @@ _SOCIAL_URL_FIELDS = (
 
 def validate_social_urls(tenant: Tenant) -> None:
     """All social URL fields must use https:// when non-empty."""
-    errors: dict[str, list[str]] = {}
+    errors: dict[str, list[StrOrPromise]] = {}
     for field_name in _SOCIAL_URL_FIELDS:
         value = getattr(tenant, field_name, "")
         if value and not value.startswith("https://"):
@@ -393,3 +394,66 @@ def validate_box_now_partner_id(tenant: Tenant) -> None:
                 )
             }
         )
+
+
+#: Model IDs accepted across the platform's OpenAI-compatible providers
+#: (including vendor/model:variant forms on OpenRouter). Rejects spaces,
+#: control characters, URLs and query strings.
+AI_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
+
+
+def validate_ai_profile(tenant: Tenant) -> None:
+    """AI provider, model and API key are set together or left empty.
+
+    There is no platform fallback: a half-configured profile would look
+    armed in the admin while leaving every AI feature off in the gateway.
+    """
+    from tenant.ai_providers import get_ai_provider
+
+    provider = tenant.ai_provider or ""
+    model = tenant.ai_model or ""
+    api_key = tenant.ai_api_key or ""
+    if not (provider or model or api_key):
+        return
+
+    errors: dict[str, list[StrOrPromise]] = {}
+    if provider and get_ai_provider(provider) is None:
+        errors.setdefault("ai_provider", []).append(
+            _("Choose an AI provider from the platform's list.")
+        )
+    if model and (
+        not AI_MODEL_PATTERN.fullmatch(model)
+        or "://" in model
+        or "//" in model
+        or ".." in model
+    ):
+        errors.setdefault("ai_model", []).append(
+            _(
+                "Enter a valid model identifier without spaces or "
+                "control characters (e.g. 'gemini-3.5-flash-lite')."
+            )
+        )
+    if api_key and (
+        api_key != api_key.strip()
+        or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in api_key)
+    ):
+        errors.setdefault("ai_api_key", []).append(
+            _(
+                "The AI API key must not contain control characters or "
+                "leading/trailing spaces."
+            )
+        )
+
+    incomplete = _(
+        "Set the AI provider, model and API key together, or leave all "
+        "three empty to disable AI features."
+    )
+    if not provider:
+        errors.setdefault("ai_provider", []).append(incomplete)
+    if not model:
+        errors.setdefault("ai_model", []).append(incomplete)
+    if not api_key:
+        errors.setdefault("ai_api_key", []).append(incomplete)
+
+    if errors:
+        raise ValidationError(errors)

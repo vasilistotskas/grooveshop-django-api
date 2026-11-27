@@ -14,11 +14,12 @@ Every `EncryptedCharField` on `Tenant`: `stripe_secret_key`,
 `viva_wallet_client_secret`, `viva_wallet_webhook_verification_key`,
 `acs_api_key`, `acs_company_password`, `acs_user_password`,
 `box_now_client_secret`, `box_now_webhook_secret`, `acp_bearer_token`,
-`chat_api_key`, `mydata_subscription_key`, `resend_api_key`,
-`resend_webhook_secret`. Each maps onto a
-`<name>_encrypted` text column (the newest, `mydata_subscription_key` and the
-two `resend_*` fields, keep their own column name). `mydata_user_id` is the TAXISnet username,
-an identifier like `acs_user_id` and `viva_wallet_client_id`, and stays
+`chat_api_key`, `ai_api_key`, `mydata_subscription_key`,
+`resend_api_key`, `resend_webhook_secret`. Each maps onto a
+`<name>_encrypted` text column (the newest — `ai_api_key`,
+`mydata_subscription_key`, and the two `resend_*` fields — keep their
+own column name). `mydata_user_id` is the TAXISnet username, an
+identifier like `acs_user_id` and `viva_wallet_client_id`, and stays
 plaintext.
 
 The fields are excluded from `HistoricalTenant`, so no snapshot table holds
@@ -68,7 +69,9 @@ derived from `SECRET_KEY`, so rotating one does not touch the other.
   text, decrypted. The platform operator still edits the real field. A
   secret the merchant owns and may edit (Stripe, Viva, ACS, BoxNow,
   myDATA, Meta) is still shown in its form to that store's Admin and
-  Owner.
+  Owner; `ai_api_key` is merchant-editable too, but write-only (never
+  rendered back into the admin form or `TenantAdminSerializer` GET
+  responses).
 
 ## Rotating the key
 

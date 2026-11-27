@@ -841,6 +841,9 @@ msgstr "A focal point is between 0 and 1."
 msgid "A heartbeat can name at most %(limit)s documents."
 msgstr "A heartbeat can name at most %(limit)s documents."
 
+msgid "A key is already saved. Leave blank to keep it, paste a new key to replace it, or tick Clear saved AI API key below."
+msgstr "A key is already saved. Leave blank to keep it, paste a new key to replace it, or tick Clear saved AI API key below."
+
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 
@@ -1324,6 +1327,21 @@ msgstr "ACS_SHOP_STATION_ID_EN — the AREA station code, used as Acs_Station_De
 
 msgid "ACS_Station_Branch_Destination value."
 msgstr "ACS_Station_Branch_Destination value."
+
+msgid "AI"
+msgstr "AI"
+
+msgid "AI API Key"
+msgstr "AI API Key"
+
+msgid "AI API key saved"
+msgstr "AI API key saved"
+
+msgid "AI Model"
+msgstr "AI Model"
+
+msgid "AI Provider"
+msgstr "AI Provider"
 
 msgctxt "order source type"
 msgid "AI agent"
@@ -1835,6 +1853,9 @@ msgstr "Another refund of this order is waiting for %(blockers)s to be settled, 
 
 msgid "Another zone already covers the whole of this country. Choose the regions this zone covers instead."
 msgstr "Another zone already covers the whole of this country. Choose the regions this zone covers instead."
+
+msgid "Anthropic"
+msgstr "Anthropic"
 
 msgid "Any APM"
 msgstr "Any APM"
@@ -3321,6 +3342,9 @@ msgstr "Choose a pickup point."
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
+msgid "Choose an AI provider from the platform's list."
+msgstr "Choose an AI provider from the platform's list."
+
 msgid "Choose at least one document to publish."
 msgstr "Choose at least one document to publish."
 
@@ -3363,6 +3387,9 @@ msgstr "Clean"
 
 msgid "Clear discount from selected products"
 msgstr "Clear discount from selected products"
+
+msgid "Clear saved AI API key"
+msgstr "Clear saved AI API key"
 
 msgid "Clearance (>50%)"
 msgstr "Clearance (>50%)"
@@ -4870,6 +4897,9 @@ msgstr "English"
 msgid "Enhanced performance and faster loading times"
 msgstr "Enhanced performance and faster loading times"
 
+msgid "Enter a new API key or tick Clear saved AI API key, not both."
+msgstr "Enter a new API key or tick Clear saved AI API key, not both."
+
 msgid "Enter a phone number, using digits and + ( ) - only."
 msgstr "Enter a phone number, using digits and + ( ) - only."
 
@@ -4893,6 +4923,9 @@ msgstr "Enter a valid email address"
 
 msgid "Enter a valid email address."
 msgstr "Enter a valid email address."
+
+msgid "Enter a valid model identifier without spaces or control characters (e.g. 'gemini-3.5-flash-lite')."
+msgstr "Enter a valid model identifier without spaces or control characters (e.g. 'gemini-3.5-flash-lite')."
 
 msgid "Enter a valid phone number"
 msgstr "Enter a valid phone number"
@@ -7181,6 +7214,9 @@ msgstr "Google Analytics Tracking ID"
 msgid "Google Analytics tracking ID must start with 'G-' (GA4) or 'UA-' (Universal Analytics)."
 msgstr "Google Analytics tracking ID must start with 'G-' (GA4) or 'UA-' (Universal Analytics)."
 
+msgid "Google Gemini"
+msgstr "Google Gemini"
+
 msgid "Google Pay"
 msgstr "Google Pay"
 
@@ -7215,6 +7251,9 @@ msgstr "Greek ΑΦΜ must be exactly 9 digits (optionally prefixed with EL or GR
 
 msgid "Greek ΑΦΜ — 9 digits, EL/GR prefix tolerated"
 msgstr "Greek ΑΦΜ — 9 digits, EL/GR prefix tolerated"
+
+msgid "Groq"
+msgstr "Groq"
 
 msgid "Gross"
 msgstr "Gross"
@@ -8055,9 +8094,6 @@ msgstr "Kind"
 msgid "Kiosk"
 msgstr "Kiosk"
 
-msgid "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
-msgstr "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
-
 msgid "LOW STOCK ALERT"
 msgstr "LOW STOCK ALERT"
 
@@ -8214,6 +8250,9 @@ msgstr "Leave empty to cover the whole country. Choose regions to cover only tho
 
 msgid "Ledger"
 msgstr "Ledger"
+
+msgid "Legacy chat-only LLM API key. Superseded by the AI tab (AI Provider, AI Model, AI API Key). Empty disables the legacy path."
+msgstr "Legacy chat-only LLM API key. Superseded by the AI tab (AI Provider, AI Model, AI API Key). Empty disables the legacy path."
 
 msgid "Legal acceptance"
 msgstr "Legal acceptance"
@@ -8982,11 +9021,17 @@ msgstr "Missing transaction id (t) or order code (s)."
 msgid "Missing uuid."
 msgstr "Missing uuid."
 
+msgid "Mistral AI"
+msgstr "Mistral AI"
+
 msgid "Mixed"
 msgstr "Mixed"
 
 msgid "Mode"
 msgstr "Mode"
+
+msgid "Model identifier accepted by the chosen provider (for example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or 'anthropic/claude-sonnet-4'). Leave empty to disable AI features."
+msgstr "Model identifier accepted by the chosen provider (for example 'gemini-3.5-flash-lite', 'gpt-4.1-mini' or 'anthropic/claude-sonnet-4'). Leave empty to disable AI features."
 
 msgid "Moderation"
 msgstr "Moderation"
@@ -9856,8 +9901,14 @@ msgstr "Open the shipment timeline"
 msgid "Open the unsubscribe confirmation page"
 msgstr "Open the unsubscribe confirmation page"
 
+msgid "OpenAI"
+msgstr "OpenAI"
+
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
+
+msgid "OpenRouter"
+msgstr "OpenRouter"
 
 msgid "Operating profit"
 msgstr "Operating profit"
@@ -12894,6 +12945,9 @@ msgstr "Save your recovery codes"
 msgid "Saved"
 msgstr "Saved"
 
+msgid "Saved — leave blank to keep, or enter a new key to replace"
+msgstr "Saved — leave blank to keep, or enter a new key to replace"
+
 msgid "Saved."
 msgstr "Saved."
 
@@ -13402,6 +13456,9 @@ msgstr "Set by the agent gateway: the id of its checkout. A checkout places one 
 
 msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr "Set on a refund or a chargeback: the charge it took money from."
+
+msgid "Set the AI provider, model and API key together, or leave all three empty to disable AI features."
+msgstr "Set the AI provider, model and API key together, or leave all three empty to disable AI features."
 
 msgid "Set the Cloudflare zone ID and API token together."
 msgstr "Set the Cloudflare zone ID and API token together."
@@ -14742,6 +14799,15 @@ msgstr "The 50 most recent movements"
 msgid "The ACS voucher was cancelled."
 msgstr "The ACS voucher was cancelled."
 
+msgid "The AI API key must not contain control characters or leading/trailing spaces."
+msgstr "The AI API key must not contain control characters or leading/trailing spaces."
+
+msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
+msgstr "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
+
+msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Leave all fields empty to disable AI features (there is no platform fallback). The saved API key is never shown again."
+msgstr "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Leave all fields empty to disable AI features (there is no platform fallback). The saved API key is never shown again."
+
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 
@@ -15910,6 +15976,9 @@ msgstr "Thumbnail Image"
 
 msgid "Tick ONLY once this store's sending domain is authenticated on the platform mail relay — SPF and DKIM published and confirmed by the relay. Until then From Email is ignored and the platform address is used, because that is the only domain the relay can sign for. Ticking this early makes every message from this store fail DMARC and land in spam."
 msgstr "Tick ONLY once this store's sending domain is authenticated on the platform mail relay — SPF and DKIM published and confirmed by the relay. Until then From Email is ignored and the platform address is used, because that is the only domain the relay can sign for. Ticking this early makes every message from this store fail DMARC and land in spam."
+
+msgid "Tick to remove the saved AI API key. Clear AI Provider and AI Model as well to disable AI features for this store."
+msgstr "Tick to remove the saved AI API key. Clear AI Provider and AI Model as well to disable AI features for this store."
 
 msgid "Tier"
 msgstr "Tier"
@@ -17840,6 +17909,9 @@ msgstr "Your order has shipped. Tracking details will appear in the order page s
 msgid "Your order status has been updated."
 msgstr "Your order status has been updated."
 
+msgid "Your own API key for the chosen AI provider. Stored encrypted and write-only in the admin — never shown again after saving. Empty disables AI features (no platform fallback)."
+msgstr "Your own API key for the chosen AI provider. Stored encrypted and write-only in the admin — never shown again after saving. Empty disables AI features (no platform fallback)."
+
 msgid "Your own sender address, e.g. orders@your-domain.gr. It takes effect only once the platform ticks From Email Verified, which happens after your domain is authenticated on the mail relay. Until then mail goes out from the platform address with your store name as the display name. Set Contact Email too: that is the reply-to address customers actually reach you on."
 msgstr "Your own sender address, e.g. orders@your-domain.gr. It takes effect only once the platform ticks From Email Verified, which happens after your domain is authenticated on the mail relay. Until then mail goes out from the platform address with your store name as the display name. Set Contact Email too: that is the reply-to address customers actually reach you on."
 
@@ -18817,6 +18889,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Issued Without Connection At"
 #~ msgstr "Issued Without Connection At"
+
+#~ msgid "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
+#~ msgstr "LLM API key for the storefront chat assistant (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Each tenant brings their own key — own quota, consent, and billing. Never expose to the browser. Empty disables the chat assistant for this tenant."
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"

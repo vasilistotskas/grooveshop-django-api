@@ -25,20 +25,32 @@ from giftcard.factories import GiftCardFactory
 from order.checkout import resume
 from order.checkout.resume import FINGERPRINT_KEY
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import CartStockUnavailableError, InvalidGiftCardError
+from order.exceptions import (
+    CartNotReadyError,
+    CartStockUnavailableError,
+    InvalidGiftCardError,
+    OrderCartChangedError,
+    OrderTotalChangedError,
+)
 from order.inventory.stock import StockManager
 from order.models.item import OrderItem
 from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.stock_reservation import StockReservation
-from order.payments import payment_hold
+from order.payments import payment_hold, stripe_settlement, viva_settlement
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from tests.utils.checkout import priced
-from tests.utils.concurrency import race
+from tests.utils.concurrency import (
+    in_thread,
+    race,
+    wait_for_a_blocked_backend,
+)
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
+from tests.utils.viva import verified_payment
+from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
@@ -529,3 +541,249 @@ def test_the_last_units_held_by_the_order_still_resume_it():
     Product.objects.filter(pk=checkout.product.pk).update(stock=1)
     earlier = checkout.order()
     assert checkout.order().pk == earlier.pk
+
+
+@pytest.mark.django_db(transaction=True)
+class TestSettlementAndCheckoutNeverCreateASecondOrder:
+    """Real commits on real connections (#839): payment settlement locks the
+    cart before the order and clears the order's lines inside the same
+    transaction, so a checkout landing beside settlement either resumes the
+    existing order or sees the cleared cart — never a second order and never
+    a deadlock."""
+
+    @staticmethod
+    def _barrier_race(first, second):
+        """Start two distinct callables on two real DB connections at once."""
+        import threading
+
+        barrier = threading.Barrier(2)
+        outcomes: list[tuple[str, object]] = []
+        failures: list[BaseException] = []
+
+        def run(name, fn):
+            barrier.wait(timeout=30)
+            outcomes.append((name, fn()))
+
+        w1 = in_thread(lambda: run("settle", first), failures)
+        w2 = in_thread(lambda: run("checkout", second), failures)
+        w1.finish(timeout=60)
+        w2.finish(timeout=60)
+        return dict(outcomes), failures
+
+    @pytest.mark.parametrize("authenticated", [False, True])
+    def test_stripe_payment_intent_race_with_repeat_checkout(
+        self, authenticated
+    ):
+        checkout = _Checkout()
+        user = UserAccountFactory(num_addresses=0) if authenticated else None
+        if user is not None:
+            Cart.objects.filter(pk=checkout.cart.pk).update(user=user)
+            checkout.cart.refresh_from_db()
+        stripe_pw = PayWayFactory.create_online_payment("stripe")
+        earlier = checkout.order(pay_way=stripe_pw, extra={"user": user})
+        Order.objects.filter(pk=earlier.pk).update(
+            payment_id="pi_race_settle_1"
+        )
+        total = earlier.calculate_order_total_amount()
+        # Capture the checkout request before settlement clears the cart,
+        # matching a shopper whose checkout POST arrived right beside the
+        # webhook.
+        repeat_req = checkout.request(pay_way=stripe_pw, extra={"user": user})
+
+        outcomes, failures = self._barrier_race(
+            lambda: OrderService.handle_payment_succeeded(
+                "pi_race_settle_1", captured=total
+            ),
+            lambda: OrderService.create_order_from_cart(**repeat_req).pk,
+        )
+
+        # Checkout either resumed the existing order or was refused cleanly
+        # because settlement already deleted the cart.
+        if failures:
+            assert len(failures) == 1
+            assert isinstance(failures[0], CartNotReadyError), failures
+        else:
+            assert outcomes["checkout"] == earlier.pk
+        assert Order.objects.count() == 1
+        assert checkout.stock() == STOCK - 1
+        assert not Cart.objects.filter(pk=checkout.cart.pk).exists()
+
+    def test_stripe_checkout_session_race_with_repeat_checkout(self):
+        checkout = _Checkout()
+        stripe_pw = PayWayFactory.create_online_payment("stripe")
+        earlier = checkout.order(pay_way=stripe_pw)
+        total = earlier.calculate_order_total_amount()
+        repeat_req = checkout.request(pay_way=stripe_pw)
+
+        outcomes, failures = self._barrier_race(
+            lambda: stripe_settlement.settle_checkout_session(
+                earlier.pk,
+                session_id="cs_race_1",
+                payment_intent_id="pi_race_cs_1",
+                captured=total,
+            ),
+            lambda: OrderService.create_order_from_cart(**repeat_req).pk,
+        )
+
+        if failures:
+            assert len(failures) == 1
+            assert isinstance(failures[0], CartNotReadyError), failures
+        else:
+            assert outcomes["checkout"] == earlier.pk
+        assert Order.objects.count() == 1
+        assert checkout.stock() == STOCK - 1
+        assert not Cart.objects.filter(pk=checkout.cart.pk).exists()
+
+    def test_viva_settlement_race_with_repeat_checkout(self, monkeypatch):
+        checkout = _Checkout()
+        earlier = checkout.order()
+        earlier.metadata["viva_order_codes"] = ["OC_RACE_1"]
+        earlier.save(update_fields=["metadata"])
+        repeat_req = checkout.request()
+        monkeypatch.setattr(
+            viva_settlement,
+            "verify_transaction",
+            lambda _tid: (
+                PaymentStatus.COMPLETED,
+                verified_payment(earlier, "OC_RACE_1"),
+            ),
+        )
+
+        outcomes, failures = self._barrier_race(
+            lambda: viva_settlement.apply_event(
+                earlier,
+                event_type_id=viva_settlement.VIVA_TRANSACTION_PAYMENT_CREATED,
+                event_data={"StatusId": "F"},
+                transaction_id="viva_txn_race_1",
+                order_code="OC_RACE_1",
+                status_id="F",
+                handle=viva_settlement.handle_payment_created,
+                read=viva_settlement.read_payment_created,
+            ),
+            lambda: OrderService.create_order_from_cart(**repeat_req).pk,
+        )
+
+        if failures:
+            assert len(failures) == 1
+            assert isinstance(failures[0], CartNotReadyError), failures
+        else:
+            assert outcomes["checkout"] == earlier.pk
+        assert Order.objects.count() == 1
+        assert checkout.stock() == STOCK - 1
+        assert not Cart.objects.filter(pk=checkout.cart.pk).exists()
+
+    def test_checkout_waiting_on_settlement_sees_deleted_cart(self):
+        """Deterministic order: settlement holds the cart lock while checkout
+        waits for it; when settlement commits, checkout sees the cart gone
+        and creates no second order."""
+        import threading
+
+        from django.db import transaction
+
+        checkout = _Checkout()
+        stripe_pw = PayWayFactory.create_online_payment("stripe")
+        earlier = checkout.order(pay_way=stripe_pw)
+        Order.objects.filter(pk=earlier.pk).update(
+            payment_id="pi_ordered_wait_1"
+        )
+        total = earlier.calculate_order_total_amount()
+        repeat_req = checkout.request(pay_way=stripe_pw)
+
+        settled_uncommitted = threading.Event()
+        commit_now = threading.Event()
+        settle_failures: list[BaseException] = []
+        checkout_failures: list[BaseException] = []
+
+        def hold_settlement() -> None:
+            with transaction.atomic():
+                OrderService.handle_payment_succeeded(
+                    "pi_ordered_wait_1", captured=total
+                )
+                settled_uncommitted.set()
+                assert commit_now.wait(timeout=30)
+
+        settler = in_thread(hold_settlement, settle_failures)
+        assert settled_uncommitted.wait(timeout=30)
+
+        buyer = in_thread(
+            lambda: OrderService.create_order_from_cart(**repeat_req),
+            checkout_failures,
+        )
+        wait_for_a_blocked_backend(timeout=15)
+        commit_now.set()
+
+        settler.finish(timeout=30)
+        buyer.finish(timeout=30)
+        assert not settle_failures, settle_failures
+        assert len(checkout_failures) == 1
+        assert isinstance(checkout_failures[0], CartNotReadyError), (
+            checkout_failures
+        )
+        assert Order.objects.count() == 1
+        assert checkout.stock() == STOCK - 1
+
+    def test_checkout_with_extra_item_never_reorders_paid_line(self):
+        """The shopper added a second product while paying; settlement removes
+        the paid product inside its transaction, so a waiting checkout sees
+        only the new product and is refused for the changed cart."""
+        import threading
+
+        from django.db import transaction
+
+        checkout = _Checkout()
+        stripe_pw = PayWayFactory.create_online_payment("stripe")
+        earlier = checkout.order(pay_way=stripe_pw)
+        Order.objects.filter(pk=earlier.pk).update(
+            payment_id="pi_extra_item_wait_1"
+        )
+        total = earlier.calculate_order_total_amount()
+
+        extra_product = ProductFactory.create(
+            stock=STOCK,
+            price=Money(Decimal("15.00"), "EUR"),
+            discount_percent=Decimal(0),
+            active=True,
+            num_images=0,
+            num_reviews=0,
+        )
+        CartItem.objects.create(
+            cart=checkout.cart, product=extra_product, quantity=1
+        )
+        # Quote before settlement commits (covers both products).
+        repeat_req = checkout.request(pay_way=stripe_pw)
+
+        settled_uncommitted = threading.Event()
+        commit_now = threading.Event()
+        settle_failures: list[BaseException] = []
+        checkout_failures: list[BaseException] = []
+
+        def hold_settlement() -> None:
+            with transaction.atomic():
+                OrderService.handle_payment_succeeded(
+                    "pi_extra_item_wait_1", captured=total
+                )
+                settled_uncommitted.set()
+                assert commit_now.wait(timeout=30)
+
+        settler = in_thread(hold_settlement, settle_failures)
+        assert settled_uncommitted.wait(timeout=30)
+
+        buyer = in_thread(
+            lambda: OrderService.create_order_from_cart(**repeat_req),
+            checkout_failures,
+        )
+        wait_for_a_blocked_backend(timeout=15)
+        commit_now.set()
+
+        settler.finish(timeout=30)
+        buyer.finish(timeout=30)
+        assert not settle_failures, settle_failures
+        assert len(checkout_failures) == 1
+        assert isinstance(
+            checkout_failures[0],
+            (OrderCartChangedError, OrderTotalChangedError),
+        ), checkout_failures
+        assert Order.objects.count() == 1
+        assert list(
+            checkout.cart.items.values_list("product_id", flat=True)
+        ) == [extra_product.pk]

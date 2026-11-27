@@ -8,6 +8,7 @@ that settles a session read back from Stripe when that webhook did not land
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import stripe
 from django.db import transaction
@@ -23,6 +24,13 @@ from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
+from order.payments.cart_clear import (
+    CART_UNSET,
+    CartUnsetType,
+    clear_cart_for_order,
+    clear_locked_cart_for_order,
+    lock_cart_for_order_id,
+)
 from order.payments.payment import (
     StripePaymentProvider,
     money_from_minor_units,
@@ -31,6 +39,9 @@ from order.payments.payment_ledger import (
     PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +52,13 @@ def settle_paid_checkout_session(
     session_id: str,
     payment_intent_id: str,
     captured: Money | None,
+    cart: Cart | None | CartUnsetType = CART_UNSET,
 ) -> None:
     """Settle *order*, locked by the caller, for the paid Checkout Session
     *session_id*: book the charge, then mark the order paid unless it was
     canceled, paid by another intent, already settled, or paid another
-    amount. Saves the order's ``metadata`` the caller filled.
+    amount. Saves the order's ``metadata`` the caller filled, and clears
+    the order's lines from *cart* inside the same transaction (#839).
 
     Then the order is confirmed whichever way it went: a session seen
     again (a redelivery, a read-back) confirms an order paid but not yet
@@ -59,6 +72,7 @@ def settle_paid_checkout_session(
         session_id=session_id,
         payment_intent_id=payment_intent_id,
         captured=captured,
+        cart=cart,
     )
     OrderLifecycleService.confirm(order)
 
@@ -69,6 +83,7 @@ def _settle_paid_checkout_session(
     session_id: str,
     payment_intent_id: str,
     captured: Money | None,
+    cart: Cart | None | CartUnsetType = CART_UNSET,
 ) -> None:
     from order.lifecycle.service import OrderLifecycleService
     from order.payments.payment_events import publish_payment_status
@@ -180,6 +195,11 @@ def _settle_paid_checkout_session(
     previous_payment_status = order.payment_status
     order.mark_as_paid(payment_id=payment_intent_id, payment_method="stripe")
     order.save(update_fields=["metadata"])
+    if previous_payment_status != PaymentStatus.COMPLETED:
+        if isinstance(cart, CartUnsetType):
+            clear_cart_for_order(order)
+        else:
+            clear_locked_cart_for_order(order, cart)
 
     OrderHistory.log_payment_update(
         order=order,
@@ -219,8 +239,9 @@ def settle_checkout_session(
     captured: Money,
 ) -> None:
     """:func:`settle_paid_checkout_session` for a session read back from
-    Stripe, under the order's row lock as the webhook holds it."""
+    Stripe, locking the cart before the order row as checkout does."""
     with transaction.atomic():
+        cart = lock_cart_for_order_id(order_id)
         order = Order.objects.select_for_update().get(pk=order_id)
         if not order.metadata:
             order.metadata = {}
@@ -229,6 +250,7 @@ def settle_checkout_session(
             session_id=session_id,
             payment_intent_id=payment_intent_id,
             captured=captured,
+            cart=cart,
         )
 
 

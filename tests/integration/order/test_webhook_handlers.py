@@ -91,7 +91,10 @@ class TestHandleStripePaymentSucceeded:
 
         # Verify
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
+            payment_intent_id,
+            captured=STRIPE_CAPTURED,
+            metadata=None,
+            cart=None,
         )
 
     def test_successful_payment_enqueues_confirmation_email(
@@ -309,7 +312,10 @@ class TestHandleStripePaymentSucceeded:
                 )
 
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
+            payment_intent_id,
+            captured=STRIPE_CAPTURED,
+            metadata=None,
+            cart=None,
         )
 
     def test_extracts_payment_intent_id_correctly(self, mock_djstripe_event):
@@ -337,7 +343,10 @@ class TestHandleStripePaymentSucceeded:
 
         # Verify correct payment_intent_id was used
         mock_service.assert_called_once_with(
-            payment_intent_id, captured=STRIPE_CAPTURED, metadata=None
+            payment_intent_id,
+            captured=STRIPE_CAPTURED,
+            metadata=None,
+            cart=None,
         )
 
     @pytest.mark.parametrize(

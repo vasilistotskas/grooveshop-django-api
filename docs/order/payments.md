@@ -111,9 +111,11 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  ├── webhook_processed_{event_id} idempotency guard
                  │
                  ├── OrderService.handle_payment_succeeded(payment_intent_id, captured=amount_received)
+                 │   ├── lock Cart before Order (order.payments.cart_clear, matching checkout)
                  │   ├── select_for_update on Order row
                  │   ├── PaymentLedger.record_charge (CHARGE row, whatever state the order is in)
                  │   ├── mark_as_paid → payment_status=COMPLETED
+                 │   ├── clear_locked_cart_for_order (inside transaction, on transition to paid)
                  │   ├── suppress_customer_status_notifications(PROCESSING)
                  │   ├── update_order_status(PROCESSING)
                  │   └── _dispatch_shipment_creation_task (on_commit)

@@ -42,9 +42,9 @@ def _client(user=None) -> APIClient:
 def _order_with(user, *lines):
     """An order for *user* holding ``(product, quantity)`` lines.
 
-    Unpaid on purpose: a paid order fires ``order_paid``, which clears the
-    user's cart, so a random factory state would delete the cart a test
-    set up before calling this."""
+    Unpaid on purpose: a factory order that is not awaiting online payment
+    triggers ``handle_order_created``'s cart cleanup, so a random factory
+    state would delete the cart a test set up before calling this."""
     order = OrderFactory(
         user=user,
         num_order_items=0,

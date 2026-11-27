@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, ClassVar, NoReturn
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn
 from uuid import UUID
 
 from django.conf import settings
@@ -74,6 +74,12 @@ from order.models.order import (
     Order,
 )
 from order.models.stock_reservation import StockReservation
+from order.payments.cart_clear import (
+    CART_UNSET,
+    CartUnsetType,
+    clear_locked_cart_for_order,
+    lock_cart_for_order_fields,
+)
 from order.payments.payment import (
     StripePaymentProvider,
 )
@@ -88,6 +94,9 @@ from order.payments.payment_ledger import (
     PAYMENT_AMOUNT_TOLERANCE,
     PaymentLedger,
 )
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 from order.signals import (
     order_stripe_payment_polled,
     payment_without_order_found,
@@ -936,7 +945,7 @@ class OrderService:
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
             # validate_cart_for_checkout sees the locked snapshot.
-            cart = Cart.objects.select_for_update().get(pk=cart.pk)
+            cart = Cart.objects.select_for_update().filter(pk=cart.pk).first()
 
             # A repeat of this agent checkout answers with its order,
             # before the refusals below: that order took the stock, and
@@ -945,6 +954,16 @@ class OrderService:
                 existing_order = cls.order_for_agent_checkout(agent_checkout)
                 if existing_order is not None:
                     return existing_order
+
+            if cart is None:
+                raise CartNotReadyError.from_validation(
+                    {
+                        "valid": False,
+                        "errors": [_("Cart is empty")],
+                        "warnings": [],
+                        "insufficient_stock": False,
+                    }
+                )
 
             cls._refuse_agent_order_on_unpaid_cart(cart, attribution)
 
@@ -1402,8 +1421,8 @@ class OrderService:
 
             # Step 7: Clear cart
             # Keep the cart while the shopper still owes a hosted
-            # payment — see Order.awaits_online_payment. It clears on
-            # ``order_paid`` instead.
+            # payment — see Order.awaits_online_payment. It clears inside
+            # the payment settlement transaction instead (#839).
             if order.awaits_online_payment and not fully_covered:
                 logger.info(
                     "Kept cart %s — order %s awaits online payment",
@@ -2527,6 +2546,28 @@ class OrderService:
         return bound
 
     @classmethod
+    def _order_target_for_stripe_intent(
+        cls,
+        payment_intent_id: str,
+        metadata: Mapping[str, str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Unlocked lookup of the order row a Stripe PaymentIntent belongs to
+        (``pk``, ``user_id``, ``metadata``), so settlement can lock its cart
+        BEFORE locking the order row (#839)."""
+        row = (
+            Order.objects.filter(payment_id=payment_intent_id)
+            .values("pk", "user_id", "metadata")
+            .first()
+        )
+        if row is None and (bound := cls._bound_order_uuid(metadata)):
+            row = (
+                Order.objects.filter(uuid=bound)
+                .values("pk", "user_id", "metadata")
+                .first()
+            )
+        return row
+
+    @classmethod
     @transaction.atomic
     def handle_payment_succeeded(
         cls,
@@ -2534,6 +2575,7 @@ class OrderService:
         *,
         captured: Money,
         metadata: Mapping[str, str] | None = None,
+        cart: Cart | None | CartUnsetType = CART_UNSET,
     ) -> PaymentEventOutcome | None:
         """Book a succeeded Stripe PaymentIntent.
 
@@ -2549,6 +2591,11 @@ class OrderService:
         the server wrote on it, *metadata*: it must bind the intent to an
         existing order (``PaymentPurpose.ORDER``) of this store, checked
         by ``binding_mismatch``.
+
+        Locks the order's cart BEFORE the order row (same lock order as
+        checkout) when *cart* is not already locked by the caller, and
+        clears the order's lines from it inside this transaction when
+        transitioning the order to paid (#839).
         """
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
@@ -2588,10 +2635,28 @@ class OrderService:
                 "invoice",
             )
         )
-        found = orders.filter(payment_id=payment_intent_id).first()
-        if found is None and (bound := cls._bound_order_uuid(metadata)):
-            found = orders.filter(uuid=bound).first()
-        order = found
+        if isinstance(cart, CartUnsetType):
+            target = cls._order_target_for_stripe_intent(
+                payment_intent_id, metadata
+            )
+            if target is None:
+                logger.error(
+                    "Order not found for payment_intent: %s", payment_intent_id
+                )
+                cls.report_payment_without_order(
+                    payment_intent_id, captured=captured, metadata=metadata
+                )
+                return None
+            locked_cart = lock_cart_for_order_fields(
+                user_id=target["user_id"], metadata=target["metadata"]
+            )
+            order = orders.filter(pk=target["pk"]).first()
+        else:
+            locked_cart = cart
+            found = orders.filter(payment_id=payment_intent_id).first()
+            if found is None and (bound := cls._bound_order_uuid(metadata)):
+                found = orders.filter(uuid=bound).first()
+            order = found
         if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
@@ -2672,6 +2737,8 @@ class OrderService:
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
         )
+        if previous != PaymentStatus.COMPLETED:
+            clear_locked_cart_for_order(order, locked_cart)
 
         if order.status == OrderStatus.PENDING:
             # The Stripe webhook handler dispatches

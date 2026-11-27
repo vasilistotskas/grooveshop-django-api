@@ -19,7 +19,7 @@ import hashlib
 import logging
 from collections.abc import Callable
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
 
@@ -29,11 +29,21 @@ from order.exceptions import PaymentStatusUnavailableError
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payments import payment_hold
+from order.payments.cart_clear import (
+    CART_UNSET,
+    CartUnsetType,
+    clear_cart_for_order,
+    clear_locked_cart_for_order,
+    lock_cart_for_order_id,
+)
 from order.payments.payment import (
     LandedCharge,
     order_viva_codes,
     provider_amount,
 )
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +224,7 @@ def handle_payment_created(
     transaction_id,
     *,
     verified: tuple[PaymentStatus | None, dict[str, Any]] | None = None,
+    cart: Cart | None | CartUnsetType = CART_UNSET,
 ):
     """Settle *order* for the Viva payment *transaction_id*.
 
@@ -539,6 +550,11 @@ def handle_payment_created(
         update_fields += ["status", "status_updated_at"]
 
     order.save(update_fields=update_fields)
+    if previous_payment_status != PaymentStatus.COMPLETED:
+        if isinstance(cart, CartUnsetType):
+            clear_cart_for_order(order)
+        else:
+            clear_locked_cart_for_order(order, cart)
 
     OrderHistory.log_payment_update(
         order=order,
@@ -668,6 +684,11 @@ def _apply_event(
     )
 
     with transaction.atomic():
+        # Lock the cart before the order row (the lock order checkout uses)
+        # when settling a payment, so the paid order and its cleared cart
+        # commit together without deadlocking with checkout (#839).
+        settling = handle is handle_payment_created
+        cart = lock_cart_for_order_id(order.pk) if settling else None
         # Re-fetch with row lock to prevent race conditions
         order = Order.objects.select_for_update().get(pk=order.pk)
 
@@ -693,6 +714,13 @@ def _apply_event(
         if handle is None:
             logger.info("Unhandled Viva Wallet event type: %s", event_type_id)
             outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+        elif settling:
+            outcome = (
+                handle_payment_created(
+                    order, event_data, transaction_id, **taken, cart=cart
+                )
+                or VivaWebhookEvent.OUTCOME_PROCESSED
+            )
         else:
             outcome = (
                 handle(order, event_data, transaction_id, **taken)

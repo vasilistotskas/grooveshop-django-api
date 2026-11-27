@@ -262,7 +262,8 @@ class StockManager:
         login merge that rehomes its holds therefore run one at a time: the
         holds read below cannot change under it, and a checkout never reads
         a hold set this call is half way through replacing. Cart rows are
-        locked only here, in checkout and in the merge.
+        locked here, in checkout, in the merge, on reorder, on coupon apply
+        and during online payment settlement.
 
         Order creation consumes the session's unconsumed holds
         (``OrderService._consume_stock_for_order``), so after this call

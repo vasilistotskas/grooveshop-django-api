@@ -502,7 +502,9 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             try:
                 validate_ai_profile(candidate)
             except DjangoValidationError as exc:
-                raise serializers.ValidationError(exc.message_dict) from exc
+                raise serializers.ValidationError(
+                    exc.message_dict, code="invalid_ai_profile"
+                ) from exc
         return attrs
 
     def update(self, instance: Tenant, validated_data):

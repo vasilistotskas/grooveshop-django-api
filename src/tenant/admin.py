@@ -150,9 +150,8 @@ class TenantAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.saved_ai_api_key = self.instance.ai_api_key
         field = self.fields.get("ai_api_key")
-        if field is not None and self.saved_ai_api_key:
+        if field is not None and self.instance.ai_api_key:
             field.help_text = _(
                 "A key is saved. Leave this blank to keep it, or enter a "
                 "new key to replace it."
@@ -170,8 +169,26 @@ class TenantAdminForm(forms.ModelForm):
         switched_off = not (
             cleaned.get("ai_provider") or cleaned.get("ai_model")
         )
-        cleaned["ai_api_key"] = "" if switched_off else self.saved_ai_api_key
+        cleaned["ai_api_key"] = (
+            "" if switched_off else self._stored_ai_api_key()
+        )
         return cleaned
+
+    def _stored_ai_api_key(self) -> str:
+        """The key saved now, not when the form was loaded.
+
+        ``validate_ai_profile`` compares the provider with the same row, so
+        a key changed by another save since the form loaded is never kept
+        under a provider it was not issued for.
+        """
+        if self.instance.pk is None:
+            return ""
+        return (
+            Tenant.objects.filter(pk=self.instance.pk)
+            .values_list("ai_api_key", flat=True)
+            .first()
+            or ""
+        )
 
 
 @admin.register(Tenant)

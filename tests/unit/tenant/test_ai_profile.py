@@ -389,6 +389,31 @@ class TestTenantAdminWriteOnlyAIKey:
         assert tenant.ai_provider == AIProvider.OPENAI
         assert tenant.ai_api_key == "sk-openai"
 
+    def test_a_key_saved_after_the_form_loaded_is_not_kept_under_a_new_provider(
+        self, bind_tenant_and_schema
+    ):
+        tenant = store_tenant(
+            "ai_admin_stale",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="gem-key-1",
+        )
+        bind_tenant_and_schema(None)
+        loaded = Tenant.objects.get(pk=tenant.pk)
+        form = self._form(
+            _request(_superuser()),
+            loaded,
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "",
+            },
+        )
+        # Another save replaces the Gemini key after this form loaded.
+        Tenant.objects.filter(pk=tenant.pk).update(ai_api_key="gem-key-2")
+        assert not form.is_valid()
+        assert "ai_api_key" in form.errors
+
     def test_a_key_without_provider_and_model_is_refused(
         self, bind_tenant_and_schema
     ):

@@ -61,7 +61,7 @@ into the list's own through `action_ordering["feed"]`.
 ## Changing either shape
 
 Removing a field from a response follows the storefront-first rule in
-`CLAUDE.md` ("API fields follow the same rule"): the storefront release that
+`AGENTS.md` ("API fields follow the same rule"): the storefront release that
 no longer requires the field reaches production first, then Django drops it.
 `tests/integration/product/product/test_view_product_feed.py` pins that a
 list row is the feed row cut down to the card's fields.

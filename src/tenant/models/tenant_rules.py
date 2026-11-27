@@ -433,14 +433,11 @@ def validate_ai_profile(tenant: Tenant) -> None:
                 "control characters (e.g. 'gemini-3.5-flash-lite')."
             )
         )
-    if api_key and (
-        api_key != api_key.strip()
-        or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in api_key)
-    ):
+    if api_key and any(not (0x21 <= ord(ch) <= 0x7E) for ch in api_key):
         errors.setdefault("ai_api_key", []).append(
             _(
-                "The AI API key must not contain control characters or "
-                "leading/trailing spaces."
+                "The AI API key must contain only printable ASCII "
+                "characters with no spaces."
             )
         )
 

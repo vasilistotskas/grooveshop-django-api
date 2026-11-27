@@ -152,7 +152,8 @@ class TestAIProfileValidation:
         assert "ai_model" in exc.value.message_dict
 
     @pytest.mark.parametrize(
-        "bad_key", [" sk-padded", "sk-padded ", "sk-\nkey"]
+        "bad_key",
+        [" sk-padded", "sk-padded ", "Bearer sk-key", "sk-\nkey", "sk-ελλ"],
     )
     def test_malformed_api_key_is_refused(self, bad_key):
         tenant = store_tenant("ai_bad_key")
@@ -463,6 +464,141 @@ class TestTenantAdminWriteOnlyAIKey:
             assert 'type="password"' in html
             assert 'name="clear_ai_api_key"' in html
 
+    def test_ai_api_key_is_set_reflects_persisted_state_after_failed_post(
+        self, bind_tenant_and_schema
+    ):
+        empty_tenant = store_tenant("ai_admin_failed_add")
+        saved_tenant = store_tenant(
+            "ai_admin_failed_clear",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="sk-still-saved",
+        )
+        owner = _store_owner(empty_tenant)
+        owner2 = _store_owner(saved_tenant)
+
+        # No saved key + failed validation after pasting a key must NOT flip
+        # ai_api_key_is_set to True.
+        bind_tenant_and_schema(empty_tenant)
+        request = _request(owner)
+        form_class = self._admin().get_form(
+            request,
+            empty_tenant,
+            fields=["ai_provider", "ai_model", "ai_api_key"],
+        )
+        failed = form_class(
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "bad model with spaces",
+                "ai_api_key": "sk-not-persisted",
+            },
+            instance=empty_tenant,
+        )
+        assert not failed.is_valid()
+        assert self._admin().ai_api_key_is_set(failed.instance) is False
+
+        # Saved key + failed clear (provider/model still set) must keep
+        # ai_api_key_is_set True.
+        bind_tenant_and_schema(saved_tenant)
+        request2 = _request(owner2)
+        form_class2 = self._admin().get_form(
+            request2,
+            saved_tenant,
+            fields=[
+                "ai_provider",
+                "ai_model",
+                "ai_api_key",
+                "clear_ai_api_key",
+            ],
+        )
+        failed_clear = form_class2(
+            {
+                "ai_provider": AIProvider.GEMINI,
+                "ai_model": "gemini-3.5-flash-lite",
+                "ai_api_key": "",
+                "clear_ai_api_key": True,
+            },
+            instance=saved_tenant,
+        )
+        assert not failed_clear.is_valid()
+        assert self._admin().ai_api_key_is_set(failed_clear.instance) is True
+
+    def test_view_only_admin_omits_ai_api_key_and_clear_fields(
+        self, bind_tenant_and_schema
+    ):
+        tenant = store_tenant(
+            "ai_admin_viewonly",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="sk-viewonly-secret",
+        )
+        owner = _store_owner(tenant)
+        bind_tenant_and_schema(tenant)
+        request = _request(owner)
+
+        with patch.object(
+            self._admin(), "has_change_permission", return_value=False
+        ):
+            listed = [
+                field
+                for _name, options in self._admin().get_fieldsets(
+                    request, tenant
+                )
+                for field in options["fields"]
+            ]
+
+        assert "ai_api_key" not in listed
+        assert "clear_ai_api_key" not in listed
+        assert "ai_api_key_is_set" in listed
+
+    def test_partial_form_and_overlong_key_error(self, bind_tenant_and_schema):
+        tenant = store_tenant("ai_admin_partial_form", chat_api_key="legacy-k")
+        user = _superuser()
+        bind_tenant_and_schema(None)
+        request = _request(user)
+
+        partial_cls = self._admin().get_form(
+            request, tenant, fields=["store_name"]
+        )
+        partial = partial_cls({"store_name": "X"}, instance=tenant)
+        assert "clear_ai_api_key" not in partial.fields
+
+        keyless_cls = self._admin().get_form(
+            request,
+            tenant,
+            fields=[
+                "ai_provider",
+                "ai_model",
+                "ai_api_key",
+                "clear_ai_api_key",
+            ],
+        )
+        keyless = keyless_cls(
+            {
+                "ai_provider": "",
+                "ai_model": "",
+                "ai_api_key": "",
+                "clear_ai_api_key": True,
+            },
+            instance=tenant,
+        )
+        assert "clear_ai_api_key" not in keyless.fields
+        assert keyless.is_valid(), keyless.errors
+        keyless.save()
+        tenant.refresh_from_db()
+        assert tenant.chat_api_key == "legacy-k"
+
+        overlong = keyless_cls(
+            {
+                "ai_provider": AIProvider.OPENAI,
+                "ai_model": "gpt-4.1-mini",
+                "ai_api_key": "k" * 300,
+            },
+            instance=tenant,
+        )
+        assert not overlong.is_valid()
+        assert len(overlong.errors["ai_api_key"]) == 1
+
 
 @pytest.mark.django_db
 @pytest.mark.urls("tenant.urls_public")
@@ -515,6 +651,20 @@ class TestTenantAdminSerializerAIProfile:
 
         tenant.refresh_from_db()
         assert tenant.ai_api_key == "sk-api-write-only"
+
+        # Clearing the AI profile via PATCH also clears legacy chat_api_key.
+        tenant.chat_api_key = "legacy-chat-key"
+        tenant.save(update_fields=["chat_api_key"])
+        cleared = operator_client.patch(
+            url,
+            {"aiProvider": "", "aiModel": "", "aiApiKey": ""},
+            format="json",
+        )
+        assert cleared.status_code == status.HTTP_200_OK
+        assert cleared.data["ai_api_key_set"] is False
+        tenant.refresh_from_db()
+        assert tenant.ai_api_key == ""
+        assert tenant.chat_api_key == ""
 
 
 @pytest.mark.django_db

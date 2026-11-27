@@ -167,7 +167,16 @@ class TenantAdminForm(forms.ModelForm):
             if self.instance and self.instance.pk
             else ""
         )
+        if self.instance is not None:
+            # Snapshot the persisted state before Django's _post_clean()
+            # mutates form.instance.ai_api_key in place on failed POSTs,
+            # so ai_api_key_is_set always reflects what is actually saved.
+            self.instance._persisted_ai_api_key_set = bool(  # type: ignore[attr-defined]
+                self._existing_ai_api_key
+            )
         self._cleared_ai_api_key = False
+        if "ai_api_key" not in self.fields or not self._existing_ai_api_key:
+            self.fields.pop("clear_ai_api_key", None)
         if "ai_api_key" in self.fields:
             self.initial["ai_api_key"] = ""
             if self._existing_ai_api_key:
@@ -182,7 +191,11 @@ class TenantAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned is None or "ai_api_key" not in self.fields:
+        if (
+            cleaned is None
+            or "ai_api_key" not in self.fields
+            or "ai_api_key" in self.errors
+        ):
             return cleaned
         new_key = cleaned.get("ai_api_key") or ""
         clear_key = bool(cleaned.get("clear_ai_api_key"))
@@ -200,6 +213,19 @@ class TenantAdminForm(forms.ModelForm):
         elif not new_key:
             cleaned["ai_api_key"] = self._existing_ai_api_key
         return cleaned
+
+    def _post_clean(self):
+        had_key_error = "ai_api_key" in self.errors
+        prior_key_errors = (
+            list(self.errors["ai_api_key"].as_data()) if had_key_error else []
+        )
+        super()._post_clean()
+        if had_key_error:
+            # Field-level validation (e.g. max_length) kept the posted
+            # key out of cleaned_data, so Tenant.clean() saw the old
+            # empty value and may append a misleading "set all three"
+            # error. Keep only the original field-level error(s).
+            self.errors["ai_api_key"] = self.error_class(prior_key_errors)
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -328,7 +354,12 @@ class TenantAdmin(BaseModelAdmin):
 
     @admin.display(boolean=True, description=_("AI API key saved"))
     def ai_api_key_is_set(self, obj):
-        return bool(obj and obj.ai_api_key)
+        if obj is None:
+            return False
+        persisted = getattr(obj, "_persisted_ai_api_key_set", None)
+        if persisted is not None:
+            return bool(persisted)
+        return bool(obj.ai_api_key)
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name == "ai_api_key":
@@ -369,9 +400,13 @@ class TenantAdmin(BaseModelAdmin):
         The secret's own field is swapped for its "set / not set" column
         in the fieldset, so its value is never rendered for a store role
         (the platform operator still sees and edits the real field).
-        ``clear_ai_api_key`` is only shown when a key is already saved.
+        ``ai_api_key`` and ``clear_ai_api_key`` are omitted on view-only
+        pages (so Django's read-only view never renders the stored key
+        in plaintext), and ``clear_ai_api_key`` is only shown when a key
+        is already saved.
         """
         fieldsets = super().get_fieldsets(request, obj)
+        can_change = self.has_change_permission(request, obj)
         has_ai_key = bool(obj and obj.ai_api_key)
         secrets = (
             set(_platform_secret_fields())
@@ -386,7 +421,11 @@ class TenantAdmin(BaseModelAdmin):
                     "fields": [
                         f"{field}_is_set" if field in secrets else field
                         for field in options["fields"]
-                        if field != "clear_ai_api_key" or has_ai_key
+                        if (field != "ai_api_key" or can_change)
+                        and (
+                            field != "clear_ai_api_key"
+                            or (can_change and has_ai_key)
+                        )
                     ],
                 },
             )

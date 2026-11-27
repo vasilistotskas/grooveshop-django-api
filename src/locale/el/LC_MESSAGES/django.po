@@ -14801,8 +14801,8 @@ msgstr "Οι 50 πιο πρόσφατες κινήσεις"
 msgid "The ACS voucher was cancelled."
 msgstr "Το voucher ACS ακυρώθηκε."
 
-msgid "The AI API key must not contain control characters or leading/trailing spaces."
-msgstr "Το κλειδί API AI δεν πρέπει να περιέχει χαρακτήρες ελέγχου ή κενά στην αρχή/τέλος."
+msgid "The AI API key must contain only printable ASCII characters with no spaces."
+msgstr "Το κλειδί API AI πρέπει να περιέχει μόνο εκτυπώσιμους χαρακτήρες ASCII χωρίς κενά."
 
 msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 msgstr "Ο πάροχος AI που χρησιμοποιείται από τον βοηθό συνομιλίας και τα εργαλεία AI του δημιουργού σελίδων αυτού του καταστήματος. Επιλέγεται από τη λίστα της πλατφόρμας (ποτέ αυθαίρετη διεύθυνση URL). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."

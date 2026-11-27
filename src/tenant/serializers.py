@@ -505,6 +505,19 @@ class TenantAdminSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(exc.message_dict) from exc
         return attrs
 
+    def update(self, instance: Tenant, validated_data):
+        if (
+            "ai_api_key" in validated_data
+            and validated_data["ai_api_key"] == ""
+            and instance.ai_api_key
+            and "chat_api_key" not in validated_data
+        ):
+            # Expand-release bridge: clearing the AI profile also clears
+            # the legacy chat_api_key so older gateway pods stop serving
+            # chat immediately.
+            validated_data["chat_api_key"] = ""
+        return super().update(instance, validated_data)
+
     class Meta:
         model = Tenant
         fields = [

@@ -14799,8 +14799,8 @@ msgstr "The 50 most recent movements"
 msgid "The ACS voucher was cancelled."
 msgstr "The ACS voucher was cancelled."
 
-msgid "The AI API key must not contain control characters or leading/trailing spaces."
-msgstr "The AI API key must not contain control characters or leading/trailing spaces."
+msgid "The AI API key must contain only printable ASCII characters with no spaces."
+msgstr "The AI API key must contain only printable ASCII characters with no spaces."
 
 msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 msgstr "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."

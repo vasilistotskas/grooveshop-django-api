@@ -263,13 +263,26 @@ class TestSettlementClearsCartAtomicallyOnce:
 
         assert cart.items.get(product=product).quantity == 1
 
-        # A redelivery or a second transaction id does not remove the extra
-        # unit either.
+        # A redelivery of the same transaction does not remove the extra unit.
         viva_settlement.apply_event(
             order,
             event_type_id=viva_settlement.VIVA_TRANSACTION_PAYMENT_CREATED,
             event_data={"StatusId": "F"},
             transaction_id="viva_txn_clear_1",
+            order_code="OC_CLEAR_1",
+            status_id="F",
+            handle=viva_settlement.handle_payment_created,
+            read=viva_settlement.read_payment_created,
+        )
+        assert cart.items.get(product=product).quantity == 1
+
+        # A second transaction for the same settled order does not remove the
+        # extra unit either.
+        viva_settlement.apply_event(
+            order,
+            event_type_id=viva_settlement.VIVA_TRANSACTION_PAYMENT_CREATED,
+            event_data={"StatusId": "F"},
+            transaction_id="viva_txn_clear_2",
             order_code="OC_CLEAR_1",
             status_id="F",
             handle=viva_settlement.handle_payment_created,

@@ -3,6 +3,49 @@
 
 
 
+## v3.275.1 (2026-11-27)
+
+### Bug fixes
+
+* fix(order): clear the order's cart lines inside payment settlement (#846) ([`0347e8d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0347e8d7f7fd39c44fa3d95ed92f7d5c0f4c8a30))
+
+* fix(order): clear the order's cart lines inside payment settlement
+
+Closes #839.
+
+Online orders keep their cart until payment settles; clearing the cart in a
+post-commit callback left a window after settlement committed where the order
+was no longer unpaid while the cart still held its lines, allowing a concurrent
+checkout to create a second payable order.
+
+- Add order.payments.cart_clear with Cart-before-Order locking helpers matching
+  checkout's lock order, and remove the post-commit order_paid cart-clear
+  receiver.
+- Clear the order's lines inside the settlement transaction across every online
+  settlement path (Stripe checkout.session.completed, Stripe
+  payment_intent.succeeded and polled/read-back settlement, Viva 1796 webhook
+  and read-back, and confirm_agent_payment), gated on transitioning to PAID so
+  redeliveries and cross-event webhooks never clear twice.
+- Prefer checkout_fingerprint.lines when present so promotion gifts never
+  subtract from extra units the shopper added while paying.
+- Handle a cart deleted by settlement cleanly as CartNotReadyError in
+  OrderService._create_order_locked, and lock Cart before CartPromotionCode in
+  CouponService.apply to match the same lock order.
+- Add real-connection concurrency and deterministic lock-order tests alongside
+  unit/integration coverage. ([`0347e8d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0347e8d7f7fd39c44fa3d95ed92f7d5c0f4c8a30))
+
+### Chores
+
+* chore(agents): migrate instructions to AGENTS.md and wire .agents/skills.json (#845) ([`c7369b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7369b4def8f7b900a4030a20f6efd81721f3a6f))
+
+* chore(agents): migrate instructions to AGENTS.md and wire .agents/skills.json ([`c7369b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7369b4def8f7b900a4030a20f6efd81721f3a6f))
+
+* chore(agents): link .agents/skills and include AGENTS.md in doc reference checks ([`c7369b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7369b4def8f7b900a4030a20f6efd81721f3a6f))
+
+### Testing
+
+* test(order): also cover a distinct second Viva transaction on a settled order ([`0347e8d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0347e8d7f7fd39c44fa3d95ed92f7d5c0f4c8a30))
+
 ## v3.275.0 (2026-11-26)
 
 ### Bug fixes

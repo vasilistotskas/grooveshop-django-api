@@ -9,17 +9,10 @@ replay protection and recovery codes are allauth's (``allauth.mfa``).
 
 from __future__ import annotations
 
-import time
-from contextlib import contextmanager
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
 from allauth.mfa.models import Authenticator
-from allauth.mfa.totp.internal.auth import (
-    format_hotp_value,
-    hotp_value,
-)
 from django.contrib.auth import SESSION_KEY
 from django.core.cache import cache
 from django.core.management import call_command
@@ -30,6 +23,11 @@ from django.urls import reverse
 from admin import staff_mfa
 from admin.forms import PlatformAdminAuthenticationForm
 from admin.staff_mfa import Step
+from tests.utils.totp import (
+    frozen_totp_clock,
+    totp_code,
+    totp_step_moved,
+)
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -50,38 +48,10 @@ def _superuser():
     return _user(is_superuser=True)
 
 
-# The TOTP step allauth validates against, held for the whole test. With
-# the real clock a code computed here and checked by allauth a moment
-# later fall in different 30-second steps whenever a boundary passes in
-# between (the tolerance is zero steps), and the enrolment fails at random.
-_clock = {"counter": 0}
-
-
 @pytest.fixture(autouse=True)
-def _frozen_totp_clock():
-    _clock["counter"] = int(time.time()) // 30
-    with patch(
-        "allauth.mfa.totp.internal.auth.yield_hotp_counters_from_time",
-        side_effect=lambda: iter([_clock["counter"]]),
-    ):
+def _held_totp_step():
+    with frozen_totp_clock():
         yield
-
-
-def _code(secret: str) -> str:
-    """The code for the step allauth currently validates against."""
-    return format_hotp_value(hotp_value(secret, _clock["counter"]))
-
-
-@contextmanager
-def _window(offset: int):
-    """Move allauth's idea of "now" by *offset* 30-second steps, so a code
-    can be used after the one that enrolled (a code is spent once)."""
-    start = _clock["counter"]
-    _clock["counter"] = start + offset
-    try:
-        yield
-    finally:
-        _clock["counter"] = start
 
 
 def _post(client, **data):
@@ -119,7 +89,9 @@ def _enrol(user):
     client = Client()
     secret = _password(client, user).context["form"].enrolment.secret
     codes = (
-        _answer(client, "enrol", _code(secret)).context["form"].recovery_codes
+        _answer(client, "enrol", totp_code(secret))
+        .context["form"]
+        .recovery_codes
     )
     return secret, list(codes)
 
@@ -222,7 +194,7 @@ class TestPasswordThenEnrol:
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
 
-        response = _answer(client, "enrol", _code(secret))
+        response = _answer(client, "enrol", totp_code(secret))
 
         form = response.context["form"]
         body = response.content.decode()
@@ -246,7 +218,7 @@ class TestPasswordThenEnrol:
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
         shown = (
-            _answer(client, "enrol", _code(secret))
+            _answer(client, "enrol", totp_code(secret))
             .context["form"]
             .recovery_codes
         )
@@ -259,7 +231,7 @@ class TestPasswordThenEnrol:
         user = _superuser()
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
-        _answer(client, "enrol", _code(secret))
+        _answer(client, "enrol", totp_code(secret))
 
         response = _answer(client, "recovery")
 
@@ -278,7 +250,7 @@ class TestPasswordThenEnrol:
         session[staff_mfa.PENDING_SESSION_KEY]["user_id"] = other.pk
         session.save()
 
-        response = _answer(client, "enrol", _code(secret))
+        response = _answer(client, "enrol", totp_code(secret))
 
         assert response.context["form"].errors
         assert not Authenticator.objects.filter(user_id=other.pk).exists()
@@ -312,8 +284,8 @@ class TestPasswordThenCode:
         client = Client()
         _password(client, user)
 
-        with _window(1):
-            response = _answer(client, "code", _code(secret))
+        with totp_step_moved(1):
+            response = _answer(client, "code", totp_code(secret))
 
         assert response.status_code == 302
         assert client.session[SESSION_KEY] == str(user.pk)
@@ -323,7 +295,7 @@ class TestPasswordThenCode:
         user = _superuser()
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
-        code = _code(secret)
+        code = totp_code(secret)
         _answer(client, "enrol", code)
         other = Client()
         _password(other, user)
@@ -350,8 +322,8 @@ class TestPasswordThenCode:
 
     def test_a_code_cannot_be_used_twice(self):
         user, secret, _ = self._enrolled()
-        with _window(-1):
-            code = _code(secret)
+        with totp_step_moved(-1):
+            code = totp_code(secret)
             first, second = Client(), Client()
             _password(first, user)
             _password(second, user)
@@ -382,8 +354,8 @@ class TestPasswordThenCode:
         for _ in range(staff_mfa.MAX_FAILURES):
             _answer(client, "code", "000000")
 
-        with _window(1):
-            response = _answer(client, "code", _code(secret))
+        with totp_step_moved(1):
+            response = _answer(client, "code", totp_code(secret))
 
         assert "Too many wrong codes" in str(response.context["form"].errors)
         assert not _signed_in(client)
@@ -395,8 +367,8 @@ class TestPasswordThenCode:
         for _ in range(staff_mfa.MAX_FAILURES - 1):
             _answer(client, "code", "000000")
 
-        with _window(1):
-            _answer(client, "code", _code(secret))
+        with totp_step_moved(1):
+            _answer(client, "code", totp_code(secret))
 
         assert not _locked(user)
 
@@ -406,13 +378,13 @@ class TestPasswordThenCode:
         client = Client()
         _password(client, user)
 
-        with _window(1):
+        with totp_step_moved(1):
             _post(
                 client,
                 step="code",
                 username=other.email,
                 password=PASSWORD,
-                otp_code=_code(secret),
+                otp_code=totp_code(secret),
             )
 
         assert client.session[SESSION_KEY] == str(user.pk)
@@ -454,7 +426,7 @@ class TestThePendingSignIn:
 
         # A minute later, well inside the window: the step must restart it.
         monkeypatch.setattr(staff_mfa.time, "time", lambda: 1_000_060.0)
-        _answer(client, "enrol", _code(secret))
+        _answer(client, "enrol", totp_code(secret))
 
         after = client.session[staff_mfa.PENDING_SESSION_KEY]["issued_at"]
         assert (before, after) == (1_000_000.0, 1_000_060.0)
@@ -477,7 +449,7 @@ class TestThePendingSignIn:
         user = _superuser()
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
-        _answer(client, "enrol", _code(secret))
+        _answer(client, "enrol", totp_code(secret))
         _answer(client, "recovery")
         client.logout()
 
@@ -628,7 +600,7 @@ class TestTheLoginPage:
         client = Client()
         secret = _password(client, user).context["form"].enrolment.secret
 
-        body = _answer(client, "enrol", _code(secret)).content.decode()
+        body = _answer(client, "enrol", totp_code(secret)).content.decode()
 
         assert "js-staff-copy" in body
         assert "js-staff-download" in body
@@ -684,5 +656,5 @@ class TestCacheDown:
         secret, _codes = _enrol(user)
         monkeypatch.setattr(totp_auth, "cache", stopped_cache())
 
-        with _window(1), pytest.raises(StaffLoginUnavailable):
-            staff_mfa.verify_code(user, _code(secret))
+        with totp_step_moved(1), pytest.raises(StaffLoginUnavailable):
+            staff_mfa.verify_code(user, totp_code(secret))

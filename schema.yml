@@ -15054,8 +15054,8 @@ paths:
   /api/v1/giftcard/purchase:
     post:
       operationId: purchaseGiftCard
-      description: Αγορά δωροκάρτας (πληρωμή Stripe)
-      summary: Αγορά δωροκάρτας (πληρωμή Stripe)
+      description: Αγορά δωροκάρτας (ηλεκτρονική πληρωμή)
+      summary: Αγορά δωροκάρτας (ηλεκτρονική πληρωμή)
       tags:
       - Gift Cards
       requestBody:

@@ -2640,8 +2640,8 @@ msgstr "Buy Quantity"
 msgid "Buy X get Y discounted"
 msgstr "Buy X get Y discounted"
 
-msgid "Buy a gift card (Stripe payment)"
-msgstr "Buy a gift card (Stripe payment)"
+msgid "Buy a gift card (online payment)"
+msgstr "Buy a gift card (online payment)"
 
 msgid "Buyer"
 msgstr "Buyer"

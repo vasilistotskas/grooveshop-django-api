@@ -57,7 +57,7 @@ serializers_config: SerializersConfig = {
         response=GiftCardPurchaseResponseSerializer,
         responses={400: GiftCardErrorResponseSerializer},
         operation_id="purchaseGiftCard",
-        summary=_("Buy a gift card (Stripe payment)"),
+        summary=_("Buy a gift card (online payment)"),
         tags=["Gift Cards"],
     ),
     "mine": ActionConfig(

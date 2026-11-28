@@ -92,7 +92,7 @@ translation catalogue), `SweepCursor` and `CachePurgeLog`
 - middleware (`src/core/middleware/`), the email templates
   (`src/core/templates/`) and the root URL conf.
 
-Read `AGENTS.md` ("Core Base Classes and Patterns"), `docs/client-ip.md`,
+Read `docs/core-patterns.md`, `docs/client-ip.md`,
 `docs/error-contract.md`, `docs/image-uploads.md`, `docs/rich-text.md`,
 `docs/safe-fetch.md`, `docs/celery-results.md` and `docs/migrations.md`
 for the part you touch.

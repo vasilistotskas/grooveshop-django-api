@@ -3,6 +3,60 @@
 
 
 
+## v3.276.0 (2026-11-28)
+
+### Bug fixes
+
+* fix(tenant): address security, anonymiser, and admin re-render edge cases for AI profile ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+* fix(tenant): pass explicit error code on TenantAdminSerializer AI profile validation ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+* fix(tenant): require new AI API key on provider switch and guard legacy chat_api_key writes ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+* fix(tenant): read the saved AI key at submit time, not when the form loaded ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+### Chores
+
+* chore(agents): drop redundant skills.json and make AGENTS.md agent-neutral (#848) ([`70bbec9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70bbec9cce1428106aae6be532879f41e782d429))
+
+* chore(agents): drop redundant skills.json and make AGENTS.md agent-neutral ([`70bbec9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70bbec9cce1428106aae6be532879f41e782d429))
+
+### Documentation
+
+* docs(agents): point the throttle rule at the file that holds it ([`70bbec9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70bbec9cce1428106aae6be532879f41e782d429))
+
+### Features
+
+* feat(tenant): one AI profile per store (provider, model, write-only key) (#847) ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+* feat(tenant): add per-store AI profile (provider, model, write-only key) ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+### Refactoring
+
+* refactor(tenant): move the chat key into the AI profile, no compatibility bridge
+
+The profile replaces chat_api_key outright instead of running beside it.
+Migration 0077 copies each stored chat key into the profile (Gemini, the
+model the gateway ran platform-wide), blanks the old column, gives it a
+database default and takes the field out of Django's state; the next release
+drops the column. tenant/resolve sends aiProfile only, the store admin and
+the platform API no longer mirror keys into the old field, and the
+Gemini-only chatApiKey alias is gone.
+
+- Provider list is a base-URL map; the capability flags were the same for
+  every provider and carried no information.
+- Admin: a blank key input keeps the saved key, clearing provider and model
+  switches AI off and removes the key, a view-only page shows whether a key
+  is set. No clear checkbox, no _post_clean override.
+- A provider change needs a newly entered key (validate_ai_profile compares
+  with the saved row), so the form and the API share one rule.
+- TenantAdminSerializer runs Tenant.clean on the submitted values; it ran
+  none of the store's rules before. ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
+### Testing
+
+* test(mfa): hold the TOTP step in one shared helper so a code never crosses a step boundary ([`8b6d9f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b6d9f5fc8db8620e537f0cb3795c7c344ed47d8))
+
 ## v3.275.1 (2026-11-27)
 
 ### Bug fixes

@@ -1340,6 +1340,9 @@ msgstr "AI Model"
 msgid "AI Provider"
 msgstr "AI Provider"
 
+msgid "AI Reasoning Effort"
+msgstr "AI Reasoning Effort"
+
 msgctxt "order source type"
 msgid "AI agent"
 msgstr "AI agent"
@@ -5200,6 +5203,9 @@ msgstr "External ID"
 msgid "External reference"
 msgstr "External reference"
 
+msgid "Extra high"
+msgstr "Extra high"
+
 msgid "Facebook Profile"
 msgstr "Facebook Profile"
 
@@ -7484,6 +7490,9 @@ msgstr "How it works"
 msgid "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
 msgstr "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
 
+msgid "How much the model reasons before it answers. Choose a value the chosen model accepts, or leave empty to use the model's default."
+msgstr "How much the model reasons before it answers. Choose a value the chosen model accepts, or leave empty to use the model's default."
+
 msgid "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
 msgstr "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
 
@@ -8236,6 +8245,9 @@ msgstr "Learn weights"
 msgid "Leave empty to cover the whole country. Choose regions to cover only those: their rates replace the whole-country zone's there."
 msgstr "Leave empty to cover the whole country. Choose regions to cover only those: their rates replace the whole-country zone's there."
 
+msgid "Leave the reasoning effort empty when AI features are off."
+msgstr "Leave the reasoning effort empty when AI features are off."
+
 msgid "Ledger"
 msgstr "Ledger"
 
@@ -8799,6 +8811,9 @@ msgstr "Max results. Default 8, cap 20."
 msgid "Max weight (kg)"
 msgstr "Max weight (kg)"
 
+msgid "Maximum"
+msgstr "Maximum"
+
 msgid "Maximum 10 tags allowed per post."
 msgstr "Maximum 10 tags allowed per post."
 
@@ -8954,6 +8969,9 @@ msgstr "Microsoft Clarity project ID must be alphanumeric (e.g. 'a1b2c3d4e5')."
 
 msgid "Mid-range (€50-€100)"
 msgstr "Mid-range (€50-€100)"
+
+msgid "Minimal"
+msgstr "Minimal"
 
 msgid "Minimum Quantity"
 msgstr "Minimum Quantity"
@@ -9497,6 +9515,9 @@ msgstr "No vouchers are waiting for a pickup list."
 
 msgid "Node path"
 msgstr "Node path"
+
+msgid "None"
+msgstr "None"
 
 msgid "Normal Priority"
 msgstr "Normal Priority"
@@ -14784,8 +14805,8 @@ msgstr "The AI API key must contain only printable ASCII characters with no spac
 msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 msgstr "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 
-msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Clear the provider and the model to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
-msgstr "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Clear the provider and the model to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
+msgid "The AI provider, model, API key and reasoning effort used by the storefront chat assistant and page-builder AI tools. Clear the provider, the model and the reasoning effort to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
+msgstr "The AI provider, model, API key and reasoning effort used by the storefront chat assistant and page-builder AI tools. Clear the provider, the model and the reasoning effort to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
 
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
@@ -18960,9 +18981,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
-
-#~ msgid "Minimal"
-#~ msgstr "Minimal"
 
 #~ msgid "Mobile"
 #~ msgstr "Mobile"

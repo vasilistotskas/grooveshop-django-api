@@ -421,11 +421,12 @@ class TenantConfigSerializer(serializers.Serializer):
     # all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
     # ``box_now_notify_phone``, ``stripe_secret_key``, ``ai_provider``,
-    # ``ai_model`` and ``ai_api_key`` are intentionally excluded — they are
-    # secrets or internal config that must never be served to anonymous
-    # callers. Only available via TenantAdminSerializer (``ai_profile`` is
-    # additionally appended to tenant_resolve responses for the agent
-    # gateway only, after an X-Internal-Token check — never cached).
+    # ``ai_model``, ``ai_api_key`` and ``ai_reasoning_effort`` are
+    # intentionally excluded — they are secrets or internal config that
+    # must never be served to anonymous callers. Only available via
+    # TenantAdminSerializer (``ai_profile`` is additionally appended to
+    # tenant_resolve responses for the agent gateway only, after an
+    # X-Internal-Token check — never cached).
 
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()
@@ -554,6 +555,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "ai_model",
             "ai_api_key",
             "ai_api_key_set",
+            "ai_reasoning_effort",
             "acp_bearer_token",
             "agent_hosted_payment_enabled",
             "agent_stripe_delegated_enabled",

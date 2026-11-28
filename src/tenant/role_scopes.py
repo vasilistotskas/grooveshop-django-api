@@ -295,6 +295,7 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "ai_provider",
         "ai_model",
         "ai_api_key",
+        "ai_reasoning_effort",
         # Security-adjacent but store-owned
         "totp_issuer",
     }

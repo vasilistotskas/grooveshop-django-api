@@ -1345,6 +1345,9 @@ msgstr "Μοντέλο AI"
 msgid "AI Provider"
 msgstr "Πάροχος AI"
 
+msgid "AI Reasoning Effort"
+msgstr "Προσπάθεια συλλογισμού AI"
+
 msgctxt "order source type"
 msgid "AI agent"
 msgstr "Πράκτορας AI"
@@ -5205,6 +5208,9 @@ msgstr "Εξωτερικό ID"
 msgid "External reference"
 msgstr "Εξωτερική αναφορά"
 
+msgid "Extra high"
+msgstr "Πολύ υψηλό"
+
 msgid "Facebook Profile"
 msgstr "Προφίλ Facebook"
 
@@ -7491,6 +7497,9 @@ msgstr "Πώς λειτουργεί"
 msgid "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
 msgstr "Πόσες φορές χάθηκε η απάντηση και στο ένα αίτημα που στάλθηκε πρώτο. Κάθε φορά διπλασιάζεται η αναμονή πριν ελεγχθεί ξανά η ACS."
 
+msgid "How much the model reasons before it answers. Choose a value the chosen model accepts, or leave empty to use the model's default."
+msgstr "Πόσο σκέφτεται το μοντέλο πριν απαντήσει. Επιλέξτε μια τιμή που δέχεται το μοντέλο που επιλέξατε ή αφήστε το κενό για την προεπιλογή του μοντέλου."
+
 msgid "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
 msgstr "Πώς εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, χειροκίνητη παράδοση, ...). Καταγράφεται στο ιστορικό της αποστολής."
 
@@ -8244,6 +8253,9 @@ msgstr "Εκμάθηση βαρών"
 msgid "Leave empty to cover the whole country. Choose regions to cover only those: their rates replace the whole-country zone's there."
 msgstr "Αφήστε το κενό για να καλύψετε ολόκληρη τη χώρα. Επιλέξτε περιφέρειες για να καλύψετε μόνο αυτές: οι τιμές τους αντικαθιστούν εκεί τις τιμές της ζώνης όλης της χώρας."
 
+msgid "Leave the reasoning effort empty when AI features are off."
+msgstr "Αφήστε κενή την προσπάθεια συλλογισμού όταν οι λειτουργίες AI είναι ανενεργές."
+
 msgid "Ledger"
 msgstr "Καθολικό"
 
@@ -8807,6 +8819,9 @@ msgstr "Μέγιστα αποτελέσματα. Προεπιλογή 8, ανώ�
 msgid "Max weight (kg)"
 msgstr "Μέγιστο βάρος (kg)"
 
+msgid "Maximum"
+msgstr "Μέγιστο"
+
 msgid "Maximum 10 tags allowed per post."
 msgstr "Επιτρέπονται έως 10 ετικέτες ανά άρθρο."
 
@@ -8962,6 +8977,9 @@ msgstr "Το αναγνωριστικό έργου Microsoft Clarity πρέπε�
 
 msgid "Mid-range (€50-€100)"
 msgstr "Μεσαία κατηγορία (€50-€100)"
+
+msgid "Minimal"
+msgstr "Ελάχιστο"
 
 msgid "Minimum Quantity"
 msgstr "Ελάχιστη ποσότητα"
@@ -9504,6 +9522,9 @@ msgstr "Δεν υπάρχουν vouchers σε αναμονή για λίστα �
 
 msgid "Node path"
 msgstr "Διαδρομή κόμβου"
+
+msgid "None"
+msgstr "Κανένα"
 
 msgid "Normal Priority"
 msgstr "Κανονική προτεραιότητα"
@@ -14786,8 +14807,8 @@ msgstr "Το κλειδί API AI πρέπει να περιέχει μόνο ε�
 msgid "The AI provider used by this store's chat assistant and page-builder AI tools. Chosen from the platform's list (never a free-form URL). Leave empty to disable AI features."
 msgstr "Ο πάροχος AI που χρησιμοποιείται από τον βοηθό συνομιλίας και τα εργαλεία AI του δημιουργού σελίδων αυτού του καταστήματος. Επιλέγεται από τη λίστα της πλατφόρμας (ποτέ αυθαίρετη διεύθυνση URL). Αφήστε το κενό για να απενεργοποιήσετε τις λειτουργίες AI."
 
-msgid "The AI provider, model and API key used by the storefront chat assistant and page-builder AI tools. Clear the provider and the model to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
-msgstr "Ο πάροχος AI, το μοντέλο και το κλειδί API που χρησιμοποιούν ο βοηθός συνομιλίας του καταστήματος και τα εργαλεία AI του δημιουργού σελίδων. Αδειάστε τον πάροχο και το μοντέλο για να απενεργοποιήσετε τις λειτουργίες AI· το αποθηκευμένο κλειδί αφαιρείται μαζί τους. Δεν υπάρχει εναλλακτική ρύθμιση της πλατφόρμας. Ένα αποθηκευμένο κλειδί δεν εμφανίζεται ποτέ ξανά."
+msgid "The AI provider, model, API key and reasoning effort used by the storefront chat assistant and page-builder AI tools. Clear the provider, the model and the reasoning effort to switch AI features off; the saved key is removed with them. There is no platform fallback. A saved key is never shown again."
+msgstr "Ο πάροχος AI, το μοντέλο, το κλειδί API και η προσπάθεια συλλογισμού που χρησιμοποιούν ο βοηθός συνομιλίας του καταστήματος και τα εργαλεία AI του δημιουργού σελίδων. Αδειάστε τον πάροχο, το μοντέλο και την προσπάθεια συλλογισμού για να απενεργοποιήσετε τις λειτουργίες AI· το αποθηκευμένο κλειδί αφαιρείται μαζί τους. Δεν υπάρχει εναλλακτική ρύθμιση της πλατφόρμας. Ένα αποθηκευμένο κλειδί δεν εμφανίζεται ποτέ ξανά."
 
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "Τα πεδία Cloudflare αφορούν μόνο κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε τα κενά αν χρησιμοποιείτε hostname της πλατφόρμας."
@@ -19357,9 +19378,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Αναγνωριστικό dataset (pixel) του Meta Conversions API που χρησιμοποιείται για αποφυγή διπλότυπων συμβάντων server-side. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το Meta CAPI."
 
-#~ msgid "Minimal"
-#~ msgstr "Μινιμαλιστικό"
-
 #~ msgid "Mobile"
 #~ msgstr "Κινητό"
 
@@ -19452,9 +19470,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "No usage"
 #~ msgstr "Χωρίς χρήση"
-
-#~ msgid "None"
-#~ msgstr "Κανένα"
 
 #~ msgid "Not Configured"
 #~ msgstr "Δεν έχει ρυθμιστεί"

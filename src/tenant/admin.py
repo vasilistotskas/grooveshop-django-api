@@ -703,12 +703,14 @@ class TenantAdmin(BaseModelAdmin):
                     "ai_provider",
                     "ai_model",
                     "ai_api_key",
+                    "ai_reasoning_effort",
                 ],
                 "description": _(
-                    "The AI provider, model and API key used by the "
-                    "storefront chat assistant and page-builder AI tools. "
-                    "Clear the provider and the model to switch AI "
-                    "features off; the saved key is removed with them. "
+                    "The AI provider, model, API key and reasoning effort "
+                    "used by the storefront chat assistant and "
+                    "page-builder AI tools. Clear the provider, the model "
+                    "and the reasoning effort to switch AI features off; "
+                    "the saved key is removed with them. "
                     "There is no platform fallback. A saved key is never "
                     "shown again."
                 ),

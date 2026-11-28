@@ -338,9 +338,7 @@ class GiftCardViewSet(BaseModelViewSet):
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(response_payload)
-        return Response(
-            response_serializer.data, status=status.HTTP_200_OK
-        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"], url_path="purchase-status")
     def purchase_status(self, request):

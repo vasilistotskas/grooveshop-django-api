@@ -41,4 +41,5 @@ def serialize_ai_profile(tenant: Tenant) -> dict[str, Any] | None:
         "base_url": AI_PROVIDER_BASE_URLS[AIProvider(tenant.ai_provider)],
         "model": tenant.ai_model,
         "api_key": tenant.ai_api_key,
+        "reasoning_effort": tenant.ai_reasoning_effort,
     }

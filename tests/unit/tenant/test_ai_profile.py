@@ -22,7 +22,11 @@ from tenant.ai_providers import (
 )
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.cache import tenant_resolve_key
-from tenant.enum import AIProvider, TenantMembershipRole
+from tenant.enum import (
+    AIProvider,
+    AIReasoningEffort,
+    TenantMembershipRole,
+)
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
@@ -78,7 +82,26 @@ class TestAIProfileValidation:
             "base_url": "https://openrouter.ai/api/v1/",
             "model": "anthropic/claude-sonnet-4:beta",
             "api_key": "sk-or-v1-secret-token",
+            "reasoning_effort": "",
         }
+
+    def test_the_chosen_reasoning_effort_is_served(self):
+        tenant = store_tenant(
+            "ai_effort",
+            ai_provider=AIProvider.OPENAI,
+            ai_model="gpt-5-mini",
+            ai_api_key="sk-effort",
+            ai_reasoning_effort=AIReasoningEffort.HIGH,
+        )
+        tenant.clean()
+        assert serialize_ai_profile(tenant)["reasoning_effort"] == "high"
+
+    def test_a_reasoning_effort_without_a_profile_is_refused(self):
+        tenant = store_tenant("ai_effort_alone")
+        tenant.ai_reasoning_effort = AIReasoningEffort.LOW
+        with pytest.raises(ValidationError) as exc:
+            tenant.clean()
+        assert "ai_reasoning_effort" in exc.value.message_dict
 
     @pytest.mark.parametrize(
         ("provider", "model", "api_key", "missing_fields"),
@@ -180,6 +203,7 @@ class TestTenantResolveAIProfile:
             "baseUrl": "https://api.openai.com/v1/",
             "model": "gpt-4.1-mini",
             "apiKey": "sk-openai-resolve-secret",
+            "reasoningEffort": "",
         }
         assert "chatApiKey" not in payload
 
@@ -560,3 +584,44 @@ class TestChatKeyMovesIntoTheProfile:
         without_key.refresh_from_db()
         assert without_key.ai_provider == ""
         assert without_key.ai_api_key == ""
+
+    def test_0078_keeps_the_gemini_stores_effort(self):
+        from importlib import import_module
+
+        migration = import_module(
+            "tenant.migrations.0078_tenant_ai_reasoning_effort"
+        )
+        gemini = store_tenant(
+            "ai_effort_gemini",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash-lite",
+            ai_api_key="gemini-key",
+        )
+        chosen = store_tenant(
+            "ai_effort_chosen",
+            ai_provider=AIProvider.GEMINI,
+            ai_model="gemini-3.5-flash",
+            ai_api_key="gemini-key",
+            ai_reasoning_effort=AIReasoningEffort.HIGH,
+        )
+        other = store_tenant(
+            "ai_effort_other",
+            ai_provider=AIProvider.ANTHROPIC,
+            ai_model="claude-sonnet-4-5",
+            ai_api_key="anthropic-key",
+        )
+        off = store_tenant("ai_effort_off")
+        with connection.cursor() as cursor:
+            cursor.execute(migration.CARRY_OVER_EFFORT)
+
+        efforts = dict(
+            Tenant.objects.filter(
+                pk__in=[gemini.pk, chosen.pk, other.pk, off.pk]
+            ).values_list("pk", "ai_reasoning_effort")
+        )
+        assert efforts == {
+            gemini.pk: "low",
+            chosen.pk: "high",
+            other.pk: "",
+            off.pk: "",
+        }

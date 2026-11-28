@@ -94,3 +94,20 @@ class AIProvider(models.TextChoices):
     MISTRAL = "mistral", _("Mistral AI")
     GROQ = "groq", _("Groq")
     OPENROUTER = "openrouter", _("OpenRouter")
+
+
+class AIReasoningEffort(models.TextChoices):
+    """The chat-completions ``reasoning_effort`` values a store can choose.
+
+    The gateway sends the chosen value to the store's provider unchanged;
+    an empty value sends none, so the model uses its own default. Which
+    values a model accepts is the provider's rule, not the platform's.
+    """
+
+    NONE = "none", _("None")
+    MINIMAL = "minimal", _("Minimal")
+    LOW = "low", _("Low")
+    MEDIUM = "medium", _("Medium")
+    HIGH = "high", _("High")
+    XHIGH = "xhigh", _("Extra high")
+    MAX = "max", _("Maximum")

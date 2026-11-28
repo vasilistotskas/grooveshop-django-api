@@ -412,10 +412,15 @@ def validate_ai_profile(tenant: Tenant) -> None:
     provider = tenant.ai_provider or ""
     model = tenant.ai_model or ""
     api_key = tenant.ai_api_key or ""
-    if not (provider or model or api_key):
+    effort = tenant.ai_reasoning_effort or ""
+    if not (provider or model or api_key or effort):
         return
 
     errors: dict[str, list[StrOrPromise]] = {}
+    if effort and not provider:
+        errors.setdefault("ai_reasoning_effort", []).append(
+            _("Leave the reasoning effort empty when AI features are off.")
+        )
     if model and (
         not AI_MODEL_PATTERN.fullmatch(model) or "//" in model or ".." in model
     ):

@@ -22,6 +22,7 @@ from core.utils.tenant_urls import (
 )
 from tenant.enum import (
     AIProvider,
+    AIReasoningEffort,
     StoreVertical,
     SuspendedReason,
     TenantPlan,
@@ -1205,6 +1206,19 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Your own API key for the chosen AI provider. Stored "
             "encrypted and never shown again after saving. Leave empty "
             "to disable AI features."
+        ),
+    )
+    ai_reasoning_effort = models.CharField(
+        _("AI Reasoning Effort"),
+        max_length=16,
+        choices=AIReasoningEffort.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "How much the model reasons before it answers. Choose a value "
+            "the chosen model accepts, or leave empty to use the model's "
+            "default."
         ),
     )
 

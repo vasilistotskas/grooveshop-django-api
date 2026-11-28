@@ -3,6 +3,44 @@
 
 
 
+## v3.277.1 (2026-11-28)
+
+### Bug fixes
+
+* fix(giftcard): the purchase answers the 200 its schema declares (#850) ([`f81fdfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81fdfc9ea55b6682a4b6abc6eea7979f5e1e68d))
+
+* fix(giftcard): the purchase answers the 200 its schema declares
+
+POST /api/v1/giftcard/purchase sent 201 while its OpenAPI description, and
+the storefront generated from it, declare 200. It returns a payment
+session (a Stripe client secret or a Viva checkout URL), not the created
+resource, so 200 is the accurate status. The schema and every consumer
+stay as they are, and the response guard now checks this body.
+
+Closes #827 ([`f81fdfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81fdfc9ea55b6682a4b6abc6eea7979f5e1e68d))
+
+### Code style
+
+* style(giftcard): format the purchase response ([`f81fdfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81fdfc9ea55b6682a4b6abc6eea7979f5e1e68d))
+
+### Documentation
+
+* docs(giftcard): the purchase summary names online payment, not Stripe only
+
+The purchase takes Stripe or Viva Wallet; its OpenAPI summary said Stripe. ([`f81fdfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81fdfc9ea55b6682a4b6abc6eea7979f5e1e68d))
+
+* docs: move core patterns and CI/CD out of AGENTS.md so agy reads it whole (#851) ([`dcc61d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcc61d4c1ec0c53419c87e2b0ea8d1bc53f6b870))
+
+* docs: move core patterns and CI/CD out of AGENTS.md so agy reads it whole
+
+Antigravity cuts a rule file at 24,000 bytes (antigravity.google/docs/rules); AGENTS.md was 32,006, so an agy session never saw its end. The two reference sections move verbatim to docs/core-patterns.md and docs/ci.md with a short summary and a link left in place; AGENTS.md is now 22,365 bytes. ([`dcc61d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcc61d4c1ec0c53419c87e2b0ea8d1bc53f6b870))
+
+* docs: is_staff is never an authorization signal on its own; IsPlatformOperator pairs it with is_superuser ([`dcc61d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcc61d4c1ec0c53419c87e2b0ea8d1bc53f6b870))
+
+### Testing
+
+* test(order): the gift card purchase in the payment-binding tests answers 200 ([`f81fdfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81fdfc9ea55b6682a4b6abc6eea7979f5e1e68d))
+
 ## v3.277.0 (2026-11-28)
 
 ### Features

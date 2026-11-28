@@ -46,6 +46,7 @@ from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
+from unfold.widgets import UnfoldAdminPasswordWidget
 
 from admin.base import BaseModelAdmin
 from admin.branding import store_mark_url
@@ -139,8 +140,60 @@ def _secret_is_set(field_name: str):
     return is_set
 
 
+class TenantAdminForm(forms.ModelForm):
+    """The store form, with a write-only AI API key.
+
+    The key's input never shows the saved key, so a blank input keeps it.
+    Clearing the provider and the model switches AI off, and the key goes
+    with them.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields.get("ai_api_key")
+        if field is not None and self.instance.ai_api_key:
+            field.help_text = _(
+                "A key is saved. Leave this blank to keep it, or enter a "
+                "new key to replace it."
+            )
+
+    def clean(self):
+        super().clean()
+        cleaned = self.cleaned_data
+        if (
+            "ai_api_key" not in self.fields
+            or "ai_api_key" in self.errors
+            or cleaned.get("ai_api_key")
+        ):
+            return cleaned
+        switched_off = not (
+            cleaned.get("ai_provider") or cleaned.get("ai_model")
+        )
+        cleaned["ai_api_key"] = (
+            "" if switched_off else self._stored_ai_api_key()
+        )
+        return cleaned
+
+    def _stored_ai_api_key(self) -> str:
+        """The key saved now, not when the form was loaded.
+
+        ``validate_ai_profile`` compares the provider with the same row, so
+        a key changed by another save since the form loaded is never kept
+        under a provider it was not issued for.
+        """
+        if self.instance.pk is None:
+            return ""
+        return (
+            Tenant.objects.filter(pk=self.instance.pk)
+            .values_list("ai_api_key", flat=True)
+            .first()
+            or ""
+        )
+
+
 @admin.register(Tenant)
 class TenantAdmin(BaseModelAdmin):
+    form = TenantAdminForm
     list_display = [
         "display_store",
         "display_plan",
@@ -249,6 +302,13 @@ class TenantAdmin(BaseModelAdmin):
             return qs
         return qs.filter(pk=scope.pk)
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "ai_api_key":
+            kwargs["widget"] = UnfoldAdminPasswordWidget(
+                attrs={"autocomplete": "new-password"}
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
     def get_readonly_fields(self, request, obj=None):
         """Everything except the merchant's own settings.
 
@@ -274,16 +334,21 @@ class TenantAdmin(BaseModelAdmin):
         )
 
     def get_fieldsets(self, request, obj=None):
-        """A store role sees whether a platform secret is set, never it.
+        """A secret the viewer may not change shows as "set / not set".
 
-        The secret's own field is swapped for its "set / not set" column
-        in the fieldset, so its value is never rendered for a store role
-        (the platform operator still sees and edits the real field).
+        A read-only field is rendered decrypted, so a platform secret is
+        swapped for its "set / not set" column for a store role, and the
+        write-only AI key for anyone who can only view the store (the
+        platform operator still edits the real fields).
         """
         fieldsets = super().get_fieldsets(request, obj)
-        if self_service_tenant(request) is None:
-            return fieldsets
-        secrets = set(_platform_secret_fields())
+        secrets = (
+            set(_platform_secret_fields())
+            if self_service_tenant(request) is not None
+            else set()
+        )
+        if obj is not None and not self.has_change_permission(request, obj):
+            secrets.add("ai_api_key")
         return [
             (
                 name,
@@ -531,7 +596,6 @@ class TenantAdmin(BaseModelAdmin):
                     "agent_commerce_enabled",
                     "agent_hosted_payment_enabled",
                     "agent_stripe_delegated_enabled",
-                    "chat_api_key",
                     "acp_bearer_token",
                 ],
             },
@@ -629,6 +693,25 @@ class TenantAdmin(BaseModelAdmin):
                     "mydata_user_id",
                     "mydata_subscription_key",
                 ],
+            },
+        ),
+        (
+            _("AI"),
+            {
+                "classes": ["tab"],
+                "fields": [
+                    "ai_provider",
+                    "ai_model",
+                    "ai_api_key",
+                ],
+                "description": _(
+                    "The AI provider, model and API key used by the "
+                    "storefront chat assistant and page-builder AI tools. "
+                    "Clear the provider and the model to switch AI "
+                    "features off; the saved key is removed with them. "
+                    "There is no platform fallback. A saved key is never "
+                    "shown again."
+                ),
             },
         ),
     ]
@@ -1034,7 +1117,7 @@ class TenantAdmin(BaseModelAdmin):
         )
 
 
-for _secret in _platform_secret_fields():
+for _secret in (*_platform_secret_fields(), "ai_api_key"):
     setattr(TenantAdmin, f"{_secret}_is_set", _secret_is_set(_secret))
 
 

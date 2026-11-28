@@ -125,7 +125,6 @@ class TestTenantAdminScoping:
         ]
         readonly = set(self._admin().get_readonly_fields(request, tenant))
         for secret in (
-            "chat_api_key",
             "acp_bearer_token",
             "cloudflare_api_token",
             "resend_api_key",
@@ -145,16 +144,16 @@ class TestTenantAdminScoping:
             for _name, options in self._admin().get_fieldsets(request, tenant)
             for field in options["fields"]
         ]
-        assert "chat_api_key" in listed
-        assert "chat_api_key_is_set" not in listed
+        assert "acp_bearer_token" in listed
+        assert "acp_bearer_token_is_set" not in listed
 
     def test_the_set_column_reports_state_and_not_the_value(self, tenant):
-        tenant.chat_api_key = "a-chat-key-value"
-        tenant.acp_bearer_token = ""
+        tenant.acp_bearer_token = "an-acp-token-value"
+        tenant.cloudflare_api_token = ""
 
         admin_ = self._admin()
-        assert admin_.chat_api_key_is_set(tenant) is True
-        assert admin_.acp_bearer_token_is_set(tenant) is False
+        assert admin_.acp_bearer_token_is_set(tenant) is True
+        assert admin_.cloudflare_api_token_is_set(tenant) is False
 
     def test_the_active_flag_is_read_only_for_platform_operators_too(
         self, tenant, bind_tenant_and_schema

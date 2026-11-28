@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import copy
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -418,10 +420,10 @@ class TenantConfigSerializer(serializers.Serializer):
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
     # all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
-    # ``box_now_notify_phone``, ``stripe_secret_key``, and
-    # ``chat_api_key`` are intentionally excluded — they are secrets or
-    # internal config that must never be served to anonymous callers.
-    # Only available via TenantAdminSerializer (``chat_api_key`` is
+    # ``box_now_notify_phone``, ``stripe_secret_key``, ``ai_provider``,
+    # ``ai_model`` and ``ai_api_key`` are intentionally excluded — they are
+    # secrets or internal config that must never be served to anonymous
+    # callers. Only available via TenantAdminSerializer (``ai_profile`` is
     # additionally appended to tenant_resolve responses for the agent
     # gateway only, after an X-Internal-Token check — never cached).
 
@@ -467,6 +469,24 @@ class TenantAdminSerializer(serializers.ModelSerializer):
     """
 
     domains = TenantDomainSerializer(many=True, read_only=True)
+    ai_api_key_set = serializers.SerializerMethodField()
+
+    def get_ai_api_key_set(self, obj: Tenant) -> bool:
+        return bool(obj.ai_api_key)
+
+    def validate(self, attrs):
+        """The store's own rules (``Tenant.clean``), as the admin form runs.
+
+        A ``ModelSerializer`` never calls ``Model.clean``, so the rules run
+        on a copy of the row with the submitted values; DRF turns the
+        Django ``ValidationError`` into a 400 with the fields' errors.
+        """
+        attrs = super().validate(attrs)
+        candidate = copy(self.instance) if self.instance else Tenant()
+        for name, value in attrs.items():
+            setattr(candidate, name, value)
+        candidate.clean()
+        return attrs
 
     class Meta:
         model = Tenant
@@ -530,7 +550,10 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Authentication ---
             "totp_issuer",
             # --- Agentic Commerce ---
-            "chat_api_key",
+            "ai_provider",
+            "ai_model",
+            "ai_api_key",
+            "ai_api_key_set",
             "acp_bearer_token",
             "agent_hosted_payment_enabled",
             "agent_stripe_delegated_enabled",
@@ -614,7 +637,11 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "is_active",
             "suspended_at",
             "suspended_reason",
+            "ai_api_key_set",
         ]
+        extra_kwargs = {
+            "ai_api_key": {"write_only": True, "required": False},
+        }
 
 
 class TenantSuspendRequestSerializer(serializers.Serializer):

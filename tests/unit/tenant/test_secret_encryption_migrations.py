@@ -66,8 +66,11 @@ class TestEncryptExistingSecrets:
             stored = _read(tenant, f"{name}_encrypted")
             assert f"plain-{name}" not in stored
             assert decrypt_value(stored) == f"plain-{name}"
+        # chat_api_key left the model in tenant 0077; the columns above
+        # cover it, the model reads the fields it still has.
         loaded = Tenant.objects.get(pk=tenant.pk)
-        for name in expand.SECRET_FIELDS:
+        modelled = {field.name for field in Tenant._meta.fields}
+        for name in set(expand.SECRET_FIELDS) & modelled:
             assert getattr(loaded, name) == f"plain-{name}"
 
     def test_the_plaintext_columns_are_left_for_the_old_release(self):
@@ -80,21 +83,21 @@ class TestEncryptExistingSecrets:
 
     def test_a_rerun_changes_nothing(self):
         tenant = store_tenant("mig_idempotent")
-        _write(tenant, "chat_api_key", "chat-old")
+        _write(tenant, "acp_bearer_token", "chat-old")
 
         expand.encrypt_existing_secrets(apps, SCHEMA_EDITOR)
-        first = _read(tenant, "chat_api_key_encrypted")
+        first = _read(tenant, "acp_bearer_token_encrypted")
         expand.encrypt_existing_secrets(apps, SCHEMA_EDITOR)
 
-        assert _read(tenant, "chat_api_key_encrypted") == first
+        assert _read(tenant, "acp_bearer_token_encrypted") == first
 
     def test_a_value_set_since_is_never_overwritten(self):
-        tenant = store_tenant("mig_no_overwrite", chat_api_key="chat-new")
-        _write(tenant, "chat_api_key", "chat-stale")
+        tenant = store_tenant("mig_no_overwrite", acp_bearer_token="chat-new")
+        _write(tenant, "acp_bearer_token", "chat-stale")
 
         expand.encrypt_existing_secrets(apps, SCHEMA_EDITOR)
 
-        assert Tenant.objects.get(pk=tenant.pk).chat_api_key == "chat-new"
+        assert Tenant.objects.get(pk=tenant.pk).acp_bearer_token == "chat-new"
 
     def test_empty_columns_stay_empty(self):
         tenant = store_tenant("mig_empty")

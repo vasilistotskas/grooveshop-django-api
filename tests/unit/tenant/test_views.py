@@ -15,7 +15,7 @@ from django.test.client import Client
 from rest_framework.test import APIClient
 
 from tenant.cache import tenant_resolve_key
-from tenant.enum import TenantMembershipRole
+from tenant.enum import AIProvider, TenantMembershipRole
 from tenant.models import TenantDomain, UserTenantMembership
 from tests.utils.staff import store_tenant
 
@@ -330,16 +330,25 @@ class TestTenantResolveChatApiKey:
 
     def _tenant_with_key(self, slug, domain):
         tenant = store_tenant(slug.replace("-", "_"))
-        tenant.chat_api_key = "tenant-chat-key"
+        tenant.ai_provider = AIProvider.GEMINI
+        tenant.ai_model = "gemini-3.5-flash-lite"
+        tenant.ai_api_key = "tenant-ai-key"
         tenant.acp_bearer_token = "tenant-acp-token"
-        tenant.save(update_fields=["chat_api_key", "acp_bearer_token"])
+        tenant.save(
+            update_fields=[
+                "ai_provider",
+                "ai_model",
+                "ai_api_key",
+                "acp_bearer_token",
+            ]
+        )
         TenantDomain.objects.create(
             tenant=tenant, domain=domain, is_primary=True
         )
         return tenant
 
     @pytest.mark.django_db
-    def test_chat_api_key_requires_the_internal_secret(
+    def test_credentials_require_the_internal_secret(
         self, resolve_client, db, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
@@ -347,25 +356,25 @@ class TestTenantResolveChatApiKey:
         url = "/api/v1/tenant/resolve?domain=chat-key.example"
 
         public = resolve_client.get(url)
-        assert "chatApiKey" not in public.json()
+        assert "aiProfile" not in public.json()
 
         forged = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="wrong")
-        assert "chatApiKey" not in forged.json()
+        assert "aiProfile" not in forged.json()
 
         gateway = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="gw-secret")
-        assert gateway.json()["chatApiKey"] == "tenant-chat-key"
+        assert gateway.json()["aiProfile"]["apiKey"] == "tenant-ai-key"
         assert gateway.json()["acpBearerToken"] == "tenant-acp-token"
 
         # The gateway request must not have poisoned the public cache.
         from django.core.cache import cache
 
         after = resolve_client.get(url)
-        assert "chatApiKey" not in after.json()
+        assert "aiProfile" not in after.json()
         assert "acpBearerToken" not in after.json()
         tenant.refresh_from_db()
         cached = cache.get(tenant_resolve_key("chat-key.example", tenant))
         assert cached is not None
-        assert "chat_api_key" not in cached
+        assert "ai_profile" not in cached
         assert "acp_bearer_token" not in cached
 
     @pytest.mark.django_db
@@ -387,7 +396,7 @@ class TestTenantResolveChatApiKey:
         assert gateway["Cache-Control"] == "private, no-store"
 
     @pytest.mark.django_db
-    def test_chat_api_key_withheld_when_no_internal_secret_configured(
+    def test_credentials_withheld_when_no_internal_secret_configured(
         self, resolve_client, db, settings
     ):
         # An empty AGENT_GATEWAY_INTERNAL_SECRET must never match an
@@ -398,10 +407,11 @@ class TestTenantResolveChatApiKey:
             "/api/v1/tenant/resolve?domain=chat-nosecret.example",
             HTTP_X_INTERNAL_TOKEN="",
         )
-        assert "chatApiKey" not in response.json()
+        assert "aiProfile" not in response.json()
+        assert "acpBearerToken" not in response.json()
 
     @pytest.mark.django_db
-    def test_keyless_tenant_serves_empty_key_to_the_gateway(
+    def test_keyless_tenant_serves_empty_credentials_to_the_gateway(
         self, resolve_client, db, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
@@ -413,7 +423,8 @@ class TestTenantResolveChatApiKey:
             "/api/v1/tenant/resolve?domain=chat-keyless.example",
             HTTP_X_INTERNAL_TOKEN="gw-secret",
         )
-        assert response.json()["chatApiKey"] == ""
+        assert response.json()["aiProfile"] is None
+        assert response.json()["acpBearerToken"] == ""
 
 
 class TestInternalDomains:

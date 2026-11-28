@@ -78,3 +78,19 @@ class StaffTokenScope(models.TextChoices):
 
     API = "api", _("API")
     BUILDER = "builder", _("Page builder session")
+
+
+class AIProvider(models.TextChoices):
+    """Platform-maintained list of OpenAI-compatible AI providers.
+
+    A store selects from this enum rather than entering a free-form base
+    URL (see ``tenant.ai_providers`` for each provider's canonical URL
+    and declared capabilities).
+    """
+
+    GEMINI = "gemini", _("Google Gemini")
+    OPENAI = "openai", _("OpenAI")
+    ANTHROPIC = "anthropic", _("Anthropic")
+    MISTRAL = "mistral", _("Mistral AI")
+    GROQ = "groq", _("Groq")
+    OPENROUTER = "openrouter", _("OpenRouter")

@@ -461,7 +461,7 @@ def test_a_model_with_an_uncleared_encrypted_column_fails_the_run(
     tenant, _ = seeded
     with schema_context(get_public_schema_name()):
         row = Tenant.objects.get(pk=tenant.pk)
-        row.chat_api_key = "llm-key"
+        row.ai_api_key = "llm-key"
         row.save()
     scrub = rules.REGISTRY["tenant.Tenant"]
     monkeypatch.setitem(

@@ -21,11 +21,13 @@ from core.utils.tenant_urls import (
     storefront_language_choices,
 )
 from tenant.enum import (
+    AIProvider,
     StoreVertical,
     SuspendedReason,
     TenantPlan,
 )
 from tenant.models.tenant_rules import (
+    validate_ai_profile,
     validate_available_locales,
     validate_box_now_partner_id,
     validate_clarity_project_id,
@@ -1163,19 +1165,46 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Stripe Agentic Commerce."
         ),
     )
-    chat_api_key = EncryptedCharField(
-        _("Chat API Key"),
-        max_length=255,
-        db_column="chat_api_key_encrypted",
+    # === AI Profile ===
+    # The store's own model provider, model and key, shared by the
+    # storefront chat assistant and the page-builder AI tools. Served to
+    # the agent gateway only on the internal-token-gated tenant/resolve
+    # response. All three empty: the store has no AI features (there is
+    # no platform fallback).
+    ai_provider = models.CharField(
+        _("AI Provider"),
+        max_length=32,
+        choices=AIProvider.choices,
         blank=True,
         default="",
+        db_default="",
         help_text=_(
-            "LLM API key for the storefront chat assistant (served to "
-            "the agent gateway only via the internal-token-gated "
-            "tenant resolve endpoint). Each tenant brings their own "
-            "key — own quota, consent, and billing. Never expose to "
-            "the browser. Empty disables the chat assistant for this "
-            "tenant."
+            "The AI provider used by this store's chat assistant and "
+            "page-builder AI tools. Chosen from the platform's list "
+            "(never a free-form URL). Leave empty to disable AI features."
+        ),
+    )
+    ai_model = models.CharField(
+        _("AI Model"),
+        max_length=128,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The model ID exactly as the chosen provider names it. "
+            "Leave empty to disable AI features."
+        ),
+    )
+    ai_api_key = EncryptedCharField(
+        _("AI API Key"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Your own API key for the chosen AI provider. Stored "
+            "encrypted and never shown again after saving. Leave empty "
+            "to disable AI features."
         ),
     )
 
@@ -1207,7 +1236,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "box_now_client_secret",
             "box_now_webhook_secret",
             "acp_bearer_token",
-            "chat_api_key",
+            "ai_api_key",
             "mydata_subscription_key",
             # A cache key component, not a fact about the store.
             "cache_generation",
@@ -1329,6 +1358,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         validate_box_now_partner_id(self)
         validate_cloudflare_credentials(self)
         validate_resend_credentials(self)
+        validate_ai_profile(self)
 
     @property
     def published_indexnow_key(self) -> str:

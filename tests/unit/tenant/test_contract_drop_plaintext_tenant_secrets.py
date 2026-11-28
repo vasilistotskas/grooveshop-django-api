@@ -74,12 +74,12 @@ def test_dropping_leaves_the_encrypted_columns_and_the_model_working(
 
 def test_a_value_the_previous_release_wrote_is_encrypted_first(old_columns):
     tenant = store_tenant("contract_late_write")
-    _write(tenant, "chat_api_key", "written-by-the-old-pods")
+    _write(tenant, "acp_bearer_token", "written-by-the-old-pods")
 
     contract.carry_over_late_writes(apps, SCHEMA_EDITOR)
 
     assert (
-        Tenant.objects.get(pk=tenant.pk).chat_api_key
+        Tenant.objects.get(pk=tenant.pk).acp_bearer_token
         == "written-by-the-old-pods"
     )
 
@@ -87,12 +87,12 @@ def test_a_value_the_previous_release_wrote_is_encrypted_first(old_columns):
 def test_a_value_set_through_the_new_release_is_never_overwritten(
     old_columns,
 ):
-    tenant = store_tenant("contract_keep_new", chat_api_key="set-since")
-    _write(tenant, "chat_api_key", "stale-plaintext")
+    tenant = store_tenant("contract_keep_new", acp_bearer_token="set-since")
+    _write(tenant, "acp_bearer_token", "stale-plaintext")
 
     contract.carry_over_late_writes(apps, SCHEMA_EDITOR)
 
-    stored = Tenant.objects.get(pk=tenant.pk).chat_api_key
+    stored = Tenant.objects.get(pk=tenant.pk).acp_bearer_token
     assert stored == "set-since"
     assert decrypt_value(_raw_encrypted(tenant)) == "set-since"
 
@@ -100,7 +100,7 @@ def test_a_value_set_through_the_new_release_is_never_overwritten(
 def _raw_encrypted(tenant: Tenant) -> str:
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT chat_api_key_encrypted FROM tenant_tenant WHERE id = %s",
+            "SELECT acp_bearer_token_encrypted FROM tenant_tenant WHERE id = %s",
             [tenant.pk],
         )
         return cursor.fetchone()[0]

@@ -9,16 +9,11 @@ drift apart.
 
 from __future__ import annotations
 
-import time
-from unittest.mock import patch
-
 import pytest
 from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 from allauth.mfa.totp.internal.auth import (
     TOTP,
-    format_hotp_value,
     generate_totp_secret,
-    hotp_value,
 )
 from django.core.cache import cache
 from django_tenants.utils import get_public_schema_name, schema_context
@@ -26,6 +21,7 @@ from rest_framework.test import APIClient
 
 from admin import staff_mfa
 from tenant.models import PlatformStaffToken
+from tests.utils.totp import frozen_totp_clock, totp_code
 from user.factories.account import UserAccountFactory
 
 LOGIN = "/api/v1/platform/auth/login"
@@ -36,18 +32,10 @@ pytestmark = [
     pytest.mark.django_db,
 ]
 
-_clock = {"counter": 0}
-
 
 @pytest.fixture(autouse=True)
-def _frozen_totp_clock():
-    """Hold allauth's TOTP step still, so a code computed here is checked in
-    the step it was computed for (the tolerance is zero steps)."""
-    _clock["counter"] = int(time.time()) // 30
-    with patch(
-        "allauth.mfa.totp.internal.auth.yield_hotp_counters_from_time",
-        side_effect=lambda: iter([_clock["counter"]]),
-    ):
+def _held_totp_step():
+    with frozen_totp_clock():
         yield
 
 
@@ -66,10 +54,6 @@ def _enrol(user) -> tuple[str, list[str]]:
         TOTP.activate(user, secret)
         codes = RecoveryCodes.activate(user).generate_codes()
     return secret, codes
-
-
-def _code(secret: str, offset: int = 0) -> str:
-    return format_hotp_value(hotp_value(secret, _clock["counter"] + offset))
 
 
 def _login(**data):
@@ -106,7 +90,7 @@ class TestSuperuserNeedsASecondFactor:
         secret, _ = _enrol(user)
 
         response = _login(
-            email=user.email, password=PASSWORD, code=_code(secret)
+            email=user.email, password=PASSWORD, code=totp_code(secret)
         )
 
         assert response.status_code == 200, response.data
@@ -142,7 +126,7 @@ class TestSuperuserNeedsASecondFactor:
             _login(email=user.email, password=PASSWORD, code="000000")
 
         response = _login(
-            email=user.email, password=PASSWORD, code=_code(secret)
+            email=user.email, password=PASSWORD, code=totp_code(secret)
         )
 
         assert response.status_code == 429
@@ -164,7 +148,7 @@ class TestSuperuserNeedsASecondFactor:
         _login(email=user.email, password=PASSWORD, code="000000")
 
         response = _login(
-            email=user.email, password=PASSWORD, code=_code(secret)
+            email=user.email, password=PASSWORD, code=totp_code(secret)
         )
 
         assert response.status_code == 200, response.data

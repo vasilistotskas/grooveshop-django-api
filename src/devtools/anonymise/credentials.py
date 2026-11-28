@@ -45,7 +45,7 @@ INTEGRATION_PREFIXES: tuple[str, ...] = (
     "google_ads_",
     "cloudflare_",
     "acp_",
-    "chat_",
+    "ai_",
 )
 
 _TEXT_FIELDS = (models.CharField, models.URLField, models.EmailField)

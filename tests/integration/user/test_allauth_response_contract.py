@@ -12,7 +12,6 @@ wins and the disagreement is a failure to fix, not a schema to loosen.
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +23,7 @@ from rest_framework import status
 
 from tests.utils.openapi import validate_against
 from tests.utils.redis import stopped_cache
+from tests.utils.totp import frozen_totp_clock, totp_code
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -475,7 +475,6 @@ def _sensitive_action(token, user):
     second factor. Its 401 lists the ways this customer can prove who they
     are."""
     from allauth.mfa.models import Authenticator
-    from allauth.mfa.totp.internal.auth import format_hotp_value, hotp_value
 
     if Authenticator.objects.filter(
         user=user, type=Authenticator.Type.TOTP
@@ -490,14 +489,14 @@ def _sensitive_action(token, user):
     secret = _call(
         Client(), "get", "/account/authenticators/totp", token=token
     ).json()["meta"]["secret"]
-    code = format_hotp_value(hotp_value(secret, int(time.time()) // 30))
-    return _call(
-        Client(),
-        "post",
-        "/account/authenticators/totp",
-        {"code": code},
-        token=token,
-    )
+    with frozen_totp_clock():
+        return _call(
+            Client(),
+            "post",
+            "/account/authenticators/totp",
+            {"code": totp_code(secret)},
+            token=token,
+        )
 
 
 def _sensitive_operation(user) -> tuple[str, str]:

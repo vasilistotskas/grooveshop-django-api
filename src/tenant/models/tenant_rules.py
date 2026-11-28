@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 
 from tenant.validators import validate_reserved_schema_name
 
@@ -368,7 +369,7 @@ _SOCIAL_URL_FIELDS = (
 
 def validate_social_urls(tenant: Tenant) -> None:
     """All social URL fields must use https:// when non-empty."""
-    errors: dict[str, list[str]] = {}
+    errors: dict[str, list[StrOrPromise]] = {}
     for field_name in _SOCIAL_URL_FIELDS:
         value = getattr(tenant, field_name, "")
         if value and not value.startswith("https://"):
@@ -393,3 +394,67 @@ def validate_box_now_partner_id(tenant: Tenant) -> None:
                 )
             }
         )
+
+
+#: A provider's model ID, including OpenRouter's ``vendor/model:variant``
+#: form. Refuses spaces, control characters, URLs and query strings.
+AI_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
+
+
+def validate_ai_profile(tenant: Tenant) -> None:
+    """AI provider, model and API key are set together or left empty.
+
+    There is no platform fallback: a half-configured profile would look
+    armed in the admin while leaving every AI feature off in the gateway.
+    A saved key belongs to its provider: changing the provider needs a new
+    key, so a store's key is never sent to another company.
+    """
+    provider = tenant.ai_provider or ""
+    model = tenant.ai_model or ""
+    api_key = tenant.ai_api_key or ""
+    if not (provider or model or api_key):
+        return
+
+    errors: dict[str, list[StrOrPromise]] = {}
+    if model and (
+        not AI_MODEL_PATTERN.fullmatch(model) or "//" in model or ".." in model
+    ):
+        errors.setdefault("ai_model", []).append(
+            _(
+                "Enter the model ID exactly as the provider names it, "
+                "without spaces or a URL."
+            )
+        )
+    if api_key and any(not (0x21 <= ord(ch) <= 0x7E) for ch in api_key):
+        errors.setdefault("ai_api_key", []).append(
+            _(
+                "The AI API key must contain only printable ASCII "
+                "characters with no spaces."
+            )
+        )
+
+    if provider and api_key and tenant.pk:
+        saved = (
+            type(tenant)
+            .objects.filter(pk=tenant.pk)
+            .values_list("ai_provider", "ai_api_key")
+            .first()
+        )
+        if saved and saved[1] == api_key and saved[0] not in ("", provider):
+            errors.setdefault("ai_api_key", []).append(
+                _("Enter the API key for the new AI provider.")
+            )
+
+    incomplete = _(
+        "Set the AI provider, model and API key together, or leave all "
+        "three empty to disable AI features."
+    )
+    if not provider:
+        errors.setdefault("ai_provider", []).append(incomplete)
+    if not model:
+        errors.setdefault("ai_model", []).append(incomplete)
+    if not api_key:
+        errors.setdefault("ai_api_key", []).append(incomplete)
+
+    if errors:
+        raise ValidationError(errors)

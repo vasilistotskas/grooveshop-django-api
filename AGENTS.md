@@ -92,7 +92,7 @@ Every app, the settings package (`src/settings/`) and the `asgi` package live in
 
 - ViewSets inherit `BaseModelViewSet` (`src/core/api/views.py`), mapping each action to an `ActionConfig` (per-action request/response serializers and OpenAPI metadata).
 - Shared abstract models live in `src/core/models.py` (`TimeStampMixinModel`, `UUIDModel`, `SeoTranslationModel`, `SortableModel`, `PublishableModel`, `MetaDataModel`, `SoftDeleteModel`).
-- Permissions (`src/core/api/permissions.py`): `request.user.is_staff` is never an authorization signal on an API request (staff checks go through `tenant.membership.is_store_staff` / `StoreStaffModelPermissions`).
+- Permissions (`src/core/api/permissions.py`): `request.user.is_staff` is never an authorization signal on its own: on a tenant-schema row it is customer residue. Store staff checks go through `tenant.membership.is_store_staff` / `StoreStaffModelPermissions`; the platform API's `IsPlatformOperator` (`src/tenant/views.py`) accepts `is_staff` only with `is_superuser` and a platform staff session.
 - Full reference (managers, filters, pagination, translation validation, custom fields, Unfold admin action rules): [`docs/core-patterns.md`](docs/core-patterns.md).
 
 ### API Conventions

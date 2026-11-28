@@ -3,6 +3,24 @@
 
 
 
+## v3.277.0 (2026-11-28)
+
+### Features
+
+* feat(tenant): reasoning effort in the store's AI profile (#849)
+
+The store's AI profile gets an optional reasoning effort (the
+chat-completions values none to max; empty sends none and the model
+uses its default), served to the agent gateway as
+aiProfile.reasoningEffort on the internal-token resolve. The gateway
+stops deciding it from a platform setting and model tables.
+
+Migration 0078 adds the column and writes "low" into existing gemini
+profiles, the value the gateway's CHAT_EFFORT sent them, so no store's
+chat changes. An effort without a provider is refused.
+
+Refs vasilistotskas/grooveshop-agent-gateway#223 ([`cad96a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cad96a2701f4c79029133b025b759c2ce595c9be))
+
 ## v3.276.0 (2026-11-28)
 
 ### Bug fixes

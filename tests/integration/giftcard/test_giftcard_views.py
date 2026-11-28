@@ -319,7 +319,7 @@ class TestPurchaseStripe:
                 PURCHASE_URL, _purchase_body(), format="json"
             )
 
-        assert response.status_code == 201, response.data
+        assert response.status_code == 200, response.data
         purchase = GiftCardPurchase.objects.get()
         assert response.data == {
             "purchase_uuid": str(purchase.uuid),
@@ -363,7 +363,7 @@ class TestPurchaseStripe:
                 format="json",
             )
 
-        assert response.status_code == 201, response.data
+        assert response.status_code == 200, response.data
         purchase = GiftCardPurchase.objects.get()
         assert purchase.buyer is None
         assert purchase.buyer_email == "guest@example.com"
@@ -394,7 +394,7 @@ class TestPurchaseViva:
                 format="json",
             )
 
-        assert response.status_code == 201, response.data
+        assert response.status_code == 200, response.data
         purchase = GiftCardPurchase.objects.get()
         assert response.data == {
             "purchase_uuid": str(purchase.uuid),

@@ -124,7 +124,7 @@ def _buy_gift_card(stripe, amount: Decimal) -> GiftCardPurchase:
             },
             format="json",
         )
-    assert response.status_code == 201, response.content
+    assert response.status_code == 200, response.content
     return GiftCardPurchase.objects.get(uuid=response.json()["purchaseUuid"])
 
 

@@ -57,7 +57,7 @@ serializers_config: SerializersConfig = {
         response=GiftCardPurchaseResponseSerializer,
         responses={400: GiftCardErrorResponseSerializer},
         operation_id="purchaseGiftCard",
-        summary=_("Buy a gift card (Stripe payment)"),
+        summary=_("Buy a gift card (online payment)"),
         tags=["Gift Cards"],
     ),
     "mine": ActionConfig(
@@ -338,9 +338,7 @@ class GiftCardViewSet(BaseModelViewSet):
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(response_payload)
-        return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
-        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"], url_path="purchase-status")
     def purchase_status(self, request):

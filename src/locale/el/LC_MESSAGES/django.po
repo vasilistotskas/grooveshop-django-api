@@ -2649,8 +2649,8 @@ msgstr "Ποσότητα αγοράς"
 msgid "Buy X get Y discounted"
 msgstr "Αγόρασε X, πάρε Y με έκπτωση"
 
-msgid "Buy a gift card (Stripe payment)"
-msgstr "Αγορά δωροκάρτας (πληρωμή Stripe)"
+msgid "Buy a gift card (online payment)"
+msgstr "Αγορά δωροκάρτας (ηλεκτρονική πληρωμή)"
 
 msgid "Buyer"
 msgstr "Αγοραστής"
